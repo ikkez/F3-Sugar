@@ -67,13 +67,9 @@ class Pagination {
     public function setCurrent($current) {
         if(!is_numeric($current)) return;
         if($current <= $this->getMax()) $this->current_page = $current;
-        else {
-            $this->current_page = $this->getMax();
-            /*$current_route = F3::get('PARAMS.0');
-            // not perfectly: wont work for /list/somethinglike17/page/17
-            F3::reroute( str_replace($current, $this->current_page, $current_route) );*/
-        }
+        else $this->current_page = $this->getMax();
     }
+
     /**
      * returns the current page number
      * @return int
@@ -81,6 +77,7 @@ class Pagination {
     public function getCurrent() {
         return $this->current_page;
     }
+
     /**
      * returns the maximum count of items to display in pages
      * @return int
@@ -88,6 +85,7 @@ class Pagination {
     public function getItemCount() {
         return $this->items_count;
     }
+
     /**
      * get maximum pages needed to display all items
      * @return int
@@ -95,6 +93,7 @@ class Pagination {
     public function getMax() {
         return ceil($this->items_count / $this->items_per_page);
     }
+
     /**
      * get next page number
      * @return int|bool
@@ -104,6 +103,7 @@ class Pagination {
         if( $nextPage > $this->getMax() ) return false;
         return $nextPage;
     }
+
     /**
      * get previous page number
      * @return int|bool
@@ -113,6 +113,7 @@ class Pagination {
         if( $prevPage < 1 ) return false;
         return $prevPage;
     }
+
     /**
      * return last page number, if current page is not in range
      * @return bool|int
@@ -120,6 +121,7 @@ class Pagination {
     public function getLast() {
         return ($this->current_page < $this->getMax() - $this->range ) ? $this->getMax() : false;
     }
+
     /**
      * return first page number, if current page is not in range
      * @return bool|int
@@ -127,6 +129,7 @@ class Pagination {
     public function getFirst() {
         return ($this->current_page > 3) ? 1 : false;
     }
+
     /**
      * return all page numbers within the given range
      * @param $range int
@@ -171,26 +174,7 @@ class Pagination {
         F3::clear('pg');
         return $output;
     }
+
+    //TODO: add tailing slash option for even nicer URLs
+
 }
-
-/**
- ** usage
-
-$items_per_page = 20;
-
-// get all items
-$article=new Axon('artikel');
-$article_count = $article->found();
-
-// build page links
-$pages = new Pagination($article_count, $items_per_page);
-F3::set('paginator', $pages->serve());
-
-// get items for current page
-$articleList = $article->afind(NULL,'headline asc', $items_per_page, $pages->getItemOffset() );
-
-F3::set('artikel',$articleList );
-
- *
- * //TODO: add tailing slash option
- */
