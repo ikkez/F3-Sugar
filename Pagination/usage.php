@@ -1,6 +1,7 @@
 <?php
 /**
  * simple usage for pagination
+ * 
  */
 
 // set max item per page
