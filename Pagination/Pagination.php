@@ -17,7 +17,7 @@
 class Pagination {
 
     private $items_count;
-    private $items_per_page = 10;
+    private $items_per_page;
     private $range = 2;
     private $current_page;
     private $template = 'paginator.html';
@@ -29,7 +29,7 @@ class Pagination {
      * @param $limit int max items per page
      * @param $routeKey string the key for pagination in your routing
      */
-    public function __construct( $items, $limit, $routeKey = 'page' ) {
+    public function __construct( $items, $limit = 10, $routeKey = 'page' ) {
         $this->items_count = is_array($items)?count($items):$items;
         $this->routeKey = $routeKey;
         $this->setLimit($limit);
