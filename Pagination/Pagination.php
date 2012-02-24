@@ -1,17 +1,17 @@
 <?php
 
 /**
-    Pagination class for the PHP Fat-Free Framework
+Pagination class for the PHP Fat-Free Framework
 
-    The contents of this file are subject to the terms of the GNU General
-    Public License Version 3.0. You may not use this file except in
-    compliance with the license. Any of the license terms and conditions
-    can be waived if you get permission from the copyright holder.
+The contents of this file are subject to the terms of the GNU General
+Public License Version 3.0. You may not use this file except in
+compliance with the license. Any of the license terms and conditions
+can be waived if you get permission from the copyright holder.
 
-    Copyright (c) 2012 by ikkez
-    Christian Knuth <mail@ikkez.de>
+Copyright (c) 2012 by ikkez
+Christian Knuth <mail@ikkez.de>
 
-        @version 1.1.0
+@version 1.2.0
  **/
 
 class Pagination {
@@ -22,6 +22,7 @@ class Pagination {
     private $current_page;
     private $template = 'paginator.html';
     private $routeKey;
+    private $linkPath;
 
     /**
      * create new pagination
@@ -68,6 +69,15 @@ class Pagination {
         if(!is_numeric($current)) return;
         if($current <= $this->getMax()) $this->current_page = $current;
         else $this->current_page = $this->getMax();
+    }
+
+    /**
+     * set path to current routing for link building
+     * @param $linkPath
+     */
+    public function setLinkPath($linkPath) {
+        $this->linkPath = (substr($linkPath,0,1) != '/') ? '/'.$linkPath:$linkPath;
+        if(substr($this->linkPath,-1) != '/') $this->linkPath .= '/';
     }
 
     /**
@@ -153,16 +163,15 @@ class Pagination {
 
     /**
      * generates the pagination output
-     * @param string $route path to current routing for link building, optional
      * @return string
      */
-    public function serve($route = null) {
-        if(is_null($route)) {
+    public function serve() {
+        if(is_null($this->linkPath)) {
             $route = F3::get('PARAMS.0');
             if(F3::exists('PARAMS.'.$this->routeKey)) {
                 $route = str_replace(F3::get('PARAMS.'.$this->routeKey),'',$route);
             } else if(substr($route,-1) != '/') { $route.= '/'; }
-        }
+        } else $route = $this->linkPath;
         F3::set('pg.route',$route);
         F3::set('pg.currentPage',$this->current_page);
         F3::set('pg.nextPage',$this->getNext());
@@ -174,7 +183,4 @@ class Pagination {
         F3::clear('pg');
         return $output;
     }
-
-    //TODO: add tailing slash option for even nicer URLs
-
 }
