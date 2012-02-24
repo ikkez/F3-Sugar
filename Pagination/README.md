@@ -59,14 +59,17 @@ The Paginator builds links, depending on the currenct route. But sometimes you m
 It will now build URLs like `search/results/1`, `search/results/2`, `search/results/3`.
 
 
+
+### some more tuning
+
+-	`setRange($range)`
+	bases on your current page, it will display the next and previous pages within `$range`. Default it 2. 
+
+
 ### Future
 
 Some TO-DOs for the future
 
 - add tailing slash option for even nicer URLs
 
-<<<<<<< HEAD
 - create pagination within template, using own `<paginate>`-TAG. Sounds nice, isn't it? ;)
-=======
-- create pagination within template, use own <paginate> tag. Sounds nice, isn't it? ;)
->>>>>>> origin/master
