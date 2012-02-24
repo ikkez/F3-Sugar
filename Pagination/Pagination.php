@@ -1,17 +1,17 @@
 <?php
 
 /**
-Pagination class for the PHP Fat-Free Framework
-
-The contents of this file are subject to the terms of the GNU General
-Public License Version 3.0. You may not use this file except in
-compliance with the license. Any of the license terms and conditions
-can be waived if you get permission from the copyright holder.
-
-Copyright (c) 2012 by ikkez
-Christian Knuth <mail@ikkez.de>
-
-@version 1.2.0
+		Pagination class for the PHP Fat-Free Framework
+		
+		The contents of this file are subject to the terms of the GNU General
+		Public License Version 3.0. You may not use this file except in
+		compliance with the license. Any of the license terms and conditions
+		can be waived if you get permission from the copyright holder.
+		
+		Copyright (c) 2012 by ikkez
+		Christian Knuth <mail@ikkez.de>
+		
+		@version 1.2.0
  **/
 
 class Pagination {
@@ -58,7 +58,7 @@ class Pagination {
      * @param $range int
      */
     public function setRange($range) {
-        if(is_numeric($limit)) $this->range = $range;
+        if(is_numeric($range)) $this->range = $range;
     }
 
     /**
@@ -145,7 +145,8 @@ class Pagination {
      * @param $range int
      * @return array page numbers in range
      */
-    public function getInRange($range) {
+    public function getInRange($range = null) {
+        if(is_null($range)) $range = $this->range;
         $current_range = array(($this->current_page-$range < 1 ? 1 : $this->current_page-$range), ($this->current_page+$range > $this->getMax() ? $this->getMax() : $this->current_page+$range));
         for($x = $current_range[0]; $x <= $current_range[1]; ++$x) {
             $rangeIDs[] = $x;
@@ -178,7 +179,7 @@ class Pagination {
         F3::set('pg.prevPage',$this->getPrev());
         F3::set('pg.firstPage',$this->getFirst());
         F3::set('pg.lastPage',$this->getLast());
-        F3::set('pg.rangePages',$this->getInRange($this->range) );
+        F3::set('pg.rangePages',$this->getInRange() );
         $output = Template::serve($this->template);
         F3::clear('pg');
         return $output;
