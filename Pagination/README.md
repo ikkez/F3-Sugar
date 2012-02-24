@@ -63,7 +63,7 @@ It will now build URLs like `search/results/1`, `search/results/2`, `search/resu
 ### some more tuning
 
 -	`setRange($range)`
-	bases on your current page, it will display the next and previous pages within `$range`. Default it 2. 
+	baseb on your current page, it will display the next and previous pages within `$range`. Default is 2. 
 
 
 ### Future
