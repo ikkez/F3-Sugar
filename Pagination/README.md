@@ -65,4 +65,8 @@ Some TO-DOs for the future
 
 - add tailing slash option for even nicer URLs
 
+<<<<<<< HEAD
 - create pagination within template, using own `<paginate>`-TAG. Sounds nice, isn't it? ;)
+=======
+- create pagination within template, use own <paginate> tag. Sounds nice, isn't it? ;)
+>>>>>>> origin/master
