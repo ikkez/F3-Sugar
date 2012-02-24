@@ -20,7 +20,7 @@ class Pagination {
     private $items_per_page;
     private $range = 2;
     private $current_page;
-    private $template = 'paginator.html';
+    private $template = 'pagebrowser.html';
     private $routeKey;
     private $linkPath;
 
