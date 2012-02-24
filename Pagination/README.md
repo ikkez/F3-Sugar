@@ -59,6 +59,43 @@ The Paginator builds links, depending on the currenct route. But sometimes you m
 It will now build URLs like `search/results/1`, `search/results/2`, `search/results/3`.
 
 
+### Styling
+
+With a bit of basic CSS styling, the output could look like this:
+![pagebrowser](http://img7.imagebanana.com/img/4j8o59n4/pagebrowser.png)
+
+	div.paginator {
+		overflow: hidden;
+		margin-bottom: 10px;
+		font-family: InterstateBold;
+	}
+		div.paginator a {
+			display: block;
+			width: 30px;
+			height: 20px;
+			line-height: 20px;
+			margin: 2px;
+			border: 1px solid #aaa;
+			float: left;
+			text-align: center;
+			-webkit-border-radius: 4px; 
+			-moz-border-radius: 4px; 
+			border-radius: 4px;  
+			font-size: 0.8em;
+		}			
+			div.paginator a:hover {
+				background: #821109;
+				color: #fff !important;
+				text-decoration: none;
+			}
+			
+		div.paginator a.active {
+			background: #ddd;
+		}
+			div.paginator a.active:hover {
+				color: #821109 !important;			
+			}
+
 
 ### some more tuning
 
