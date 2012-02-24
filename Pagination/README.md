@@ -68,7 +68,6 @@ With a bit of basic CSS styling, the output could look like this:
 	div.paginator {
 		overflow: hidden;
 		margin-bottom: 10px;
-		font-family: InterstateBold;
 	}
 		div.paginator a {
 			display: block;
@@ -101,7 +100,7 @@ With a bit of basic CSS styling, the output could look like this:
 ### some more tuning
 
 -	`setRange($range)`
-	baseb on your current page, it will display the next and previous pages within `$range`. Default is 2. 
+	based on your current page, it will display the next and previous pages within `$range`. Default is 2. 
 
 
 ### Future
