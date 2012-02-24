@@ -44,11 +44,25 @@ Is that easy?!
 
 ### Configuration
 
-Of course you can define another token key in your route, instead of `@page`. Therefor just set it as third argument on instantiation.
+Of course you can define another token key in your route, instead of `@page`. Therefor just set it as third argument on instantiation (here without @-symbol).
 
 	$pages = new Pagination($article_count, $items_per_page, 'paginationToken');
 
-if your template is within another subdirectory, or you want to use different templates, you can change the template path with:
+If your template is within another subdirectory, or you want to use different templates, you can change the template path with:
 
 	$pages->setTemplate('templates/pagebrowser.html');
+	
+The Paginator builds links, depending on the currenct route. But sometimes you maybe want to serve other pagebrowser link. You can set another link path like this:
 
+	$pages->setLinkPath('search/results/');
+	
+It will now build URLs like `search/results/1`, `search/results/2`, `search/results/3`.
+
+
+### Future
+
+Some TO-DOs for the future
+
+- add tailing slash option for even nicer URLs
+
+- create pagination within template, use own <paginate> tag. Sounds nice, isn't it? ;)
