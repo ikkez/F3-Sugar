@@ -1,6 +1,6 @@
 ## F3 Pagination
 
-create quick and easy Pagination for your F3 appication.
+create quick and easy Pagination for your F3 application.
 
 ***
 

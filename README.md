@@ -1,16 +1,23 @@
-## F3 Sugar, some custom helpers and plugins for the fatfree framework
+## F3 Sugar, some custom helpers and plugins for the PHP Fat-Free Framework
 
-Copyright (C) 2012 Christian Knuth
-
-***
 
 ### Pagination
 
 A little class that helps you to build a page browser.
 
-Further discription is comming soon.
+***
+
+### FileUnit
+
+F3-Plugin which offers some more file system functionality
+
+***
 
 
+
+#### Licence
+
+Copyright (C) 2012 Christian Knuth
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
