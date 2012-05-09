@@ -12,7 +12,7 @@
     Copyright (c) 2012 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.0.1
+    @version 1.0.2
  **/
 
 
@@ -20,7 +20,9 @@ class FileUnit extends Base {
 
     const
         TEXT_NotDir = 'source path is no directory: %s',
-        TEXT_CantRecursiveIntoDir = 'Directory %s contained a directory we can not recurse into.';
+        TEXT_CantRecursiveIntoDir = 'Directory %s contained a directory we can not recurse into.',
+        TEXT_DeleteFileFailed = 'Deleting file failed:  %s',
+        TEXT_RemoveDirFailed = 'Removing Directory failed: %s';
 
     /**
      * copy a whole directory and its content, recursive
@@ -95,6 +97,7 @@ class FileUnit extends Base {
 
     /**
      * delete all files and folders within target path
+     * 
      * @param $dir string path to clean
      * @return bool
      */
@@ -106,8 +109,11 @@ class FileUnit extends Base {
         $dir = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir), RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($dir as $node)
             if($node->getFilename() != '..' && $node->getFilename() != '.' )
-                if ($node->isDir()) rmdir($node->__toString());
-                else unlink($node->__toString());
+                if($node->isDir()) {
+                	if(!@rmdir($node->__toString()))
+                		trigger_error(sprintf(self::TEXT_RemoveDirFailed,$node->__toString()));                		
+                } elseif(!@unlink($node->__toString())) 
+                	trigger_error(sprintf(self::TEXT_DeleteFileFailed,$node->__toString()));
         return true;
     }
 
