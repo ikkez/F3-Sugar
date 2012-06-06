@@ -9,7 +9,13 @@ A little class that helps you to build a page browser.
 
 ### FileUnit
 
-F3-Plugin which offers some more file system functionality
+F3-Plugin which offers some more file system functionality.
+
+***
+
+### VDB
+
+A variable DB extension for managing database structures.
 
 ***
 
