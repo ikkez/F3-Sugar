@@ -10,7 +10,7 @@ It's uses the Standard PHP Libary with DirectoryIterators and file SPL objects t
 - 	`FileUnit::copyDir('/source/path/', '/target/path/');`
 	
 	Will copy the whole directory tree with all files and folders to a specified location.
-	It returns an array copied and skipped (e.g. symbolic links) items. Us
+	It returns an array of copied and skipped (e.g. symbolic links) items.
 
 - 	`FileUnit::listDir('/path/to/list');`
 	
