@@ -1,4 +1,5 @@
-## F3 Sugar, some custom helpers and plugins for the PHP Fat-Free Framework
+## F3 Sugar
+some custom helpers and plugins for the PHP Fat-Free Framework
 
 
 ### Pagination

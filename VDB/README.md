@@ -3,7 +3,7 @@
 This F3-Plugin provides you a variable SQL data access layer by extending the SQL database plugin for the PHP Fat-Free Framework.
 It might be useful for installation scripts.
 
-NOTICE: still beta version.
+NOTICE: still beta version. currently only mysql & sqlite tested.
 
 ***
 
@@ -30,5 +30,5 @@ After copying vdb.php into F3's lib Folder, create your DB using VDB Class:
 ### TODO:
 
 -	add remove Column feature
--	add drop talbe feature
+-	add drop table feature
 -	check syntax for all different sql backends
