@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.1.1
+        @version 0.4.0
  **/
 
 class VDB extends DB {
@@ -32,7 +32,7 @@ class VDB extends DB {
                 'SPECIAL_DATE'=>' DATE ',
                 'SPECIAL_DATETIME'=>' DATETIME ',
             ),
-            'sqlite2' => array(
+            'sqlite2?' => array(
                 'BOOL'=>" BOOLEAN ",
                 'BOOLEAN'=>" BOOLEAN ",
                 'INT8'=>' INTEGER ',
@@ -99,26 +99,33 @@ class VDB extends DB {
      * @param $table
      * @param $column
      * @param $type
+     * @param bool $passThrough
      * @return bool
      */
-    function addCol($table,$column,$type) {
+    function addCol($table,$column,$type,$passThrough = false) {
         // check if column is already existing
         $schema = $this->schema($table,60);
         foreach($schema['result'] as $col) {
             if(in_array($column,$col)) return false;
         }
         //prepare columntypes
-        $match=FALSE;
-        foreach ($this->dataTypes as $backend=>$val)
-            if (preg_match('/'.$backend.'/',$this->backend)) {
-                $match=TRUE;
-                break;
+        if($passThrough == false) {
+            $match=FALSE;
+            foreach ($this->dataTypes as $backend=>$types)
+                if (preg_match('/'.$backend.'/',$this->backend)) {
+                    $match=TRUE;
+                    break;
+                }
+            if (!$match) {
+                trigger_error(self::TEXT_DBEngine);
+                return FALSE;
             }
-        if(array_key_exists(strtoupper($type),$val))
-            $type = $val[strtoupper($type)];
-        else {
-            trigger_error(sprintf(self::TEXT_NoDatatype,strtoupper($type),$this->backend));
-            return FALSE;
+            if(array_key_exists(strtoupper($type),$types))
+                $type = $types[strtoupper($type)];
+            else {
+                trigger_error(sprintf(self::TEXT_NoDatatype,strtoupper($type),$this->backend));
+                return FALSE;
+            }
         }
         $cmd=array(
             'sqlite2?'=>array(
@@ -127,6 +134,107 @@ class VDB extends DB {
                 "ALTER TABLE $table ADD $column $type"),
             //TODO: complete that
             /*'mssql|sybase|dblib|ibm|odbc'=>array(
+                "")*/
+        );
+        $match=FALSE;
+        foreach ($cmd as $backend=>$val)
+            if (preg_match('/'.$backend.'/',$this->backend)) {
+                $match=TRUE;
+                break;
+            }
+        if (!$match) {
+            trigger_error(self::TEXT_DBEngine);
+            return FALSE;
+        }
+        return (!$this->exec($val[0]))?TRUE:FALSE;
+    }
+
+    /**
+     * removes a column from a table
+     * @param $table
+     * @param $column
+     * @return bool
+     */
+    public function removeCol($table,$column) {
+
+        if(preg_match('/sqlite2?/',$this->backend)) {
+            // SQlite does not support drop column directly
+            $newCols = array();
+            $schema = $this->schema($table,0);
+            foreach($schema['result'] as &$col)
+                if(!in_array($column,$col) && $col['name'] != 'id') $newCols[$col['name']] = $col['type'];
+
+            $this->begin();
+            $this->createTable($table.'_new');
+            foreach($newCols as $name => $type)
+                $this->addCol($table.'_new',$name,$type,true);
+            $this->exec('INSERT INTO '.$table.'_new SELECT id, '.implode(', ',array_keys($newCols)).' FROM '.$table);
+            $this->dropTable($table);
+            $this->renameTable($table.'_new',$table);
+            $this->commit();
+            return true;
+        } else {
+            $cmd=array(
+                'mysql'=>array(
+                    "ALTER TABLE `$table` DROP `$column` "),
+                //TODO: complete that
+                'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
+                    "")
+            );
+            $match=FALSE;
+            foreach ($cmd as $backend=>$val)
+                if (preg_match('/'.$backend.'/',$this->backend)) {
+                    $match=TRUE;
+                    break;
+                }
+            if (!$match) {
+                trigger_error(self::TEXT_DBEngine);
+                return FALSE;
+            }
+            return (!$this->exec($val[0]))?TRUE:FALSE;
+        }
+    }
+
+    /**
+     * rename a table
+     * @param $table_name
+     * @param $new_name
+     * @return bool
+     */
+    public function renameTable($table_name,$new_name) {
+        $cmd=array(
+            'sqlite2?|pgsql'=>array(
+                "ALTER TABLE $table_name RENAME TO $new_name;"),
+            'mysql'=>array(
+                "RENAME TABLE `$table_name` TO `$new_name`;"),
+            //TODO: complete that
+            /*'mssql|sybase|dblib|ibm|odbc'=>array(
+                "")*/
+        );
+        $match=FALSE;
+        foreach ($cmd as $backend=>$val)
+            if (preg_match('/'.$backend.'/',$this->backend)) {
+                $match=TRUE;
+                break;
+            }
+        if (!$match) {
+            trigger_error(self::TEXT_DBEngine);
+            return FALSE;
+        }
+        return (!$this->exec($val[0]))?TRUE:FALSE;
+    }
+
+    /**
+     * drop table
+     * @param $table
+     * @return bool
+     */
+    public function dropTable($table) {
+        $cmd=array(
+            'mysql|sqlite2?'=>array(
+                "DROP TABLE IF EXISTS $table;"),
+            //TODO: complete that
+            /*'pgsql|mssql|sybase|dblib|ibm|odbc'=>array(
                 "")*/
         );
         $match=FALSE;
