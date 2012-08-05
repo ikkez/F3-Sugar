@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.4.0
+        @version 0.4.1
  **/
 
 class VDB extends DB {
@@ -95,6 +95,22 @@ class VDB extends DB {
     }
 
     /**
+     * get columns of a table
+     * @param $table
+     * @param bool $types
+     * @return array
+     */
+    public function getCols($table,$types = false) {
+        $columns = array();
+        $schema = $this->schema($table,60);
+        foreach($schema['result'] as $cols) {
+            if($types)  $columns[$cols[$schema['field']]] = $cols[$schema['type']];
+            else        $columns[] = $cols[$schema['field']];
+        }
+        return $columns;
+    }
+
+    /**
      * add a column to a table
      * @param $table
      * @param $column
@@ -104,10 +120,8 @@ class VDB extends DB {
      */
     function addCol($table,$column,$type,$passThrough = false) {
         // check if column is already existing
-        $schema = $this->schema($table,60);
-        foreach($schema['result'] as $col) {
-            if(in_array($column,$col)) return false;
-        }
+        if(in_array($column,$this->getCols($table))) return false;
+
         //prepare columntypes
         if($passThrough == false) {
             $match=FALSE;
@@ -160,15 +174,16 @@ class VDB extends DB {
         if(preg_match('/sqlite2?/',$this->backend)) {
             // SQlite does not support drop column directly
             $newCols = array();
-            $schema = $this->schema($table,0);
-            foreach($schema['result'] as &$col)
-                if(!in_array($column,$col) && $col['name'] != 'id') $newCols[$col['name']] = $col['type'];
-
+            $schema = $this->schema($table,60);
+            foreach($schema['result'] as $col)
+                if(!in_array($column,$col) && $col[$schema['field']] != 'id')
+                    $newCols[$col[$schema['field']]] = $col[$schema['type']];
             $this->begin();
             $this->createTable($table.'_new');
             foreach($newCols as $name => $type)
                 $this->addCol($table.'_new',$name,$type,true);
-            $this->exec('INSERT INTO '.$table.'_new SELECT id, '.implode(', ',array_keys($newCols)).' FROM '.$table);
+            $fields = (!empty($newCols))?', '.implode(', ',array_keys($newCols)):'';
+            $this->exec('INSERT INTO '.$table.'_new SELECT id'.$fields.' FROM '.$table);
             $this->dropTable($table);
             $this->renameTable($table.'_new',$table);
             $this->commit();
@@ -256,6 +271,7 @@ class VDB extends DB {
      * @return bool
      */
     function createTable($table) {
+        if(in_array($table,$this->getTables())) return true;
         $cmd=array(
             'sqlite2?'=>array(
                 "CREATE TABLE $table (
