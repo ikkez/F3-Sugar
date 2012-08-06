@@ -12,71 +12,58 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.4.1
+        @version 0.4.2
  **/
 
 class VDB extends DB {
 
-    private
+    protected
         $dataTypes = array(
-            'mysql' => array(
-                'BOOL'=>" SET('1') ",
-                'BOOLEAN'=>" SET('1') ",
-                'INT8'=>' TINYINT(3) UNSIGNED ',
-                'INT32'=>' INT(11) UNSIGNED ',
-                'FLOAT'=>' DOUBLE ',
-                'DOUBLE'=>' DOUBLE ',
-                'TEXT8'=>' VARCHAR(255) ',
-                'TEXT16'=>' TEXT ',
-                'TEXT32'=>' LONGTEXT ',
-                'SPECIAL_DATE'=>' DATE ',
-                'SPECIAL_DATETIME'=>' DATETIME ',
+            'BOOL'=>array(              'mysql'=>" SET('1') ",
+                                        'sqlite2?'=>' BOOLEAN ',
+                                        'pgsql'=> ' text ',
             ),
-            'sqlite2?' => array(
-                'BOOL'=>" BOOLEAN ",
-                'BOOLEAN'=>" BOOLEAN ",
-                'INT8'=>' INTEGER ',
-                'INT32'=>' INTEGER ',
-                'FLOAT'=>' DOUBLE ',
-                'DOUBLE'=>' DOUBLE ',
-                'TEXT8'=>' VARCHAR(255) ',
-                'TEXT16'=>' TEXT ',
-                'TEXT32'=>' TEXT ',
-                'SPECIAL_DATE'=>' DATE ',
-                'SPECIAL_DATETIME'=>' DATETIME ',
+            'BOOLEAN'=>array(           'mysql'=>" SET('1') ",
+                                        'sqlite2?'=>' BOOLEAN ',
+                                        'pgsql'=> ' text ',
             ),
-            'pgsql' => array(
-                'BOOL'=>" text ",
-                'BOOLEAN'=>" text ",
-                'INT8'=>' integer ',
-                'INT32'=>' integer ',
-                'FLOAT'=>' double precision ',
-                'DOUBLE'=>' double precision ',
-                'TEXT8'=>' text ',
-                'TEXT16'=>' text ',
-                'TEXT32'=>' text ',
-                'SPECIAL_DATE'=>' date ',
-                'SPECIAL_DATETIME'=>' timestamp without time zone ',
+            'INT8'=>array(              'mysql'=>' TINYINT(3) UNSIGNED ',
+                                        'sqlite2?'=>' INTEGER ',
+                                        'pgsql'=> ' integer ',
             ),
-        );
+            'INT32'=>array(             'mysql'=>' INT(11) UNSIGNED ',
+                                        'sqlite2?'=>' INTEGER ',
+                                        'pgsql'=> ' integer ',
+            ),
+            'FLOAT'=>array(             'mysql|sqlite2?'=>' DOUBLE ',
+                                        'pgsql'=> ' double precision ',
+            ),
+            'DOUBLE'=>array(            'mysql|sqlite2?'=>' DOUBLE ',
+                                        'pgsql'=> ' double precision ',
+            ),
+            'TEXT8'=>array(             'mysql|sqlite2?'=>' VARCHAR(255) ',
+                                        'pgsql'=> ' text ',
+            ),
+            'TEXT16'=>array(            'mysql|sqlite2?'=>' TEXT ',
+                                        'pgsql'=> ' text ',
+            ),
+            'TEXT32'=>array(            'mysql'=>' LONGTEXT ',
+                                        'sqlite2?'=>' TEXT ',
+                                        'pgsql'=> ' text ',
+            ),
+            'SPECIAL_DATE'=>array(      'mysql|sqlite2?'=>' DATE ',
+                                        'pgsql'=> ' date ',
+            ),
+            'SPECIAL_DATETIME'=>array(  'mysql|sqlite2?'=>' DATETIME ',
+                                        'pgsql'=> ' timestamp without time zone ',
+            ),
+    );
 
     const
         TEXT_NoDatatype='The specified datatype %s is not defined in %s driver';
 
-    /**
-     * get all tables of current DB
-     * @return bool|array list of tables, or false
-     */
-    function getTables(){
-        $cmd=array(
-            'mysql'=>array(
-                "show tables"),
-            'sqlite2?'=>array(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name!='sqlite_sequence'"),
-            //TODO: check if that's working
-            'mssql|pgsql|sybase|dblib|ibm|odbc'=>array(
-                "select table_name from information_schema.tables where table_schema = 'public'")
-        );
+
+    private function findQuery($cmd) {
         $match=FALSE;
         foreach ($cmd as $backend=>$val)
             if (preg_match('/'.$backend.'/',$this->backend)) {
@@ -87,7 +74,27 @@ class VDB extends DB {
             trigger_error(self::TEXT_DBEngine);
             return FALSE;
         }
-        $tables = $this->exec($val[0]);
+        return (is_array($val))?$val[0]:$val;
+    }
+
+    /**
+     * get all tables of current DB
+     * @return bool|array list of tables, or false
+     */
+    public function getTables() {
+        $cmd=array(
+            'mysql'=>array(
+                "show tables"),
+            'sqlite2?'=>array(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name!='sqlite_sequence'"),
+            //TODO: check if that's working
+            'mssql|pgsql|sybase|dblib|ibm|odbc'=>array(
+                "select table_name from information_schema.tables where table_schema = 'public'")
+        );
+        $query = $this->findQuery($cmd);
+        if(!$query) return false;
+
+        $tables = $this->exec($query);
         if ($tables && is_array($tables) && count($tables)>0)
             foreach ($tables as &$table)
                 $table = array_shift($table);
@@ -118,49 +125,31 @@ class VDB extends DB {
      * @param bool $passThrough
      * @return bool
      */
-    function addCol($table,$column,$type,$passThrough = false) {
+    public function addCol($table,$column,$type,$passThrough = false) {
         // check if column is already existing
         if(in_array($column,$this->getCols($table))) return false;
 
         //prepare columntypes
         if($passThrough == false) {
-            $match=FALSE;
-            foreach ($this->dataTypes as $backend=>$types)
-                if (preg_match('/'.$backend.'/',$this->backend)) {
-                    $match=TRUE;
-                    break;
-                }
-            if (!$match) {
-                trigger_error(self::TEXT_DBEngine);
-                return FALSE;
-            }
-            if(array_key_exists(strtoupper($type),$types))
-                $type = $types[strtoupper($type)];
-            else {
+            if(!array_key_exists(strtoupper($type),$this->dataTypes)){
                 trigger_error(sprintf(self::TEXT_NoDatatype,strtoupper($type),$this->backend));
                 return FALSE;
             }
+            $type_val = $this->findQuery($this->dataTypes[strtoupper($type)]);
+            if(!$type_val) return false;
         }
         $cmd=array(
             'sqlite2?'=>array(
-                "ALTER TABLE `$table` ADD `$column` $type"),
+                "ALTER TABLE `$table` ADD `$column` $type_val"),
             'mysql|pgsql'=>array(
-                "ALTER TABLE $table ADD $column $type"),
+                "ALTER TABLE $table ADD $column $type_val"),
             //TODO: complete that
             /*'mssql|sybase|dblib|ibm|odbc'=>array(
                 "")*/
         );
-        $match=FALSE;
-        foreach ($cmd as $backend=>$val)
-            if (preg_match('/'.$backend.'/',$this->backend)) {
-                $match=TRUE;
-                break;
-            }
-        if (!$match) {
-            trigger_error(self::TEXT_DBEngine);
-            return FALSE;
-        }
-        return (!$this->exec($val[0]))?TRUE:FALSE;
+        $query = $this->findQuery($cmd);
+        if(!$query) return false;
+        return (!$this->exec($query))?TRUE:FALSE;
     }
 
     /**
@@ -188,6 +177,7 @@ class VDB extends DB {
             $this->renameTable($table.'_new',$table);
             $this->commit();
             return true;
+
         } else {
             $cmd=array(
                 'mysql'=>array(
@@ -196,17 +186,9 @@ class VDB extends DB {
                 'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
                     "")
             );
-            $match=FALSE;
-            foreach ($cmd as $backend=>$val)
-                if (preg_match('/'.$backend.'/',$this->backend)) {
-                    $match=TRUE;
-                    break;
-                }
-            if (!$match) {
-                trigger_error(self::TEXT_DBEngine);
-                return FALSE;
-            }
-            return (!$this->exec($val[0]))?TRUE:FALSE;
+            $query = $this->findQuery($cmd);
+            if(!$query) return false;
+            return (!$this->exec($query))?TRUE:FALSE;
         }
     }
 
@@ -226,17 +208,9 @@ class VDB extends DB {
             /*'mssql|sybase|dblib|ibm|odbc'=>array(
                 "")*/
         );
-        $match=FALSE;
-        foreach ($cmd as $backend=>$val)
-            if (preg_match('/'.$backend.'/',$this->backend)) {
-                $match=TRUE;
-                break;
-            }
-        if (!$match) {
-            trigger_error(self::TEXT_DBEngine);
-            return FALSE;
-        }
-        return (!$this->exec($val[0]))?TRUE:FALSE;
+        $query = $this->findQuery($cmd);
+        if(!$query) return false;
+        return (!$this->exec($query))?TRUE:FALSE;
     }
 
     /**
@@ -252,17 +226,9 @@ class VDB extends DB {
             /*'pgsql|mssql|sybase|dblib|ibm|odbc'=>array(
                 "")*/
         );
-        $match=FALSE;
-        foreach ($cmd as $backend=>$val)
-            if (preg_match('/'.$backend.'/',$this->backend)) {
-                $match=TRUE;
-                break;
-            }
-        if (!$match) {
-            trigger_error(self::TEXT_DBEngine);
-            return FALSE;
-        }
-        return (!$this->exec($val[0]))?TRUE:FALSE;
+        $query = $this->findQuery($cmd);
+        if(!$query) return false;
+        return (!$this->exec($query))?TRUE:FALSE;
     }
 
     /**
@@ -270,7 +236,7 @@ class VDB extends DB {
      * @param $table
      * @return bool
      */
-    function createTable($table) {
+    public function createTable($table) {
         if(in_array($table,$this->getTables())) return true;
         $cmd=array(
             'sqlite2?'=>array(
@@ -285,16 +251,8 @@ class VDB extends DB {
             'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
                 "CREATE TABLE $table (id SERIAL PRIMARY KEY)")
         );
-        $match=FALSE;
-        foreach ($cmd as $backend=>$val)
-            if (preg_match('/'.$backend.'/',$this->backend)) {
-                $match=TRUE;
-                break;
-            }
-        if (!$match) {
-            trigger_error(self::TEXT_DBEngine);
-            return FALSE;
-        }
-        return (!$this->exec($val[0]))?TRUE:FALSE;
+        $query = $this->findQuery($cmd);
+        if(!$query) return false;
+        return (!$this->exec($query))?TRUE:FALSE;
     }
 }
