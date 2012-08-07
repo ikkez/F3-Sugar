@@ -19,6 +19,7 @@ class VDB_Tests extends F3instance {
 
             $this->set('DB',$db);
             $type .= ': ';
+            $db->dropTable('test');
 
             // create table
             $cr_result = $db->createTable('test');
@@ -36,6 +37,17 @@ class VDB_Tests extends F3instance {
                 $type.'adding column',
                 $type.'cannot add a column'
             );
+
+            // rename column
+            $result1 = $db->renameCol('test','title','title123');
+            $this->expect(
+                $result1 == true &&
+                in_array('title123',$db->getCols('test')) == true &&
+                in_array('title',$db->getCols('test')) == false,
+                $type.'renaming column',
+                $type.'cannot rename a column'
+            );
+            $result1 = $db->renameCol('test','title123','title');
 
             // remove column
             $result1 = $db->removeCol('test','title');
