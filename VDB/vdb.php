@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.4.2
+        @version 0.5.0
  **/
 
 class VDB extends DB {
@@ -137,7 +137,7 @@ class VDB extends DB {
             }
             $type_val = $this->findQuery($this->dataTypes[strtoupper($type)]);
             if(!$type_val) return false;
-        }
+        } else $type_val = $type;
         $cmd=array(
             'sqlite2?'=>array(
                 "ALTER TABLE `$table` ADD `$column` $type_val"),
@@ -182,6 +182,53 @@ class VDB extends DB {
             $cmd=array(
                 'mysql'=>array(
                     "ALTER TABLE `$table` DROP `$column` "),
+                //TODO: complete that
+                'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
+                    "")
+            );
+            $query = $this->findQuery($cmd);
+            if(!$query) return false;
+            return (!$this->exec($query))?TRUE:FALSE;
+        }
+    }
+
+    /**
+     * rename a column
+     * @param $table
+     * @param $column
+     * @param $column_new
+     * @return bool
+     */
+    public function renameCol($table,$column,$column_new) {
+
+        if(preg_match('/sqlite2?/',$this->backend)) {
+            // SQlite does not support rename column directly
+            $newCols = array();
+            $schema = $this->schema($table,60);
+            foreach($schema['result'] as $col)
+                if($col[$schema['field']] != 'id')
+                    $newCols[$col[$schema['field']]] = $col[$schema['type']];
+            $newCols[$column_new] = $newCols[$column];
+            unset($newCols[$column]);
+            $this->begin();
+            $this->createTable($table.'_new');
+            foreach($newCols as $name => $type)
+                $this->addCol($table.'_new',$name,$type,true);
+
+            $new_fields = (!empty($newCols))?', '.implode(', ',array_keys($newCols)):'';
+            $cur_fields = $this->getCols($table);
+            $old_fields = (!empty($cur_fields))?implode(', ',array_keys($cur_fields)):'';
+            $this->exec('INSERT INTO '.$table.'_new(id'.$new_fields.') SELECT '.$old_fields.' FROM '.$table);
+            $this->dropTable($table);
+            $this->renameTable($table.'_new',$table);
+            $this->commit();
+            return true;
+
+        } else {
+            $colTypes = $this->getCols($table,true);
+            $cmd=array(
+                'mysql'=>array(
+                    "ALTER TABLE `$table` CHANGE `$column` `$column_new` ".$colTypes[$column]),
                 //TODO: complete that
                 'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
                     "")
