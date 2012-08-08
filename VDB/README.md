@@ -1,16 +1,19 @@
-## F3 vDB
+## VDB
+#### A variable DB extension for managing database structures.
 
 This F3-Plugin provides you a variable SQL data access layer by extending the SQL database plugin for the PHP Fat-Free Framework.
 It might be useful for installation scripts.
 
-NOTICE: still beta version. currently only mysql & sqlite tested.
+NOTICE: still beta version. Currently mysql, sqlite & postgreSQL are supported.
 
 ***
 
 ### Usage
 
-After copying vdb.php into F3's lib Folder, create your DB using VDB Class:
-`$db = new VDB("mysql:host=$host; dbname=$dbname".$port,$user,$password);`
+After copying vdb.php into F3's lib Folder, create your DB using VDB Class (same syntax as before, just change DB to VDB):
+`$db = new VDB('mysql:host=localhost;port=3306;dbname='.$dbname,$user,$password);`
+
+VDB Class prodives you the following methods:
 
 - 	`$db->getTables();`
 	
@@ -46,6 +49,10 @@ After copying vdb.php into F3's lib Folder, create your DB using VDB Class:
 
 	Removes a column from a given table.
 	
+-	`$db->renameCol($table, $old_column_name, $new_column_name);`
+
+	Renames a column from a given table.	
+	
 -	`$db->renameTable($old_table_name, $new_table_name);` 
 	
 	Renames a table.
@@ -58,4 +65,3 @@ After copying vdb.php into F3's lib Folder, create your DB using VDB Class:
 ### TODO:
 
 -	check syntax for all different sql backends
--	renameColumn feature
