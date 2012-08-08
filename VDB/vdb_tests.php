@@ -12,7 +12,8 @@ class VDB_Tests extends F3instance {
                 'root',
                 ''
             ),
-            'sqlite' => new VDB('sqlite::memory:')
+            'sqlite' => new VDB('sqlite::memory:'),
+            'pgsql' => new VDB('pgsql:host=localhost;dbname=test','test','1234'),
         );
 
         foreach( $dbs as $type => $db) {

@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.5.0
+        @version 0.5.3
  **/
 
 class VDB extends DB {
@@ -62,7 +62,11 @@ class VDB extends DB {
     const
         TEXT_NoDatatype='The specified datatype %s is not defined in %s driver';
 
-
+    /**
+     * parse command array and return backend specifiy query
+     * @param $cmd
+     * @return bool
+     */
     private function findQuery($cmd) {
         $match=FALSE;
         foreach ($cmd as $backend=>$val)
@@ -87,6 +91,7 @@ class VDB extends DB {
                 "show tables"),
             'sqlite2?'=>array(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name!='sqlite_sequence'"),
+            // works: pgsql
             //TODO: check if that's working
             'mssql|pgsql|sybase|dblib|ibm|odbc'=>array(
                 "select table_name from information_schema.tables where table_schema = 'public'")
@@ -181,9 +186,11 @@ class VDB extends DB {
         } else {
             $cmd=array(
                 'mysql'=>array(
-                    "ALTER TABLE `$table` DROP `$column` "),
+                    "ALTER TABLE `$table` DROP `$column`"),
+                'pgsql'=>array(
+                    "ALTER TABLE $table DROP COLUMN $column"),
                 //TODO: complete that
-                'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
+                'mssql|sybase|dblib|ibm|odbc'=>array(
                     "")
             );
             $query = $this->findQuery($cmd);
@@ -229,8 +236,11 @@ class VDB extends DB {
             $cmd=array(
                 'mysql'=>array(
                     "ALTER TABLE `$table` CHANGE `$column` `$column_new` ".$colTypes[$column]),
+                'pgsql'=>array(
+                    "ALTER TABLE $table RENAME COLUMN $column TO $column_new",
+                ),
                 //TODO: complete that
-                'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
+                'mssql|sybase|dblib|ibm|odbc'=>array(
                     "")
             );
             $query = $this->findQuery($cmd);
@@ -267,10 +277,10 @@ class VDB extends DB {
      */
     public function dropTable($table) {
         $cmd=array(
-            'mysql|sqlite2?'=>array(
+            'mysql|sqlite2?|pgsql'=>array(
                 "DROP TABLE IF EXISTS $table;"),
             //TODO: complete that
-            /*'pgsql|mssql|sybase|dblib|ibm|odbc'=>array(
+            /*'mssql|sybase|dblib|ibm|odbc'=>array(
                 "")*/
         );
         $query = $this->findQuery($cmd);
@@ -294,6 +304,7 @@ class VDB extends DB {
                 id INT(11) NOT NULL AUTO_INCREMENT ,
                 PRIMARY KEY ( id )
                 ) DEFAULT CHARSET=utf8"),
+            // works: pgsql
             //TODO: check if that's working
             'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
                 "CREATE TABLE $table (id SERIAL PRIMARY KEY)")
