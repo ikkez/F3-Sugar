@@ -2,12 +2,17 @@
 
 class VDB_Tests extends F3instance {
 
+    function myErrorHandler($code, $text, $file, $line) {
+        return true;
+    }
+
 	function run() {
         $this->set('title','Variable DB');
 
+        $oeh = set_error_handler(array("self","myErrorHandler"));
 
         $dbs = array(
-            'mysql' => new VDB(
+            'mysql' =>  new VDB(
                 'mysql:host=localhost;port=3306;dbname=test',
                 'root',
                 ''
@@ -38,6 +43,17 @@ class VDB_Tests extends F3instance {
                 $type.'adding column',
                 $type.'cannot add a column'
             );
+
+            foreach(array_keys($db->dataTypes) as $index=>$field) {
+                // testing column types
+                $result1 = $db->addCol('test','column_'.$index,$field);
+                $this->expect(
+                    $result1 == true
+                        && in_array('column_'.$index,$db->getCols('test')) == true,
+                    $type.'adding column ['.$field.']',
+                    $type.'cannot add a column of type:'.$field
+                );
+            }
 
             // rename column
             $result1 = $db->renameCol('test','title','title123');
