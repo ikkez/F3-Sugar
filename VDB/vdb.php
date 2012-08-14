@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.5.3
+        @version 0.5.5
  **/
 
 class VDB extends DB {
@@ -32,18 +32,15 @@ class VDB extends DB {
                                        'mssql|sybase|dblib|odbc'=>'bit',
             ),
             'INT8'=>array(             'mysql'=>'TINYINT(3) UNSIGNED',
-                                       'sqlite2?'=>'INTEGER',
-                                       'pgsql'=>'integer',
+                                       'sqlite2?|pgsql'=>'integer',
                                        'mssql|sybase|dblib|odbc'=>'tinyint',
             ),
             'INT16'=>array(            'mysql'=>'INT(11) UNSIGNED',
-                                       'sqlite2?'=>'INTEGER',
-                                       'pgsql|sybase|odbc'=>'integer',
+                                       'sqlite2?|pgsql|sybase|odbc'=>'integer',
                                        'mssql|dblib'=>'int',
             ),
             'INT32'=>array(            'mysql'=>'INT(11) UNSIGNED',
-                                       'sqlite2?'=>'INTEGER',
-                                       'pgsql'=>'integer',
+                                       'sqlite2?|pgsql'=>'integer',
                                        'mssql|sybase|dblib|odbc'=>'bigint',
             ),
             'FLOAT'=>array(            'mysql|sqlite2?'=>'DOUBLE',
@@ -58,19 +55,15 @@ class VDB extends DB {
                                        'pgsql'=>'text',
                                        'mssql|sybase|dblib|odbc'=>'char(255)',
             ),
-            'TEXT16'=>array(           'mysql|sqlite2?'=>'TEXT',
-                                       'pgsql|mssql|sybase|dblib|odbc'=>'text',
+            'TEXT16'=>array(           'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc'=>'text',
             ),
             'TEXT32'=>array(           'mysql'=>'LONGTEXT',
-                                       'sqlite2?'=>'TEXT',
-                                       'pgsql|mssql|sybase|dblib|odbc'=>'text',
+                                       'sqlite2?|pgsql|mssql|sybase|dblib|odbc'=>'text',
             ),
-            'SPECIAL_DATE'=>array(     'mysql|sqlite2?'=>'DATE',
-                                       'pgsql|mssql|sybase|dblib|odbc'=>'date',
+            'SPECIAL_DATE'=>array(     'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc'=>'date',
             ),
-            'SPECIAL_DATETIME'=>array( 'mysql|sqlite2?'=>'DATETIME',
-                                       'pgsql'=>'timestamp without time zone',
-                                       'mssql|sybase|dblib|odbc'=>'datetime',
+            'SPECIAL_DATETIME'=>array( 'pgsql'=>'timestamp without time zone',
+                                       'mysql|sqlite2?|mssql|sybase|dblib|odbc'=>'datetime',
             ),
     );
 
