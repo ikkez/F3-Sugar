@@ -17,8 +17,6 @@
 
 class VDB extends DB {
 
-    // list of available dataTypes
-    // mssql PDO is still experimental
     public
         $dataTypes = array(
             'BOOL'=>array(             'mysql'=>"SET('1')",
@@ -64,7 +62,7 @@ class VDB extends DB {
             ),
             'TEXT32'=>array(           'mysql'=>'LONGTEXT',
                                        'sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv'=>'text',
-                                       'ibm'=>'BLOB SUB_TYPE TEXT',
+                                       'ibm'=>'CLOB(2000000000)',
             ),
             'SPECIAL_DATE'=>array(     'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv|ibm'=>'date',
             ),
@@ -290,11 +288,8 @@ class VDB extends DB {
      */
     public function dropTable($table) {
         $cmd=array(
-            'mysql|sqlite2?|pgsql'=>array(
+            'mysql|sqlite2?|pgsql|mssql|sybase|dblib|ibm|odbc'=>array(
                 "DROP TABLE IF EXISTS $table;"),
-            //TODO: complete that
-            /*'mssql|sybase|dblib|ibm|odbc'=>array(
-                "")*/
         );
         $query = $this->findQuery($cmd);
         if(!$query) return false;
@@ -309,18 +304,22 @@ class VDB extends DB {
     public function createTable($table) {
         if(in_array($table,$this->getTables())) return true;
         $cmd=array(
-            'sqlite2?'=>array(
+            'sqlite2?|sybase|dblib|odbc'=>array(
                 "CREATE TABLE $table (
                 id INTEGER PRIMARY KEY AUTOINCREMENT )"),
             'mysql'=>array(
                 "CREATE TABLE $table (
-                id INT(11) NOT NULL AUTO_INCREMENT ,
-                PRIMARY KEY ( id )
+                    id INT(11) NOT NULL AUTO_INCREMENT ,
+                    PRIMARY KEY ( id )
                 ) DEFAULT CHARSET=utf8"),
-            // works: pgsql
-            //TODO: check if that's working
-            'mssql|sybase|dblib|pgsql|ibm|odbc'=>array(
-                "CREATE TABLE $table (id SERIAL PRIMARY KEY)")
+            'pgsql'=>array(
+                "CREATE TABLE $table (id SERIAL PRIMARY KEY)"),
+            'mssql'=>array(
+                "CREATE TABLE $table (id INT PRIMARY KEY);"
+            ),
+            'ibm'=>array(
+                "CREATE TABLE $table (id INTEGER AS IDENTITY NOT NULL, PRIMARY KEY(id));"
+            ),
         );
         $query = $this->findQuery($cmd);
         if(!$query) return false;
