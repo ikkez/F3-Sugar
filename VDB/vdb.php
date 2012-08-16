@@ -19,30 +19,21 @@ class VDB extends DB {
 
     public
         $dataTypes = array(
-            'BOOL'=>array(             'mysql'=>"SET('1')",
-                                       'sqlite2?'=>'BOOLEAN',
+            'BOOLEAN'=>array(          'mysql|sqlite2?'=>'BOOLEAN',
                                        'pgsql'=>'text',
                                        'mssql|sybase|dblib|odbc|sqlsrv'=>'bit',
                                        'ibm'=>'numeric(1,0)',
             ),
-            'BOOLEAN'=>array(          'mysql'=>"SET('1')",
-                                       'sqlite2?'=>'BOOLEAN',
-                                       'pgsql'=>'text',
-                                       'mssql|sybase|dblib|odbc|sqlsrv'=>'bit',
-                                       'ibm'=>'numeric(1,0)',
-            ),
-            'INT8'=>array(             'mysql'=>'TINYINT(3) UNSIGNED',
+            'INT8'=>array(             'mysql'=>'TINYINT(3)',
                                        'sqlite2?|pgsql'=>'integer',
                                        'mssql|sybase|dblib|odbc|sqlsrv'=>'tinyint',
                                        'ibm'=>'smallint',
             ),
-            'INT16'=>array(            'mysql'=>'INT(11) UNSIGNED',
-                                       'sqlite2?|pgsql|sybase|odbc|sqlsrv|imb'=>'integer',
-                                       'mssql|dblib'=>'int',
+            'INT16'=>array(            'sqlite2?|pgsql|sybase|odbc|sqlsrv|imb'=>'integer',
+                                       'mysql|mssql|dblib'=>'int',
             ),
-            'INT32'=>array(            'mysql'=>'INT(11) UNSIGNED',
-                                       'sqlite2?|pgsql'=>'integer',
-                                       'mssql|sybase|dblib|odbc|sqlsrv|imb'=>'bigint',
+            'INT32'=>array(            'sqlite2?|pgsql'=>'integer',
+                                       'mysql|mssql|sybase|dblib|odbc|sqlsrv|imb'=>'bigint',
             ),
             'FLOAT'=>array(            'mysql|sqlite2?'=>'DOUBLE',
                                        'pgsql'=>'double precision',
@@ -104,8 +95,9 @@ class VDB extends DB {
                 "show tables"),
             'sqlite2?'=>array(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name!='sqlite_sequence'"),
-            'mssql|sqlsrv|pgsql|sybase|dblib|ibm|odbc'=>array(
-                "select table_name from information_schema.tables where table_schema = 'public'")
+            'mssql|sqlsrv|pgsql|sybase|dblib|odbc'=>array(
+                "select table_name from information_schema.tables where table_schema = 'public'"),
+            'ibm'=>array("select TABLE_NAME from sysibm.tables"),
         );
         $query = $this->findQuery($cmd);
         if(!$query) return false;
@@ -157,10 +149,10 @@ class VDB extends DB {
         $cmd=array(
             'sqlite2?'=>array(
                 "ALTER TABLE `$table` ADD `$column` $type_val"),
-            'mysql|pgsql'=>array(
+            'mysql|pgsql|mssql'=>array(
                 "ALTER TABLE $table ADD $column $type_val"),
             //TODO: complete that
-            /*'mssql|sybase|dblib|ibm|odbc'=>array(
+            /*'sybase|dblib|ibm|odbc'=>array(
                 "")*/
         );
         $query = $this->findQuery($cmd);
@@ -306,11 +298,10 @@ class VDB extends DB {
         $cmd=array(
             'sqlite2?|sybase|dblib|odbc'=>array(
                 "CREATE TABLE $table (
-                id INTEGER PRIMARY KEY AUTOINCREMENT )"),
+                    id INTEGER PRIMARY KEY AUTOINCREMENT )"),
             'mysql'=>array(
                 "CREATE TABLE $table (
-                    id INT(11) NOT NULL AUTO_INCREMENT ,
-                    PRIMARY KEY ( id )
+                    id SERIAL
                 ) DEFAULT CHARSET=utf8"),
             'pgsql'=>array(
                 "CREATE TABLE $table (id SERIAL PRIMARY KEY)"),
@@ -318,7 +309,8 @@ class VDB extends DB {
                 "CREATE TABLE $table (id INT PRIMARY KEY);"
             ),
             'ibm'=>array(
-                "CREATE TABLE $table (id INTEGER AS IDENTITY NOT NULL, PRIMARY KEY(id));"
+                "CREATE TABLE $table (
+                    id INTEGER AS IDENTITY NOT NULL, PRIMARY KEY(id));"
             ),
         );
         $query = $this->findQuery($cmd);
