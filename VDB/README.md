@@ -19,22 +19,22 @@ VDB Class prodives you the following methods:
 	
 	This will return a list of all tables available within the given dbname.
 
--	`$db->getCols( $table, $types = false );`
+-	`$db->getCols( $tableName, $types = false );`
 
 	Returns an array of all column fields for a given table. When you set $types to TRUE, it will return an assoc array with fieldnames as keys and its type as value.
 	
-- 	`$db->createTable('article')`
+- 	`$db->createTable( $tableName )`
 	
-	Creates a table named 'article', containing an auto-incremented field called 'id', which is required for Axon.
+	Creates a new table, containing an auto-incremented, primary-key field named 'id', which is required for Axon.
 
-- 	`$db->addCol('article','headline','TEXT8');`
+- 	`$db->addCol( $tableName, $columnName, $dataType );`
 	
-	Adds a further field called 'headline' to table 'article'. Third argument defines the datatype for the new field.
-	Available mapped types so far, are:
+	Adds a further column field to a table. The $dataType argument defines the type for the new field.
+	Available mapped types so far:
 	
-	- BOOL
 	- BOOLEAN
 	- INT8
+	- INT16
 	- INT32
 	- FLOAT
 	- DOUBLE
@@ -45,19 +45,19 @@ VDB Class prodives you the following methods:
 	- SPECIAL_DATETIME	
 	
 	
--	`$db->removeCol($table, $column);`
+-	`$db->removeCol( $tableName, $columnName );`
 
-	Removes a column from a given table.
+	Removes a column from the given table.
 	
--	`$db->renameCol($table, $old_column_name, $new_column_name);`
+-	`$db->renameCol( $tableName, $currentColumnName, $newColumnName );`
 
-	Renames a column from a given table.	
+	Renames a column from the given table.	
 	
--	`$db->renameTable($old_table_name, $new_table_name);` 
+-	`$db->renameTable( $oldTableName, $newTableName );` 
 	
 	Renames a table.
 	
--	`$db->dropTable($table);`
+-	`$db->dropTable( $tableName );`
 
 	Deletes a table.
 
