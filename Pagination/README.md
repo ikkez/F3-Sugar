@@ -6,7 +6,7 @@ create quick and easy Pagination for your F3 application.
 
 ### Usage
 
-1.	First of all, be sure that the class is loaded by F3's *autoloader*. Simply put the file into one of your include paths, you defined like `F3::set('AUTOLOAD', 'app/;app/classes');`.
+1.	Copy Pagination.php into your lib/ folder OR put the file into one of your include paths, you defined in *AUTOLOAD* ( like `F3::set('AUTOLOAD', 'app/;app/classes');` ).
 
 2.	Pagination uses a *template file* to generate the pagebrowser. Put this template in your GUI folder, you defined like `F3::set('GUI','templates/')`
 
@@ -57,6 +57,19 @@ The Paginator builds links, depending on the currenct route. But sometimes you m
 	$pages->setLinkPath('search/results/');
 	
 It will now build URLs like `search/results/1`, `search/results/2`, `search/results/3`.
+
+
+### Using <pagination> TAG in Templates
+
+Since F3 v2.0.13 it is possible to setup own template tags. You can use that shortcut for Pagination Plugin too. Just register the plugin in the responsible controller like this:
+	
+	Template::extend('pagination','Pagination::renderTag');
+	
+You can now use `<pagination items="{{@maxItems}}"></pagination>` to generate the pagination directly form the inside of your template file.
+There are also some more options you can pass through the arguments of that tag to the plugin. A fully configured tag could look like this:
+`<pagination items="253" limit="15" range="5" src="tmpl/foo/bar/pagination.html" token="articlePage"></pagination>`
+
+Of course your can pass variables to all of those arguments, like `range="{{@range}}"`, too.	
 
 
 ### Styling
