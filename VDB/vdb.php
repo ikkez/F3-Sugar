@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.5.5
+        @version 0.7.0
  **/
 
 class VDB extends DB {
@@ -149,11 +149,10 @@ class VDB extends DB {
         $cmd=array(
             'sqlite2?'=>array(
                 "ALTER TABLE `$table` ADD `$column` $type_val"),
-            'mysql|pgsql|mssql'=>array(
+            'mysql|pgsql|mssql|sybase|dblib|odbc'=>array(
                 "ALTER TABLE $table ADD $column $type_val"),
-            //TODO: complete that
-            /*'sybase|dblib|ibm|odbc'=>array(
-                "")*/
+            'ibm'=>array(
+                "ALTER TABLE $table ADD COLUMN $column $type_val"),
         );
         $query = $this->findQuery($cmd);
         if(!$query) return false;
@@ -188,13 +187,10 @@ class VDB extends DB {
 
         } else {
             $cmd=array(
-                'mysql'=>array(
+                'mysql|mssql|sybase|dblib'=>array(
                     "ALTER TABLE `$table` DROP `$column`"),
-                'pgsql'=>array(
+                'pgsql|odbc|ibm'=>array(
                     "ALTER TABLE $table DROP COLUMN $column"),
-                //TODO: complete that
-                'mssql|sybase|dblib|ibm|odbc'=>array(
-                    "")
             );
             $query = $this->findQuery($cmd);
             if(!$query) return false;
@@ -234,17 +230,24 @@ class VDB extends DB {
             $this->commit();
             return true;
 
+        } elseif(preg_match('/odbc/',$this->backend)) {
+            // no rename column for odbc
+            $colTypes = $this->getCols($table,true);
+            $this->begin();
+            $this->addCol($table,$column,$colTypes[$column]);
+            $this->exec("UPDATE $table SET $column_new = $column");
+            $this->removeCol($table,$column);
+            $this->commit();
+            return true;
         } else {
             $colTypes = $this->getCols($table,true);
             $cmd=array(
                 'mysql'=>array(
                     "ALTER TABLE `$table` CHANGE `$column` `$column_new` ".$colTypes[$column]),
-                'pgsql'=>array(
-                    "ALTER TABLE $table RENAME COLUMN $column TO $column_new",
-                ),
-                //TODO: complete that
-                'mssql|sybase|dblib|ibm|odbc'=>array(
-                    "")
+                'pgsql|ibm'=>array(
+                    "ALTER TABLE $table RENAME COLUMN $column TO $column_new"),
+                'mssql|sybase|dblib'=>array(
+                    "sp_rename $table.$column, $column_new"),
             );
             $query = $this->findQuery($cmd);
             if(!$query) return false;
@@ -259,18 +262,23 @@ class VDB extends DB {
      * @return bool
      */
     public function renameTable($table_name,$new_name) {
-        $cmd=array(
-            'sqlite2?|pgsql'=>array(
-                "ALTER TABLE $table_name RENAME TO $new_name;"),
-            'mysql'=>array(
-                "RENAME TABLE `$table_name` TO `$new_name`;"),
-            //TODO: complete that
-            /*'mssql|sybase|dblib|ibm|odbc'=>array(
-                "")*/
-        );
-        $query = $this->findQuery($cmd);
-        if(!$query) return false;
-        return (!$this->exec($query))?TRUE:FALSE;
+        if(preg_match('/odbc/',$this->backend)) {
+            $this->exec("SELECT * INTO $new_name FROM $table_name");
+            $this->dropTable($table_name);
+            return true;
+        } else {
+            $cmd=array(
+                'sqlite2?|pgsql'=>array(
+                    "ALTER TABLE $table_name RENAME TO $new_name;"),
+                'mysql|ibm'=>array(
+                    "RENAME TABLE `$table_name` TO `$new_name`;"),
+                'mssql|sybase|dblib'=>array(
+                    "sp_rename $table_name, $new_name")
+            );
+            $query = $this->findQuery($cmd);
+            if(!$query) return false;
+            return (!$this->exec($query))?TRUE:FALSE;
+        }
     }
 
     /**
