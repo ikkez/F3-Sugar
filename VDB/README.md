@@ -4,7 +4,7 @@
 This F3-Plugin provides you a variable SQL data access layer by extending the SQL database plugin for the PHP Fat-Free Framework.
 It might be useful for installation scripts.
 
-NOTICE: still beta version. Currently mysql, sqlite & postgreSQL are supported.
+This extension is still under development. Some more features are comming up the road. Currently MySQL, SQLite & PostgreSQL are supported and fully tested. Further support for SQL Server, Sybase, Access and IBM DB2 are already included. 
 
 ***
 
@@ -60,8 +60,3 @@ VDB Class prodives you the following methods:
 -	`$db->dropTable( $tableName );`
 
 	Deletes a table.
-
-
-### TODO:
-
--	check syntax for all different sql backends
