@@ -11,10 +11,10 @@
 		Copyright (c) 2012 by ikkez
 		Christian Knuth <mail@ikkez.de>
 		
-		@version 1.3.0
+		@version 1.3.1
  **/
 
-class Pagination {
+class Pagination extends F3 {
 
     private
         $items_count,
@@ -38,7 +38,7 @@ class Pagination {
         $this->items_count = is_array($items)?count($items):$items;
         $this->routeKey = $routeKey;
         $this->setLimit($limit);
-        $this->setCurrent( F3::exists('PARAMS.'.$routeKey) ? F3::get('PARAMS.'.$routeKey) : 1);
+        $this->setCurrent( self::exists('PARAMS.'.$routeKey) ? self::get('PARAMS.'.$routeKey) : 1);
     }
 
     /**
@@ -172,20 +172,20 @@ class Pagination {
      */
     public function serve() {
         if(is_null($this->linkPath)) {
-            $route = F3::get('PARAMS.0');
-            if(F3::exists('PARAMS.'.$this->routeKey)) {
-                $route = str_replace(F3::get('PARAMS.'.$this->routeKey),'',$route);
+            $route = self::get('PARAMS.0');
+            if(self::exists('PARAMS.'.$this->routeKey)) {
+                $route = str_replace(self::get('PARAMS.'.$this->routeKey),'',$route);
             } else if(substr($route,-1) != '/') { $route.= '/'; }
         } else $route = $this->linkPath;
-        F3::set('pg.route',$route);
-        F3::set('pg.currentPage',$this->current_page);
-        F3::set('pg.nextPage',$this->getNext());
-        F3::set('pg.prevPage',$this->getPrev());
-        F3::set('pg.firstPage',$this->getFirst());
-        F3::set('pg.lastPage',$this->getLast());
-        F3::set('pg.rangePages',$this->getInRange() );
+        self::set('pg.route',$route);
+        self::set('pg.currentPage',$this->current_page);
+        self::set('pg.nextPage',$this->getNext());
+        self::set('pg.prevPage',$this->getPrev());
+        self::set('pg.firstPage',$this->getFirst());
+        self::set('pg.lastPage',$this->getLast());
+        self::set('pg.rangePages',$this->getInRange() );
         $output = Template::serve($this->template);
-        F3::clear('pg');
+        self::clear('pg');
         return $output;
     }
 
@@ -199,17 +199,17 @@ class Pagination {
         $attr = $args['@attrib'];
         if(!array_key_exists('items',$attr))
             trigger_error(TEXT_MissingItemsAttr);
-        $itemval = F3::resolve($attr['items']);
+        $itemval = self::resolve($attr['items']);
         $items = is_array($itemval)?count($itemval):$itemval;
         $pn = new self($items);
         if(array_key_exists('limit',$attr))
-            $pn->setLimit(F3::resolve($attr['limit']));
+            $pn->setLimit(self::resolve($attr['limit']));
         if(array_key_exists('range',$attr))
-            $pn->setRange(F3::resolve($attr['range']));
+            $pn->setRange(self::resolve($attr['range']));
         if(array_key_exists('src',$attr))
-            $pn->setTemplate(F3::resolve($attr['src']));
+            $pn->setTemplate(self::resolve($attr['src']));
         if(array_key_exists('token',$attr))
-            $pn->routeKey(F3::resolve($attr['token']));
+            $pn->routeKey(self::resolve($attr['token']));
 
         return $pn->serve();
     }
