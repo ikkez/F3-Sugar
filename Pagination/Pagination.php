@@ -11,18 +11,22 @@
 		Copyright (c) 2012 by ikkez
 		Christian Knuth <mail@ikkez.de>
 		
-		@version 1.2.0
+		@version 1.3.0
  **/
 
 class Pagination {
 
-    private $items_count;
-    private $items_per_page;
-    private $range = 2;
-    private $current_page;
-    private $template = 'pagebrowser.html';
-    private $routeKey;
-    private $linkPath;
+    private
+        $items_count,
+        $items_per_page,
+        $range = 2,
+        $current_page,
+        $template = 'pagebrowser.html',
+        $routeKey,
+        $linkPath;
+
+    const
+        TEXT_MissingItemsAttr='You need to specify items attribute for a pagination.';
 
     /**
      * create new pagination
@@ -183,5 +187,30 @@ class Pagination {
         $output = Template::serve($this->template);
         F3::clear('pg');
         return $output;
+    }
+
+    /**
+     * magic render function for custom tags
+     * @static
+     * @param $args
+     * @return string
+     */
+    static public function renderTag($args){
+        $attr = $args['@attrib'];
+        if(!array_key_exists('items',$attr))
+            trigger_error(TEXT_MissingItemsAttr);
+        $itemval = F3::resolve($attr['items']);
+        $items = is_array($itemval)?count($itemval):$itemval;
+        $pn = new self($items);
+        if(array_key_exists('limit',$attr))
+            $pn->setLimit(F3::resolve($attr['limit']));
+        if(array_key_exists('range',$attr))
+            $pn->setRange(F3::resolve($attr['range']));
+        if(array_key_exists('src',$attr))
+            $pn->setTemplate(F3::resolve($attr['src']));
+        if(array_key_exists('token',$attr))
+            $pn->routeKey(F3::resolve($attr['token']));
+
+        return $pn->serve();
     }
 }
