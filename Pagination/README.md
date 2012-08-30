@@ -120,6 +120,5 @@ With a bit of basic CSS styling, the output could look like this:
 
 Some TO-DOs for the future
 
-- add tailing slash option for even nicer URLs
+- maybe add tailing slash option for URLs
 
-- create pagination within template, using own `<paginate>`-TAG. Sounds nice, isn't it? ;)
