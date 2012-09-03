@@ -103,9 +103,8 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	$db->table('news',function($table){		
 		$table->removeCol('plugin-xy');	
 	});	
-	```
-	
-	
+	```	
+
 -	`$table->renameCol( $currentColumnName, $newColumnName );`
 
 	Renames a column from the given table.
