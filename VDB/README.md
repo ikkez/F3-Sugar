@@ -63,17 +63,28 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	Adds a further column field to a table. The $dataType argument defines the type for the new field.
 	Available mapped types so far:
 	
-	- BOOLEAN
-	- INT8
-	- INT16
-	- INT32
-	- FLOAT
-	- DOUBLE
-	- TEXT8
-	- TEXT16
-	- TEXT32
-	- DATE
-	- DATETIME	
+	- 	**BOOLEAN**		
+		resolves in (0,1)		
+	- 	**INT8**		
+		at least 1 byte, lower bound: 0, upper bound; 255
+	- 	**INT16**		
+		at least 4 bytes, bound: ±2,147,483,648
+	- 	**INT32**		
+		at most 8 bytes, bound: ±2^63
+	- 	**FLOAT**		
+		approximate numeric, 4 bytes, bound: ±1.79E + 308 
+	- 	**DOUBLE**	
+		exact numeric, at least 5 bytes, bound: ±10^38+1 
+	- 	**TEXT8**		
+		character string, 1 bytes, max length 255
+	- 	**TEXT16**	
+		character string, 2 bytes, max length 2,147,483,647
+	- 	**TEXT32**	
+		character string, 4 bytes, max length 4,294,967,295 
+	- 	**DATE**		
+		3 bytes
+	- 	**DATETIME**	
+		8 bytes
 	
 	usage:
 	```
