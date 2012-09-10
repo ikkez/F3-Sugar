@@ -14,8 +14,7 @@ class VDB_Tests extends F3instance {
         $dbs = array(
             'mysql' =>  new VDB(
                 'mysql:host=localhost;port=3306;dbname=test',
-                'root',
-                ''
+                'root', ''
             ),
             'sqlite' => new VDB('sqlite::memory:'),
             'pgsql' => new VDB('pgsql:host=localhost;dbname=test','test','1234'),
@@ -37,52 +36,63 @@ class VDB_Tests extends F3instance {
             );
 
             // add column
-            $result1 = $db->addCol('test','title','TEXT8');
+            list($r1,$r2) = $db->table('test',
+                function($table){   return $table->addCol('title','TEXT8'); },
+                function($table){   return $table->getCols(); });
             $this->expect(
-                $result1 == true && in_array('title',$db->getCols('test')) == true,
+                $r1 == true && in_array('title',$r2) == true,
                 $type.'adding column',
                 $type.'cannot add a column'
             );
 
             foreach(array_keys($db->dataTypes) as $index=>$field) {
                 // testing column types
-                $result1 = $db->addCol('test','column_'.$index,$field);
+                list($r1,$r2) = $db->table('test',
+                    function($table) use($index,$field) {
+                        return $table->addCol('column_'.$index,$field);
+                    },
+                    function($table){ return $table->getCols(); });
                 $this->expect(
-                    $result1 == true
-                        && in_array('column_'.$index,$db->getCols('test')) == true,
+                    $r1 == true && in_array('column_'.$index,$r2) == true,
                     $type.'adding column ['.$field.']',
                     $type.'cannot add a column of type:'.$field
                 );
             }
 
             // rename column
-            $result1 = $db->renameCol('test','title','title123');
+            list($r1,$r2) = $db->table('test',
+                function($table){ return $table->renameCol('title','title123'); },
+                function($table){ return $table->getCols(); });
             $this->expect(
-                $result1 == true &&
-                in_array('title123',$db->getCols('test')) == true &&
-                in_array('title',$db->getCols('test')) == false,
+                $r1 == true &&
+                in_array('title123',$r2) == true &&
+                in_array('title',$r2) == false,
                 $type.'renaming column',
                 $type.'cannot rename a column'
             );
-            $result1 = $db->renameCol('test','title123','title');
+            $db->table('test', function($table){ return $table->renameCol('title123','title'); });
 
             // remove column
-            $result1 = $db->removeCol('test','title');
+            list($r1,$r2) = $db->table('test',
+                function($table){ return $table->dropCol('title'); },
+                function($table){ return $table->getCols(); });
             $this->expect(
-                $result1 == true && in_array('title',$db->getCols('test')) == false,
+                $r1 == true && in_array('title',$r2) == false,
                 $type.'removng column',
                 $type.'cannot remove a column'
             );
 
             // rename table
             $db->dropTable('test123');
-            $valid = $db->renameTable('test','test123');
+            $valid = $db->table('test',
+                function($table){ return $table->renameTable('test123'); });
             $this->expect(
                 $valid == true && in_array('test123',$db->getTables()) == true && in_array('test',$db->getTables()) == false,
                 $type.'renaming table',
                 $type.'cannot rename a table'
             );
-            $db->renameTable('test123','test');
+            $db->table('test123',
+                function($table){ $table->renameTable('test'); });
 
             // drop table
             $db->dropTable('test');

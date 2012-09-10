@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.7.0
+        @version 0.7.2
  **/
 
 class VDB extends DB {
@@ -35,14 +35,14 @@ class VDB extends DB {
             'INT32'=>array(            'sqlite2?|pgsql'=>'integer',
                                        'mysql|mssql|sybase|dblib|odbc|sqlsrv|imb'=>'bigint',
             ),
-            'FLOAT'=>array(            'mysql|sqlite2?'=>'DOUBLE',
+            'FLOAT'=>array(            'mysql|sqlite2?'=>'FLOAT',
                                        'pgsql'=>'double precision',
                                        'mssql|sybase|dblib|odbc|sqlsrv'=>'float',
                                        'imb'=>'decfloat'
             ),
             'DOUBLE'=>array(           'mysql|sqlite2?|ibm'=>'DOUBLE',
                                        'pgsql|sybase|odbc|sqlsrv'=>'double precision',
-                                       'mssql|dblib'=>'float',
+                                       'mssql|dblib'=>'decimal',
             ),
             'TEXT8'=>array(            'mysql|sqlite2?|ibm'=>'VARCHAR(255)',
                                        'pgsql'=>'text',
@@ -55,16 +55,49 @@ class VDB extends DB {
                                        'sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv'=>'text',
                                        'ibm'=>'CLOB(2000000000)',
             ),
-            'SPECIAL_DATE'=>array(     'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv|ibm'=>'date',
+            'DATE'=>array(             'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv|ibm'=>'date',
             ),
-            'SPECIAL_DATETIME'=>array( 'pgsql'=>'timestamp without time zone',
+            'DATETIME'=>array(         'pgsql'=>'timestamp without time zone',
                                        'mysql|sqlite2?|mssql|sybase|dblib|odbc|sqlsrv'=>'datetime',
                                        'ibm'=>'timestamp',
             ),
     );
 
+    public
+        $name;
+
     const
         TEXT_NoDatatype='The specified datatype %s is not defined in %s driver';
+
+    /**
+     * alter table operation stack wrapper
+     * @param $name
+     * @param $func
+     * @return mixed
+     */
+    public function table($name,$func) {
+        $func = func_get_args();
+        array_shift($func);
+        $tmp = $this->name;
+        $this->name = $name;
+        if(count($func)>1)
+            foreach($func as $f)
+                $return[] = call_user_func($f,$this);
+        else    $return = call_user_func($func[0],$this);
+        $this->name = $tmp;
+        return $return;
+    }
+
+    /**
+     * create table operation stack wrapper
+     * @param $name
+     * @param $func
+     * @return mixed
+     */
+    public function create($name,$func){
+        $this->createTable($name);
+        return $this->table($name,$func);
+    }
 
     /**
      * parse command array and return backend specifiy query
@@ -101,199 +134,11 @@ class VDB extends DB {
         );
         $query = $this->findQuery($cmd);
         if(!$query) return false;
-
         $tables = $this->exec($query);
         if ($tables && is_array($tables) && count($tables)>0)
             foreach ($tables as &$table)
                 $table = array_shift($table);
         return $tables;
-    }
-
-    /**
-     * get columns of a table
-     * @param $table
-     * @param bool $types
-     * @return array
-     */
-    public function getCols($table,$types = false) {
-        $columns = array();
-        $schema = $this->schema($table,60);
-        foreach($schema['result'] as $cols) {
-            if($types)  $columns[$cols[$schema['field']]] = $cols[$schema['type']];
-            else        $columns[] = $cols[$schema['field']];
-        }
-        return $columns;
-    }
-
-    /**
-     * add a column to a table
-     * @param $table
-     * @param $column
-     * @param $type
-     * @param bool $passThrough
-     * @return bool
-     */
-    public function addCol($table,$column,$type,$passThrough = false) {
-        // check if column is already existing
-        if(in_array($column,$this->getCols($table))) return false;
-
-        //prepare columntypes
-        if($passThrough == false) {
-            if(!array_key_exists(strtoupper($type),$this->dataTypes)){
-                trigger_error(sprintf(self::TEXT_NoDatatype,strtoupper($type),$this->backend));
-                return FALSE;
-            }
-            $type_val = $this->findQuery($this->dataTypes[strtoupper($type)]);
-            if(!$type_val) return false;
-        } else $type_val = $type;
-        $cmd=array(
-            'sqlite2?'=>array(
-                "ALTER TABLE `$table` ADD `$column` $type_val"),
-            'mysql|pgsql|mssql|sybase|dblib|odbc'=>array(
-                "ALTER TABLE $table ADD $column $type_val"),
-            'ibm'=>array(
-                "ALTER TABLE $table ADD COLUMN $column $type_val"),
-        );
-        $query = $this->findQuery($cmd);
-        if(!$query) return false;
-        return (!$this->exec($query))?TRUE:FALSE;
-    }
-
-    /**
-     * removes a column from a table
-     * @param $table
-     * @param $column
-     * @return bool
-     */
-    public function removeCol($table,$column) {
-
-        if(preg_match('/sqlite2?/',$this->backend)) {
-            // SQlite does not support drop column directly
-            $newCols = array();
-            $schema = $this->schema($table,60);
-            foreach($schema['result'] as $col)
-                if(!in_array($column,$col) && $col[$schema['field']] != 'id')
-                    $newCols[$col[$schema['field']]] = $col[$schema['type']];
-            $this->begin();
-            $this->createTable($table.'_new');
-            foreach($newCols as $name => $type)
-                $this->addCol($table.'_new',$name,$type,true);
-            $fields = (!empty($newCols))?', '.implode(', ',array_keys($newCols)):'';
-            $this->exec('INSERT INTO '.$table.'_new SELECT id'.$fields.' FROM '.$table);
-            $this->dropTable($table);
-            $this->renameTable($table.'_new',$table);
-            $this->commit();
-            return true;
-
-        } else {
-            $cmd=array(
-                'mysql|mssql|sybase|dblib'=>array(
-                    "ALTER TABLE `$table` DROP `$column`"),
-                'pgsql|odbc|ibm'=>array(
-                    "ALTER TABLE $table DROP COLUMN $column"),
-            );
-            $query = $this->findQuery($cmd);
-            if(!$query) return false;
-            return (!$this->exec($query))?TRUE:FALSE;
-        }
-    }
-
-    /**
-     * rename a column
-     * @param $table
-     * @param $column
-     * @param $column_new
-     * @return bool
-     */
-    public function renameCol($table,$column,$column_new) {
-
-        if(preg_match('/sqlite2?/',$this->backend)) {
-            // SQlite does not support rename column directly
-            $newCols = array();
-            $schema = $this->schema($table,60);
-            foreach($schema['result'] as $col)
-                if($col[$schema['field']] != 'id')
-                    $newCols[$col[$schema['field']]] = $col[$schema['type']];
-            $newCols[$column_new] = $newCols[$column];
-            unset($newCols[$column]);
-            $this->begin();
-            $this->createTable($table.'_new');
-            foreach($newCols as $name => $type)
-                $this->addCol($table.'_new',$name,$type,true);
-
-            $new_fields = (!empty($newCols))?', '.implode(', ',array_keys($newCols)):'';
-            $cur_fields = $this->getCols($table);
-            $old_fields = (!empty($cur_fields))?implode(', ',array_keys($cur_fields)):'';
-            $this->exec('INSERT INTO '.$table.'_new(id'.$new_fields.') SELECT '.$old_fields.' FROM '.$table);
-            $this->dropTable($table);
-            $this->renameTable($table.'_new',$table);
-            $this->commit();
-            return true;
-
-        } elseif(preg_match('/odbc/',$this->backend)) {
-            // no rename column for odbc
-            $colTypes = $this->getCols($table,true);
-            $this->begin();
-            $this->addCol($table,$column,$colTypes[$column]);
-            $this->exec("UPDATE $table SET $column_new = $column");
-            $this->removeCol($table,$column);
-            $this->commit();
-            return true;
-        } else {
-            $colTypes = $this->getCols($table,true);
-            $cmd=array(
-                'mysql'=>array(
-                    "ALTER TABLE `$table` CHANGE `$column` `$column_new` ".$colTypes[$column]),
-                'pgsql|ibm'=>array(
-                    "ALTER TABLE $table RENAME COLUMN $column TO $column_new"),
-                'mssql|sybase|dblib'=>array(
-                    "sp_rename $table.$column, $column_new"),
-            );
-            $query = $this->findQuery($cmd);
-            if(!$query) return false;
-            return (!$this->exec($query))?TRUE:FALSE;
-        }
-    }
-
-    /**
-     * rename a table
-     * @param $table_name
-     * @param $new_name
-     * @return bool
-     */
-    public function renameTable($table_name,$new_name) {
-        if(preg_match('/odbc/',$this->backend)) {
-            $this->exec("SELECT * INTO $new_name FROM $table_name");
-            $this->dropTable($table_name);
-            return true;
-        } else {
-            $cmd=array(
-                'sqlite2?|pgsql'=>array(
-                    "ALTER TABLE $table_name RENAME TO $new_name;"),
-                'mysql|ibm'=>array(
-                    "RENAME TABLE `$table_name` TO `$new_name`;"),
-                'mssql|sybase|dblib'=>array(
-                    "sp_rename $table_name, $new_name")
-            );
-            $query = $this->findQuery($cmd);
-            if(!$query) return false;
-            return (!$this->exec($query))?TRUE:FALSE;
-        }
-    }
-
-    /**
-     * drop table
-     * @param $table
-     * @return bool
-     */
-    public function dropTable($table) {
-        $cmd=array(
-            'mysql|sqlite2?|pgsql|mssql|sybase|dblib|ibm|odbc'=>array(
-                "DROP TABLE IF EXISTS $table;"),
-        );
-        $query = $this->findQuery($cmd);
-        if(!$query) return false;
-        return (!$this->exec($query))?TRUE:FALSE;
     }
 
     /**
@@ -325,4 +170,193 @@ class VDB extends DB {
         if(!$query) return false;
         return (!$this->exec($query))?TRUE:FALSE;
     }
+
+    /**
+     * rename a table
+     * @param $new_name
+     * @return bool
+     */
+    public function renameTable($new_name) {
+        if(preg_match('/odbc/',$this->backend)) {
+            $this->exec("SELECT * INTO $new_name FROM $this->name");
+            $this->dropTable();
+            $this->name = $new_name;
+            return true;
+        } else {
+            $cmd=array(
+                'sqlite2?|pgsql'=>array(
+                    "ALTER TABLE $this->name RENAME TO $new_name;"),
+                'mysql|ibm'=>array(
+                    "RENAME TABLE `$this->name` TO `$new_name`;"),
+                'mssql|sybase|dblib'=>array(
+                    "sp_rename $this->name, $new_name")
+            );
+            $query = $this->findQuery($cmd);
+            if(!$query) return false;
+            $this->name = $new_name;
+            return (!$this->exec($query))?TRUE:FALSE;
+        }
+    }
+
+    /**
+     * drop table
+     * @param null $name
+     * @return bool
+     */
+    public function dropTable($name = null) {
+        $table = ($name)?$name:$this->name;
+        $cmd=array(
+            'mysql|sqlite2?|pgsql|mssql|sybase|dblib|ibm|odbc'=>array(
+                "DROP TABLE IF EXISTS $table;"),
+        );
+        $query = $this->findQuery($cmd);
+        if(!$query) return false;
+        return (!$this->exec($query))?TRUE:FALSE;
+    }
+
+    /**
+     * get columns of a table
+     * @param bool $types
+     * @return array
+     */
+    public function getCols($types = false) {
+        $columns = array();
+        $schema = $this->schema($this->name,60);
+        foreach($schema['result'] as $cols) {
+            if($types)  $columns[$cols[$schema['field']]] = $cols[$schema['type']];
+            else        $columns[] = $cols[$schema['field']];
+        }
+        return $columns;
+    }
+
+    /**
+     * add a column to a table
+     * @param $column
+     * @param $type
+     * @param bool $passThrough
+     * @return bool
+     */
+    public function addCol($column,$type,$passThrough = false) {
+        // check if column is already existing
+        if(in_array($column,$this->getCols())) return false;
+        //prepare columntypes
+        if($passThrough == false) {
+            if(!array_key_exists(strtoupper($type),$this->dataTypes)){
+                trigger_error(sprintf(self::TEXT_NoDatatype,strtoupper($type),$this->backend));
+                return FALSE;
+            }
+            $type_val = $this->findQuery($this->dataTypes[strtoupper($type)]);
+            if(!$type_val) return false;
+        } else $type_val = $type;
+        $cmd=array(
+            'sqlite2?'=>array(
+                "ALTER TABLE `$this->name` ADD `$column` $type_val"),
+            'mysql|pgsql|mssql|sybase|dblib|odbc'=>array(
+                "ALTER TABLE $this->name ADD $column $type_val"),
+            'ibm'=>array(
+                "ALTER TABLE $this->name ADD COLUMN $column $type_val"),
+        );
+        $query = $this->findQuery($cmd);
+        if(!$query) return false;
+        return (!$this->exec($query))?TRUE:FALSE;
+    }
+
+    /**
+     * removes a column from a table
+     * @param $column
+     * @return bool
+     */
+    public function dropCol($column) {
+        if(preg_match('/sqlite2?/',$this->backend)) {
+            // SQlite does not support drop column directly
+            $newCols = array();
+            $schema = $this->schema($this->name,60);
+            foreach($schema['result'] as $col)
+                if(!in_array($column,$col) && $col[$schema['field']] != 'id')
+                    $newCols[$col[$schema['field']]] = $col[$schema['type']];
+            $this->begin();
+            $this->create($this->name.'_new',function($table) use($newCols) {
+                foreach($newCols as $name => $type)
+                    $table->addCol($name,$type,true);
+                $fields = (!empty($newCols))?', '.implode(', ',array_keys($newCols)):'';
+                $table->exec('INSERT INTO '.$table->name.
+                    ' SELECT id'.$fields.' FROM '.$table->name);
+            });
+            $tname = $this->name;
+            $this->dropTable();
+            $this->table($this->name.'_new',function($table) use($tname){
+                $table->renameTable($tname);
+            });
+            $this->commit();
+            return true;
+        } else {
+            $cmd=array(
+                'mysql|mssql|sybase|dblib'=>array(
+                    "ALTER TABLE `$this->name` DROP `$column`"),
+                'pgsql|odbc|ibm'=>array(
+                    "ALTER TABLE $this->name DROP COLUMN $column"),
+            );
+            $query = $this->findQuery($cmd);
+            if(!$query) return false;
+            return (!$this->exec($query))?TRUE:FALSE;
+        }
+    }
+
+    /**
+     * rename a column
+     * @param $column
+     * @param $column_new
+     * @return bool
+     */
+    public function renameCol($column,$column_new) {
+        if(preg_match('/sqlite2?/',$this->backend)) {
+            // SQlite does not support rename column directly
+            $newCols = array();
+            $schema = $this->schema($this->name,60);
+            foreach($schema['result'] as $col)
+                if($col[$schema['field']] != 'id')
+                    $newCols[$col[$schema['field']]] = $col[$schema['type']];
+            $newCols[$column_new] = $newCols[$column];
+            unset($newCols[$column]);
+            $this->begin();
+            $oname = $this->name;
+            $this->create($this->name.'_new',function($table) use($newCols,$oname) {
+                foreach($newCols as $name => $type)
+                    $table->addCol($name,$type,true);
+                $new_fields = (!empty($newCols))?', '.implode(', ',array_keys($newCols)):'';
+                $cur_fields = $table->getCols();
+                $old_fields = (!empty($cur_fields))?implode(', ',array_keys($cur_fields)):'';
+                $table->exec('INSERT INTO '.$table->name.'(id'.$new_fields.') SELECT '.$old_fields.' FROM '.$oname);
+            });
+            $tname = $this->name;
+            $this->dropTable();
+            $this->table($this->name.'_new',
+                function($table) use($tname){ $table->renameTable($tname); });
+            $this->commit();
+            return true;
+        } elseif(preg_match('/odbc/',$this->backend)) {
+            // no rename column for odbc
+            $colTypes = $this->getCols(true);
+            $this->begin();
+            $this->addCol($column,$colTypes[$column]);
+            $this->exec("UPDATE $this->name SET $column_new = $column");
+            $this->dropCol($column);
+            $this->commit();
+            return true;
+        } else {
+            $colTypes = $this->getCols(true);
+            $cmd=array(
+                'mysql'=>array(
+                    "ALTER TABLE `$this->name` CHANGE `$column` `$column_new` ".$colTypes[$column]),
+                'pgsql|ibm'=>array(
+                    "ALTER TABLE $this->name RENAME COLUMN $column TO $column_new"),
+                'mssql|sybase|dblib'=>array(
+                    "sp_rename $this->name.$column, $column_new"),
+            );
+            $query = $this->findQuery($cmd);
+            if(!$query) return false;
+            return (!$this->exec($query))?TRUE:FALSE;
+        }
+    }
+
 }
