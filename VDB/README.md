@@ -72,8 +72,8 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	- TEXT8
 	- TEXT16
 	- TEXT32
-	- SPECIAL_DATE
-	- SPECIAL_DATETIME	
+	- DATE
+	- DATETIME	
 	
 	usage:
 	```
@@ -94,14 +94,14 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	```	
 	
 	
--	`$table->removeCol( $columnName );`
+-	`$table->dropCol( $columnName );`
 
 	Removes a column from the given table.
 	
 	usage:
 	```
 	$db->table('news',function($table){		
-		$table->removeCol('plugin-xy');	
+		$table->dropCol('plugin-xy');	
 	});	
 	```	
 

@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.7.0
+        @version 0.7.2
  **/
 
 class VDB extends DB {
@@ -55,9 +55,9 @@ class VDB extends DB {
                                        'sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv'=>'text',
                                        'ibm'=>'CLOB(2000000000)',
             ),
-            'SPECIAL_DATE'=>array(     'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv|ibm'=>'date',
+            'DATE'=>array(             'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv|ibm'=>'date',
             ),
-            'SPECIAL_DATETIME'=>array( 'pgsql'=>'timestamp without time zone',
+            'DATETIME'=>array(         'pgsql'=>'timestamp without time zone',
                                        'mysql|sqlite2?|mssql|sybase|dblib|odbc|sqlsrv'=>'datetime',
                                        'ibm'=>'timestamp',
             ),
@@ -140,7 +140,6 @@ class VDB extends DB {
                 $table = array_shift($table);
         return $tables;
     }
-
 
     /**
      * create a basic table, containing ID field
