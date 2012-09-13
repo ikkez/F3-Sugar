@@ -12,7 +12,7 @@
     Copyright (c) 2012 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.1.0
+    @version 1.1.2
  **/
 
 
@@ -127,11 +127,25 @@ class FileUnit extends Base {
      * @return array|bool   file info on success, otherwise false
      */
     static function saveUploaded($input_name,$target_path,$slug = FALSE) {
-        if ($_FILES[$input_name]["error"] > 0) {
-            trigger_error('Error: '.$_FILES[$input_name]["error"]);
+        $file = $_FILES[$input_name];
+        if($file['size'] == 0 && $file['error'] == 0)
+            $file['error'] = 8;
+        if ($file["error"] > 0) {
+            $upload_errors = array(
+                "No errors.",
+                "Larger than upload_max_filesize.",
+                "Larger than form MAX_FILE_SIZE.",
+                "Partial upload.",
+                "No file.",
+                "No temporary directory.",
+                "Can't write to disk.",
+                "File upload stopped by extension.",
+                "File is empty."
+            );
+            trigger_error('Error: '.$upload_errors[$file["error"]]);
             return false;
         } else {
-            $fileBase = basename($_FILES[$input_name]['name']);
+            $fileBase = basename($file['name']);
             if($slug)
                 if(strstr($fileBase,'.')){
                     list($fileName,$fileExt) = explode('.',$fileBase);
@@ -139,9 +153,9 @@ class FileUnit extends Base {
                 } else
                     $copyFile = Web::slug($fileBase);
             else $copyFile = $fileBase;
-            if(@move_uploaded_file($_FILES[$input_name]['tmp_name'], $target_path.$copyFile)) {
+            if(@move_uploaded_file($file['tmp_name'], $target_path.$copyFile)) {
                 $fileInfo = pathinfo($target_path.$copyFile);
-                $fileInfo['type'] = $_FILES[$input_name]["type"];
+                $fileInfo['type'] = $file["type"];
                 $fileInfo['size'] = ceil(filesize($target_path.$copyFile)/1024);
                 return $fileInfo;
             } else return false;
