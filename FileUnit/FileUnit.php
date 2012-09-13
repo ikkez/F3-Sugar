@@ -12,7 +12,7 @@
     Copyright (c) 2012 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.0.2
+    @version 1.1.0
  **/
 
 
@@ -123,18 +123,26 @@ class FileUnit extends Base {
      *
      * @param $input_name   name of input form field
      * @param $target_path  target directory
+     * @param bool $slug    rename filename to URL & filesystem-friendly version
      * @return array|bool   file info on success, otherwise false
      */
-    static function saveUploaded($input_name,$target_path) {
+    static function saveUploaded($input_name,$target_path,$slug = FALSE) {
         if ($_FILES[$input_name]["error"] > 0) {
             trigger_error('Error: '.$_FILES[$input_name]["error"]);
             return false;
         } else {
-            $copyPath = $target_path . basename( $_FILES[$input_name]['name']);
-            if(@move_uploaded_file($_FILES[$input_name]['tmp_name'], $copyPath)) {
-                $fileInfo = pathinfo($copyPath);
+            $fileBase = basename($_FILES[$input_name]['name']);
+            if($slug)
+                if(strstr($fileBase,'.')){
+                    list($fileName,$fileExt) = explode('.',$fileBase);
+                    $copyFile = Web::slug($fileName).'.'.$fileExt;
+                } else
+                    $copyFile = Web::slug($fileBase);
+            else $copyFile = $fileBase;
+            if(@move_uploaded_file($_FILES[$input_name]['tmp_name'], $target_path.$copyFile)) {
+                $fileInfo = pathinfo($target_path.$copyFile);
                 $fileInfo['type'] = $_FILES[$input_name]["type"];
-                $fileInfo['size'] = ceil(filesize($copyPath)/1024);
+                $fileInfo['size'] = ceil(filesize($target_path.$copyFile)/1024);
                 return $fileInfo;
             } else return false;
         }
