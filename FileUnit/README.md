@@ -21,10 +21,11 @@ It's uses the Standard PHP Libary with DirectoryIterators and file SPL objects t
 	Deletes everything within the given path.
 	
 
-- 	`FileUnit::saveUploaded('inputFormName','/copy/to/this/dir/');`
+- 	`FileUnit::saveUploaded($formInputName, 'files/', $slug);`
 	
-	Catches the uploaded file of a submitted Form, e.g. of `<input name="image>`, and copy it to the specified path.
-	It returns some file information, like filesize, mimetype, extension and so on, when everything went fine, otherwise false.
+	Catches the uploaded file of a submitted Form, e.g. of `<input name="image>`, and copy it to the specified path. Be sure to set the right encoding in your form. Typically for file upload is `enctype="multipart/form-data"`.
+	If you set $slug to TRUE, it will convert the filename string to a URL & filesystem-friendly version.
+	It returns some file information, like basename, filename, extension, filesize in kbyte and  mimetype, when everything went fine, otherwise false.
 	
 
 
