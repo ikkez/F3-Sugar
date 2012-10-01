@@ -12,10 +12,7 @@ class VDB_Tests extends F3instance {
         $oeh = set_error_handler(array("self","myErrorHandler"));
 
         $dbs = array(
-            'mysql' =>  new VDB(
-                'mysql:host=localhost;port=3306;dbname=test',
-                'root', ''
-            ),
+            'mysql' =>  new VDB('mysql:host=localhost;port=3306;dbname=test','root',''),
             'sqlite' => new VDB('sqlite::memory:'),
             'pgsql' => new VDB('pgsql:host=localhost;dbname=test','test','1234'),
         );
@@ -41,8 +38,18 @@ class VDB_Tests extends F3instance {
                 function($table){   return $table->getCols(); });
             $this->expect(
                 $r1 == true && in_array('title',$r2) == true,
-                $type.'adding column',
-                $type.'cannot add a column'
+                $type.'adding column, nullable',
+                $type.'cannot add a column, nullable'
+            );
+
+            // add column, not null
+            list($r1,$r2) = $db->table('test',
+                function($table){   return $table->addCol('title2','TEXT8',false); },
+                function($table){   return $table->getCols(true); });
+            $this->expect(
+                $r1 == true && in_array('title2',array_keys($r2)) == true && $r2['title2']['null'] == false,
+                $type.'adding column, not nullable',
+                $type.'cannot add a column, not nullable'
             );
 
             foreach(array_keys($db->dataTypes) as $index=>$field) {

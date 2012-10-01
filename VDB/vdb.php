@@ -12,7 +12,7 @@
     Christian Knuth <mail@ikkez.de>
 
         @package VDB
-        @version 0.7.2
+        @version 0.8.0
  **/
 
 class VDB extends DB {
@@ -115,7 +115,7 @@ class VDB extends DB {
             trigger_error(self::TEXT_DBEngine);
             return FALSE;
         }
-        return (is_array($val))?$val[0]:$val;
+        return $val;
     }
 
     /**
@@ -133,8 +133,8 @@ class VDB extends DB {
             'ibm'=>array("select TABLE_NAME from sysibm.tables"),
         );
         $query = $this->findQuery($cmd);
-        if(!$query) return false;
-        $tables = $this->exec($query);
+        if(!$query[0]) return false;
+        $tables = $this->exec($query[0]);
         if ($tables && is_array($tables) && count($tables)>0)
             foreach ($tables as &$table)
                 $table = array_shift($table);
@@ -151,7 +151,7 @@ class VDB extends DB {
         $cmd=array(
             'sqlite2?|sybase|dblib|odbc'=>array(
                 "CREATE TABLE $table (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT )"),
+                    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT )"),
             'mysql'=>array(
                 "CREATE TABLE $table (
                     id SERIAL
@@ -167,8 +167,8 @@ class VDB extends DB {
             ),
         );
         $query = $this->findQuery($cmd);
-        if(!$query) return false;
-        return (!$this->exec($query))?TRUE:FALSE;
+        if(!$query[0]) return false;
+        return (!$this->exec($query[0]))?TRUE:FALSE;
     }
 
     /**
@@ -192,9 +192,9 @@ class VDB extends DB {
                     "sp_rename $this->name, $new_name")
             );
             $query = $this->findQuery($cmd);
-            if(!$query) return false;
+            if(!$query[0]) return false;
             $this->name = $new_name;
-            return (!$this->exec($query))?TRUE:FALSE;
+            return (!$this->exec($query[0]))?TRUE:FALSE;
         }
     }
 
@@ -210,8 +210,8 @@ class VDB extends DB {
                 "DROP TABLE IF EXISTS $table;"),
         );
         $query = $this->findQuery($cmd);
-        if(!$query) return false;
-        return (!$this->exec($query))?TRUE:FALSE;
+        if(!$query[0]) return false;
+        return (!$this->exec($query[0]))?TRUE:FALSE;
     }
 
     /**
@@ -220,11 +220,19 @@ class VDB extends DB {
      * @return array
      */
     public function getCols($types = false) {
+        if(empty($this->name)) trigger_error('No table specified.');
         $columns = array();
         $schema = $this->schema($this->name,60);
         foreach($schema['result'] as $cols) {
-            if($types)  $columns[$cols[$schema['field']]] = $cols[$schema['type']];
-            else        $columns[] = $cols[$schema['field']];
+            if($types) {
+                $columns[$cols[$schema['field']]] = array(
+                    'type'=>$cols[$schema['type']],
+                    'null'=>($cols[$schema['nullname']] == $schema['nullval'])?true:false,
+                    //'default'=>$cols['Default'], // TODO: add defaults, sqlite: dflt_value
+                    //'extra'=>$cols['Extra'], // TODO: add auto increment
+                );
+            } else
+                $columns[] = $cols[$schema['field']];
         }
         return $columns;
     }
@@ -233,10 +241,11 @@ class VDB extends DB {
      * add a column to a table
      * @param $column
      * @param $type
+     * @param bool $nullable
      * @param bool $passThrough
      * @return bool
      */
-    public function addCol($column,$type,$passThrough = false) {
+    public function addCol($column,$type,$nullable = true,$passThrough = false) {
         // check if column is already existing
         if(in_array($column,$this->getCols())) return false;
         //prepare columntypes
@@ -248,17 +257,18 @@ class VDB extends DB {
             $type_val = $this->findQuery($this->dataTypes[strtoupper($type)]);
             if(!$type_val) return false;
         } else $type_val = $type;
+        $null_cmd = ($nullable)?'NULL':'NOT NULL';
         $cmd=array(
             'sqlite2?'=>array(
-                "ALTER TABLE `$this->name` ADD `$column` $type_val"),
+                "ALTER TABLE `$this->name` ADD `$column` $type_val $default $null_cmd"),
             'mysql|pgsql|mssql|sybase|dblib|odbc'=>array(
-                "ALTER TABLE $this->name ADD $column $type_val"),
+                "ALTER TABLE $this->name ADD $column $type_val $null_cmd"),
             'ibm'=>array(
-                "ALTER TABLE $this->name ADD COLUMN $column $type_val"),
+                "ALTER TABLE $this->name ADD COLUMN $column $type_val $null_cmd"),
         );
         $query = $this->findQuery($cmd);
-        if(!$query) return false;
-        return (!$this->exec($query))?TRUE:FALSE;
+        if(!$query[0]) return false;
+        return (!$this->exec($query[0]))?TRUE:FALSE;
     }
 
     /**
@@ -270,14 +280,16 @@ class VDB extends DB {
         if(preg_match('/sqlite2?/',$this->backend)) {
             // SQlite does not support drop column directly
             $newCols = array();
-            $schema = $this->schema($this->name,60);
-            foreach($schema['result'] as $col)
-                if(!in_array($column,$col) && $col[$schema['field']] != 'id')
-                    $newCols[$col[$schema['field']]] = $col[$schema['type']];
+            $newCols = $this->getCols(true);
+            // unset primary-key fields, TODO: support other PKs than ID and multiple PKs
+            unset($newCols['id']);
+            // unset drop field
+            unset($newCols[$column]);
             $this->begin();
             $this->create($this->name.'_new',function($table) use($newCols) {
-                foreach($newCols as $name => $type)
-                    $table->addCol($name,$type,true);
+                // TODO: add PK fields
+                foreach($newCols as $name => $col)
+                    $table->addCol($name,$col['type'],$col['null'],true);
                 $fields = (!empty($newCols))?', '.implode(', ',array_keys($newCols)):'';
                 $table->exec('INSERT INTO '.$table->name.
                     ' SELECT id'.$fields.' FROM '.$table->name);
@@ -297,8 +309,8 @@ class VDB extends DB {
                     "ALTER TABLE $this->name DROP COLUMN $column"),
             );
             $query = $this->findQuery($cmd);
-            if(!$query) return false;
-            return (!$this->exec($query))?TRUE:FALSE;
+            if(!$query[0]) return false;
+            return (!$this->exec($query[0]))?TRUE:FALSE;
         }
     }
 
@@ -312,21 +324,21 @@ class VDB extends DB {
         if(preg_match('/sqlite2?/',$this->backend)) {
             // SQlite does not support rename column directly
             $newCols = array();
-            $schema = $this->schema($this->name,60);
-            foreach($schema['result'] as $col)
-                if($col[$schema['field']] != 'id')
-                    $newCols[$col[$schema['field']]] = $col[$schema['type']];
+            $newCols = $this->getCols(true);
+            // unset primary-key fields, TODO: support other PKs than ID and multiple PKs
+            unset($newCols['id']);
+            // rename column
             $newCols[$column_new] = $newCols[$column];
             unset($newCols[$column]);
             $this->begin();
             $oname = $this->name;
             $this->create($this->name.'_new',function($table) use($newCols,$oname) {
-                foreach($newCols as $name => $type)
-                    $table->addCol($name,$type,true);
+                foreach($newCols as $name => $col)
+                    $table->addCol($name,$col['type'],$col['null'],true);
+                // TODO: add PK fields here
                 $new_fields = (!empty($newCols))?', '.implode(', ',array_keys($newCols)):'';
-                $cur_fields = $table->getCols();
-                $old_fields = (!empty($cur_fields))?implode(', ',array_keys($cur_fields)):'';
-                $table->exec('INSERT INTO '.$table->name.'(id'.$new_fields.') SELECT '.$old_fields.' FROM '.$oname);
+                $cur_fields = implode(', ',array_keys($table->getCols()));
+                $table->exec('INSERT INTO '.$table->name.'(id'.$new_fields.') SELECT '.$cur_fields.' FROM '.$oname);
             });
             $tname = $this->name;
             $this->dropTable();
@@ -338,7 +350,7 @@ class VDB extends DB {
             // no rename column for odbc
             $colTypes = $this->getCols(true);
             $this->begin();
-            $this->addCol($column,$colTypes[$column]);
+            $this->addCol($column,$colTypes[$column]['type'],$colTypes[$column]['null'],true);
             $this->exec("UPDATE $this->name SET $column_new = $column");
             $this->dropCol($column);
             $this->commit();
@@ -347,15 +359,15 @@ class VDB extends DB {
             $colTypes = $this->getCols(true);
             $cmd=array(
                 'mysql'=>array(
-                    "ALTER TABLE `$this->name` CHANGE `$column` `$column_new` ".$colTypes[$column]),
+                    "ALTER TABLE `$this->name` CHANGE `$column` `$column_new` ".$colTypes[$column]['type']),
                 'pgsql|ibm'=>array(
                     "ALTER TABLE $this->name RENAME COLUMN $column TO $column_new"),
                 'mssql|sybase|dblib'=>array(
                     "sp_rename $this->name.$column, $column_new"),
             );
             $query = $this->findQuery($cmd);
-            if(!$query) return false;
-            return (!$this->exec($query))?TRUE:FALSE;
+            if(!$query[0]) return false;
+            return (!$this->exec($query[0]))?TRUE:FALSE;
         }
     }
 
