@@ -31,4 +31,4 @@ It's uses the Standard PHP Libary with DirectoryIterators and file SPL objects t
 
 ### TODO:
 
--	add support for multiple uploaded files
+-	tell me

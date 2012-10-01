@@ -12,7 +12,7 @@
     Copyright (c) 2012 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.1.2
+    @version 1.1.5
  **/
 
 
@@ -127,39 +127,57 @@ class FileUnit extends Base {
      * @return array|bool   file info on success, otherwise false
      */
     static function saveUploaded($input_name,$target_path,$slug = FALSE) {
-        $file = $_FILES[$input_name];
-        if($file['size'] == 0 && $file['error'] == 0)
-            $file['error'] = 8;
-        if ($file["error"] > 0) {
-            $upload_errors = array(
-                "No errors.",
-                "Larger than upload_max_filesize.",
-                "Larger than form MAX_FILE_SIZE.",
-                "Partial upload.",
-                "No file.",
-                "No temporary directory.",
-                "Can't write to disk.",
-                "File upload stopped by extension.",
-                "File is empty."
-            );
-            trigger_error('Error: '.$upload_errors[$file["error"]]);
+        if(!array_key_exists($input_name,$_FILES)) {
+            trigger_error('Error: No files submitted. Right form enctype setted?');
             return false;
-        } else {
-            $fileBase = basename($file['name']);
-            if($slug)
-                if(strstr($fileBase,'.')){
-                    list($fileName,$fileExt) = explode('.',$fileBase);
-                    $copyFile = Web::slug($fileName).'.'.$fileExt;
-                } else
-                    $copyFile = Web::slug($fileBase);
-            else $copyFile = $fileBase;
-            if(@move_uploaded_file($file['tmp_name'], $target_path.$copyFile)) {
-                $fileInfo = pathinfo($target_path.$copyFile);
-                $fileInfo['type'] = $file["type"];
-                $fileInfo['size'] = ceil(filesize($target_path.$copyFile)/1024);
-                return $fileInfo;
-            } else return false;
         }
+        $files = array();
+        $return = array();
+        if(is_array($_FILES[$input_name]['name']))
+            foreach($_FILES[$input_name]['name'] as $index=>$val)
+                $files[] = array(
+                    'name'=>$val,
+                    'type'=>$_FILES[$input_name]['type'][$index],
+                    'size'=>$_FILES[$input_name]['size'][$index],
+                    'tmp_name'=>$_FILES[$input_name]['tmp_name'][$index],
+                    'error'=>$_FILES[$input_name]['error'][$index]);
+        else
+            $files[] = $_FILES[$input_name];
+        foreach($files as $index=>$file) {
+            if($file['size'] == 0 && $file['error'] == 0)
+                $file['error'] = 8;
+            if ($file["error"] > 0) {
+                $upload_errors = array(
+                    "No errors.",
+                    "Larger than upload_max_filesize.",
+                    "Larger than form MAX_FILE_SIZE.",
+                    "Partial upload.",
+                    "No file.",
+                    "No temporary directory.",
+                    "Can't write to disk.",
+                    "File upload stopped by extension.",
+                    "File is empty."
+                );
+                trigger_error('Error: '.$upload_errors[$file["error"]]);
+                return false;
+            } else {
+                $fileBase = basename($file['name']);
+                if($slug)
+                    if(strstr($fileBase,'.')){
+                        list($fileName,$fileExt) = explode('.',$fileBase);
+                        $copyFile = Web::slug($fileName).'.'.$fileExt;
+                    } else
+                        $copyFile = Web::slug($fileBase);
+                else $copyFile = $fileBase;
+                if(move_uploaded_file($file['tmp_name'], $target_path.$copyFile)) {
+                    $fileInfo = pathinfo($target_path.$copyFile);
+                    $fileInfo['type'] = $file["type"];
+                    $fileInfo['size'] = ceil(filesize($target_path.$copyFile)/1024);
+                    $return[] = $fileInfo;
+                } else return false;
+            }
+        }
+        return (count($return)==1)?$return[0]:$return;
     }
 
 
