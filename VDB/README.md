@@ -65,48 +65,76 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	
 	<table>
 		<tr>
-			<td>**BOOLEAN**</td>
+			<th>Type</th>
+			<th></th>
+			<th>size</th>
+			<th>bound</th>
+		</tr>
+		<tr>
+			<td>BOOLEAN</td>
 			<td>resolves in (0,1)</td>
+			<td></td>
+			<td></td>
 		</tr>
 		<tr>
-			<td>**INT8**</td>
-			<td>at least 1 byte, lower bound: 0, upper bound; 255</td>
+			<td>INT8</td>
+			<td></td>
+			<td>at least 1 byte</td>
+			<td>lower: 0, upper; 255</td>
 		</tr>
 		<tr>
-			<td>**INT16**</td>
-			<td>at least 4 bytes, bound: ±2,147,483,648</td>
+			<td>INT16</td>
+			<td></td>
+			<td>at least 4 bytes</td>
+			<td>±2,147,483,648</td>
 		</tr>
 		<tr>
-			<td>**INT32**</td>
-			<td>at most 8 bytes, bound: ±2^63</td>
+			<td>INT32</td>
+			<td></td>
+			<td>at most 8 bytes</td>
+			<td>±2^63</td>
 		</tr>
 		<tr>
-			<td>**FLOAT**</td>
-			<td>approximate numeric, 4 bytes, bound: ±1.79E + 308</td>
+			<td>FLOAT</td>
+			<td>approximate numeric</td>
+			<td>4 bytes</td>
+			<td>±1.79E + 308</td>
 		</tr>
 		<tr>
-			<td>**DOUBLE**</td>
-			<td>exact numeric, at least 5 bytes, bound: ±10^38+1</td>
+			<td>DOUBLE</td>
+			<td>exact numeric</td>
+			<td>at least 5 bytes</td>
+			<td>±10^38+1</td>
 		</tr>
 		<tr>
-			<td>**TEXT8**</td>
-			<td>character string, 1 bytes, max length 255</td>
+			<td>TEXT8</td>
+			<td>character string</td>
+			<td>1 byte</td>
+			<td>max length 255</td>
 		</tr>
 		<tr>
-			<td>**TEXT16**</td>
-			<td>character string, 2 bytes, max length 2,147,483,647</td>
+			<td>TEXT16</td>
+			<td>character string</td>
+			<td>2 bytes</td>
+			<td>max length 2,147,483,647</td>
 		</tr>
 		<tr>
-			<td>**TEXT32**</td>
-			<td>character string, 4 bytes, max length 4,294,967,295</td>
+			<td>TEXT32</td>
+			<td>character string</td>
+			<td>4 bytes</td>
+			<td>max length 4,294,967,295</td>
 		</tr>
 		<tr>
-			<td>**DATE**</td>
+			<td>DATE</td>
+			<td></td>
 			<td>3 bytes</td>
+			<td></td>
 		</tr>
 		<tr>
-			<td>**DATETIME**</td>
+			<td>DATETIME</td>
+			<td></td>
 			<td>8 bytes</td>
+			<td></td>
 		</tr>
 	</table>	
 	
