@@ -15,11 +15,11 @@ After copying vdb.php into F3's lib Folder, create your DB handler using VDB Cla
 
 VDB Class prodives you the following simple methods for creating and dropping tables:
 
-- 	`$db->getTables();`
+- 	**$db->getTables();**
 	
 	This will return a list of all tables available within the given dbname.
 	
-- 	`$db->create( $tableName, func() )`
+- 	**$db->create( $tableName, func() )**
 	
 	Creates a new table, containing an auto-incremented, primary-key field named 'id', which is required for Axon.
 	You can pass through a function in the 2nd parameter, which contains more operations on the new table.
@@ -33,7 +33,7 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	});
 	```
 
-- 	`$db->table( $tableName, func() )`
+- 	**$db->table( $tableName, func() )**
 
 	Works the same way like ->create() but just loads an already existing table for altering operations, instead of creating a new one.	
 	
@@ -58,42 +58,68 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 
 #### Methods used for operations within the handled functions are:
 
-- 	`$table->addCol( $columnName, $dataType );`
+- 	**$table->addCol( $columnName, $dataType, $nullable = true );**
 	
 	Adds a further column field to a table. The $dataType argument defines the type for the new field.
 	Available mapped types so far:
 	
-	- 	**BOOLEAN**		
-		resolves in (0,1)		
-	- 	**INT8**		
-		at least 1 byte, lower bound: 0, upper bound; 255
-	- 	**INT16**		
-		at least 4 bytes, bound: ±2,147,483,648
-	- 	**INT32**		
-		at most 8 bytes, bound: ±2^63
-	- 	**FLOAT**		
-		approximate numeric, 4 bytes, bound: ±1.79E + 308 
-	- 	**DOUBLE**	
-		exact numeric, at least 5 bytes, bound: ±10^38+1 
-	- 	**TEXT8**		
-		character string, 1 bytes, max length 255
-	- 	**TEXT16**	
-		character string, 2 bytes, max length 2,147,483,647
-	- 	**TEXT32**	
-		character string, 4 bytes, max length 4,294,967,295 
-	- 	**DATE**		
-		3 bytes
-	- 	**DATETIME**	
-		8 bytes
+	<table>
+		<tr>
+			<td>**BOOLEAN**</td>
+			<td>resolves in (0,1)</td>
+		</tr>
+		<tr>
+			<td>**INT8**</td>
+			<td>at least 1 byte, lower bound: 0, upper bound; 255</td>
+		</tr>
+		<tr>
+			<td>**INT16**</td>
+			<td>at least 4 bytes, bound: ±2,147,483,648</td>
+		</tr>
+		<tr>
+			<td>**INT32**</td>
+			<td>at most 8 bytes, bound: ±2^63</td>
+		</tr>
+		<tr>
+			<td>**FLOAT**</td>
+			<td>approximate numeric, 4 bytes, bound: ±1.79E + 308</td>
+		</tr>
+		<tr>
+			<td>**DOUBLE**</td>
+			<td>exact numeric, at least 5 bytes, bound: ±10^38+1</td>
+		</tr>
+		<tr>
+			<td>**TEXT8**</td>
+			<td>character string, 1 bytes, max length 255</td>
+		</tr>
+		<tr>
+			<td>**TEXT16**</td>
+			<td>character string, 2 bytes, max length 2,147,483,647</td>
+		</tr>
+		<tr>
+			<td>**TEXT32**</td>
+			<td>character string, 4 bytes, max length 4,294,967,295</td>
+		</tr>
+		<tr>
+			<td>**DATE**</td>
+			<td>3 bytes</td>
+		</tr>
+		<tr>
+			<td>**DATETIME**</td>
+			<td>8 bytes</td>
+		</tr>
+	</table>	
 	
 	usage:
 	```
 	$db->table('news',function($table){		
 		$table->addCol('author','TEXT8');	
 	});	
-	```			
+	```	
+	
+	If $nullable is false, the field is added as NOT NULL field, so i cannot contain null value.		
 
--	`$table->getCols( $types = false );`
+-	**$table->getCols( $types = false );**
 
 	Returns an array of all column fields for a given table. When you set $types to TRUE, it will return an assoc array with fieldnames as keys and its type as value.
 
@@ -105,7 +131,7 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	```	
 	
 	
--	`$table->dropCol( $columnName );`
+-	**$table->dropCol( $columnName );**
 
 	Removes a column from the given table.
 	
@@ -116,7 +142,7 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	});	
 	```	
 
--	`$table->renameCol( $currentColumnName, $newColumnName );`
+-	**$table->renameCol( $currentColumnName, $newColumnName );**
 
 	Renames a column from the given table.
 	
@@ -127,7 +153,7 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	});	
 	```
 	
--	`$table->renameTable( $newTableName );` 
+-	**$table->renameTable( $newTableName );** 
 	
 	Renames a table.
 	
@@ -138,7 +164,7 @@ VDB Class prodives you the following simple methods for creating and dropping ta
 	});
 	```	
 	
--	`$table->dropTable();`
+-	**$table->dropTable();**
 
 	Deletes a table.
 	
