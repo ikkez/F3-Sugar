@@ -260,7 +260,7 @@ class VDB extends DB {
         $null_cmd = ($nullable)?'NULL':'NOT NULL';
         $cmd=array(
             'sqlite2?'=>array(
-                "ALTER TABLE `$this->name` ADD `$column` $type_val $default $null_cmd"),
+                "ALTER TABLE `$this->name` ADD `$column` $type_val $null_cmd"),
             'mysql|pgsql|mssql|sybase|dblib|odbc'=>array(
                 "ALTER TABLE $this->name ADD $column $type_val $null_cmd"),
             'ibm'=>array(
