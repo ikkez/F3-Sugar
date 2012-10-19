@@ -301,11 +301,20 @@ class VDB extends DB {
         $schema = $this->schema($this->name,60);
         foreach($schema['result'] as $cols) {
             if($types) {
+                $default = $cols[$schema['default']];
+                // remove single-qoutes in sqlite
+                if(preg_match('/sqlite2?/',$this->backend))
+                    $default=substr($default,1,-1);
+                // extract value from character_data in postgre
+                if(preg_match('/pgsql/',$this->backend) && !is_null($default))
+                    if(is_int(strpos($default,'nextval')))
+                        $default=null; // set autoincrement defaults to null
+                    elseif(preg_match("/\'(.*)\'/",$default,$match))
+                        $default = $match[1];
                 $columns[$cols[$schema['field']]] = array(
                     'type'=>$cols[$schema['type']],
                     'null'=>($cols[$schema['nullname']] == $schema['nullval'])?true:false,
-                    //'default'=>$cols['Default'], // TODO: add defaults, sqlite: dflt_value
-                    //'extra'=>$cols['Extra'], // TODO: detect auto increment, etc. ?
+                    'default'=>$default,
                 );
             } else
                 $columns[] = $cols[$schema['field']];
@@ -345,8 +354,10 @@ class VDB extends DB {
             $def_cmd = $this->findQuery($def_cmds).' '.
                 ((strstr(strtolower($type_val),'int')) ? 0 : "''");
         else
-            $def_cmd = ($default !== false) ? $this->findQuery($def_cmds).' '.
-                ((is_numeric($default)) ? $default : ("'".$default."'")) : '';
+            $def_cmd = ($default !== false) ?
+                $this->findQuery($def_cmds).' '.
+                    ((is_numeric($default)) ? $default : ("'".htmlspecialchars($default,ENT_QUOTES,F3::get('ENCODING'))."'"))
+                : '';
         $cmd=array(
             'sqlite2?'=>array(
                 "ALTER TABLE `$this->name` ADD `$column` $type_val $null_cmd $def_cmd"),

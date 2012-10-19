@@ -52,6 +52,26 @@ class VDB_Tests extends F3instance {
                 $type.'cannot add a column, not nullable'
             );
 
+            // default value test, nullable
+            list($r1,$r2) = $db->table('test',
+                function($table){   return $table->addCol('text_default_nullable','TEXT8',true,'foo bar'); },
+                function($table){   return $table->getCols(true); });
+            $this->expect(
+                $r1 == true && in_array('text_default_nullable',array_keys($r2)) == true && $r2['text_default_nullable']['default'] == 'foo bar',
+                $type.'adding column, nullable with default value',
+                $type.'missmatching default value in nullable column'
+            );
+
+            // default value test, not nullable
+            list($r1,$r2) = $db->table('test',
+                function($table){   return $table->addCol('text_default_not_null','TEXT8',false,'foo bar'); },
+                function($table){   return $table->getCols(true); });
+            $this->expect(
+                $r1 == true && in_array('text_default_not_null',array_keys($r2)) == true && $r2['text_default_not_null']['default'] == 'foo bar',
+                $type.'adding column, not nullable with default value',
+                $type.'missmatching default value in not nullable column'
+            );
+
             foreach(array_keys($db->dataTypes) as $index=>$field) {
                 // testing column types
                 list($r1,$r2) = $db->table('test',
