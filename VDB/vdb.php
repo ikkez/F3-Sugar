@@ -1,73 +1,80 @@
 <?php
 
 /**
-    VDB - an extension of the SQL database plugin for the PHP Fat-Free Framework
+    VDB - a SQL Table Schema Builder extension for the PHP Fat-Free Framework
 
     The contents of this file are subject to the terms of the GNU General
     Public License Version 3.0. You may not use this file except in
     compliance with the license. Any of the license terms and conditions
     can be waived if you get permission from the copyright holder.
 
+    crafted by   __ __     __
+                |__|  |--.|  |--.-----.-----.
+                |  |    < |    <|  -__|-- __|
+                |__|__|__||__|__|_____|_____|
+
     Copyright (c) 2012 by ikkez
-    Christian Knuth <mail@ikkez.de>
+    Christian Knuth <ikkez0n3@gmail.com>
+    https://github.com/ikkez/F3-Sugar/tree/master/VDB
 
         @package VDB
-        @version 0.8.0
+        @version 0.9.0
  **/
 
 class VDB extends DB {
 
     public
         $dataTypes = array(
-            'BOOLEAN'=>array(          'mysql|sqlite2?'=>'BOOLEAN',
-                                       'pgsql'=>'text',
-                                       'mssql|sybase|dblib|odbc|sqlsrv'=>'bit',
-                                       'ibm'=>'numeric(1,0)',
+            'BOOLEAN'=>array(       'mysql|sqlite2?'=>'BOOLEAN',
+                                    'pgsql'=>'text',
+                                    'mssql|sybase|dblib|odbc|sqlsrv'=>'bit',
+                                    'ibm'=>'numeric(1,0)',
             ),
-            'INT8'=>array(             'mysql'=>'TINYINT(3)',
-                                       'sqlite2?|pgsql'=>'integer',
-                                       'mssql|sybase|dblib|odbc|sqlsrv'=>'tinyint',
-                                       'ibm'=>'smallint',
+            'INT8'=>array(          'mysql'=>'TINYINT(3)',
+                                    'sqlite2?|pgsql'=>'integer',
+                                    'mssql|sybase|dblib|odbc|sqlsrv'=>'tinyint',
+                                    'ibm'=>'smallint',
             ),
-            'INT16'=>array(            'sqlite2?|pgsql|sybase|odbc|sqlsrv|imb'=>'integer',
-                                       'mysql|mssql|dblib'=>'int',
+            'INT16'=>array(         'sqlite2?|pgsql|sybase|odbc|sqlsrv|imb'=>'integer',
+                                    'mysql|mssql|dblib'=>'int',
             ),
-            'INT32'=>array(            'sqlite2?|pgsql'=>'integer',
-                                       'mysql|mssql|sybase|dblib|odbc|sqlsrv|imb'=>'bigint',
+            'INT32'=>array(         'sqlite2?|pgsql'=>'integer',
+                                    'mysql|mssql|sybase|dblib|odbc|sqlsrv|imb'=>'bigint',
             ),
-            'FLOAT'=>array(            'mysql|sqlite2?'=>'FLOAT',
-                                       'pgsql'=>'double precision',
-                                       'mssql|sybase|dblib|odbc|sqlsrv'=>'float',
-                                       'imb'=>'decfloat'
+            'FLOAT'=>array(         'mysql|sqlite2?'=>'FLOAT',
+                                    'pgsql'=>'double precision',
+                                    'mssql|sybase|dblib|odbc|sqlsrv'=>'float',
+                                    'imb'=>'decfloat'
             ),
-            'DOUBLE'=>array(           'mysql|sqlite2?|ibm'=>'DOUBLE',
-                                       'pgsql|sybase|odbc|sqlsrv'=>'double precision',
-                                       'mssql|dblib'=>'decimal',
+            'DOUBLE'=>array(        'mysql|sqlite2?|ibm'=>'DOUBLE',
+                                    'pgsql|sybase|odbc|sqlsrv'=>'double precision',
+                                    'mssql|dblib'=>'decimal',
             ),
-            'TEXT8'=>array(            'mysql|sqlite2?|ibm'=>'VARCHAR(255)',
-                                       'pgsql'=>'text',
-                                       'mssql|sybase|dblib|odbc|sqlsrv'=>'char(255)',
+            'TEXT8'=>array(         'mysql|sqlite2?|ibm'=>'VARCHAR(255)',
+                                    'pgsql'=>'text',
+                                    'mssql|sybase|dblib|odbc|sqlsrv'=>'char(255)',
             ),
-            'TEXT16'=>array(           'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv'=>'text',
-                                       'ibm'=>'BLOB SUB_TYPE TEXT',
+            'TEXT16'=>array(        'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv'=>'text',
+                                    'ibm'=>'BLOB SUB_TYPE TEXT',
             ),
-            'TEXT32'=>array(           'mysql'=>'LONGTEXT',
-                                       'sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv'=>'text',
-                                       'ibm'=>'CLOB(2000000000)',
+            'TEXT32'=>array(        'mysql'=>'LONGTEXT',
+                                    'sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv'=>'text',
+                                    'ibm'=>'CLOB(2000000000)',
             ),
-            'DATE'=>array(             'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv|ibm'=>'date',
+            'DATE'=>array(          'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv|ibm'=>'date',
             ),
-            'DATETIME'=>array(         'pgsql'=>'timestamp without time zone',
-                                       'mysql|sqlite2?|mssql|sybase|dblib|odbc|sqlsrv'=>'datetime',
-                                       'ibm'=>'timestamp',
+            'DATETIME'=>array(      'pgsql'=>'timestamp without time zone',
+                                    'mysql|sqlite2?|mssql|sybase|dblib|odbc|sqlsrv'=>'datetime',
+                                    'ibm'=>'timestamp',
             ),
-    );
+        );
 
     public
         $name;
 
     const
-        TEXT_NoDatatype='The specified datatype %s is not defined in %s driver';
+        TEXT_NoDatatype='The specified datatype %s is not defined in %s driver',
+        TEXT_NotNullFieldNeedsDefault='You cannot add the not nullable column `%s´ without specifying a default value';
 
     /**
      * alter table operation stack wrapper
@@ -212,7 +219,7 @@ class VDB extends DB {
             // add non-pk fields and import all data
             $this->table($oname,function($table) use($newCols,$oname) {
                 foreach($newCols as $name => $col)
-                    $table->addCol($name,$col['type'],$col['null'],false,true); //TODO: defaults
+                    $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
                 $fields = implode(', ',$table->getCols());
                 $table->exec('INSERT INTO '.$table->name.'('.$fields.') SELECT '.$fields.' FROM '.$table->name.'_temp');
             });
@@ -231,7 +238,7 @@ class VDB extends DB {
                 'pgsql'=>array(
                     "ALTER TABLE $this->name DROP CONSTRAINT ".$this->name.'_pkey;',
                     "ALTER TABLE $this->name ADD CONSTRAINT ".$this->name."_pkey PRIMARY KEY ( $pk_string );",
-                    ),
+                ),
                 'mssql'=>array(
                     ""),
                 'ibm'=>array(
@@ -245,7 +252,6 @@ class VDB extends DB {
             return TRUE;
         }
     }
-
 
     /**
      * rename a table
@@ -327,14 +333,14 @@ class VDB extends DB {
      * @param $column name
      * @param $type datatype definition
      * @param bool $nullable allow NULL values
-     * @param $default default insert value
+     * @param bool|mixed $default default insert value
      * @param bool $passThrough
      * @return bool
      */
     public function addCol($column,$type,$nullable = true,$default = false,$passThrough = false) {
         // check if column is already existing
         if(in_array($column,$this->getCols())) return false;
-        //prepare columntypes
+        // prepare columntypes
         if($passThrough == false) {
             if(!array_key_exists(strtoupper($type),$this->dataTypes)){
                 trigger_error(sprintf(self::TEXT_NoDatatype,strtoupper($type),$this->backend));
@@ -348,16 +354,13 @@ class VDB extends DB {
             'sqlite2?|mysql|pgsql|mssql|sybase|dblib|odbc'=>'DEFAULT',
             'ibm'=>'WITH DEFAULT',
         );
-        // not nullable fields should have a default value,
-        // so add predefined default if no other is provided
+        // not nullable fields should have a default value [SQlite]
         if($default === false && $nullable === false)
-            $def_cmd = $this->findQuery($def_cmds).' '.
-                ((strstr(strtolower($type_val),'int')) ? 0 : "''");
+            trigger_error(sprintf(self::TEXT_NotNullFieldNeedsDefault,$column));
         else
             $def_cmd = ($default !== false) ?
                 $this->findQuery($def_cmds).' '.
-                    ((is_numeric($default)) ? $default : ("'".htmlspecialchars($default,ENT_QUOTES,F3::get('ENCODING'))."'"))
-                : '';
+                    "'".htmlspecialchars($default,ENT_QUOTES,F3::get('ENCODING'))."'" : '';
         $cmd=array(
             'sqlite2?'=>array(
                 "ALTER TABLE `$this->name` ADD `$column` $type_val $null_cmd $def_cmd"),
@@ -389,7 +392,7 @@ class VDB extends DB {
             $this->create($this->name.'_new',function($table) use($newCols) {
                 // TODO: add PK fields
                 foreach($newCols as $name => $col)
-                    $table->addCol($name,$col['type'],$col['null'],false,true); // TODO: add default values
+                    $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
                 $fields = (!empty($newCols)) ? ', '.implode(', ',array_keys($newCols)) : '';
                 $table->exec('INSERT INTO '.$table->name.
                     ' SELECT id'.$fields.' FROM '.$table->name);
@@ -421,22 +424,23 @@ class VDB extends DB {
      * @return bool
      */
     public function renameCol($column,$column_new) {
+        $colTypes = $this->getCols(true);
+        // check if column is already existing
+        if(!in_array($column,array_keys($colTypes))) return false;
         if(preg_match('/sqlite2?/',$this->backend)) {
-            // SQlite does not support rename column directly
-            $newCols = array();
-            $newCols = $this->getCols(true);
+            // SQlite does not support drop or rename column directly
             // unset primary-key fields, TODO: support other PKs than ID and multiple PKs
-            unset($newCols['id']);
+            unset($colTypes['id']);
             // rename column
-            $newCols[$column_new] = $newCols[$column];
-            unset($newCols[$column]);
+            $colTypes[$column_new] = $colTypes[$column];
+            unset($colTypes[$column]);
             $this->begin();
             $oname = $this->name;
-            $this->create($this->name.'_new',function($table) use($newCols,$oname) {
-                foreach($newCols as $name => $col)
-                    $table->addCol($name,$col['type'],$col['null'],false,true); // TODO: defaults
+            $this->create($this->name.'_new',function($table) use($colTypes,$oname) {
+                foreach($colTypes as $name => $col)
+                    $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
                 // TODO: add PK fields here
-                $new_fields = (!empty($newCols)) ? ', '.implode(', ',array_keys($newCols)) : '';
+                $new_fields = (!empty($colTypes)) ? ', '.implode(', ',array_keys($colTypes)) : '';
                 $cur_fields = implode(', ',$table->getCols());
                 $table->exec('INSERT INTO '.$table->name.'(id'.$new_fields.') SELECT '.$cur_fields.' FROM '.$oname);
             });
@@ -449,9 +453,8 @@ class VDB extends DB {
         } elseif(preg_match('/odbc/',$this->backend)) {
             // no rename column for odbc
             $this->begin();
-            $this->table($this->name,function($table) use($column){
-                $colTypes = $table->getCols(true);
-                $table->addCol($column.'_new',$colTypes[$column]['type'],$colTypes[$column]['null'],false,true); // TODO: defaults
+            $this->table($this->name,function($table) use($column, $colTypes){
+                $table->addCol($column.'_new',$colTypes[$column]['type'],$colTypes[$column]['null'],$colTypes[$column]['default'],true);
             });
             $this->exec("UPDATE $this->name SET $column_new = $column");
             $this->dropCol($column);
@@ -472,5 +475,4 @@ class VDB extends DB {
             return (!$this->exec($query[0]))?TRUE:FALSE;
         }
     }
-
 }
