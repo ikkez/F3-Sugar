@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/tree/master/VDB
 
         @package VDB
-        @version 0.9.0
+        @version 0.9.1
  **/
 
 class VDB extends DB {
@@ -83,6 +83,7 @@ class VDB extends DB {
      * @return mixed
      */
     public function table($name,$func) {
+        if(!self::valid($name)) return false;
         $func = func_get_args();
         array_shift($func);
         $tmp = $this->name;
@@ -102,6 +103,7 @@ class VDB extends DB {
      * @return mixed
      */
     public function create($name,$func){
+        if(!self::valid($name)) return false;
         $this->createTable($name);
         return $this->table($name,$func);
     }
@@ -160,7 +162,7 @@ class VDB extends DB {
                 "CREATE TABLE $table (
                     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT )"),
             'mysql'=>array(
-                "CREATE TABLE $table (
+                "CREATE TABLE `$table` (
                     id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT
                 ) DEFAULT CHARSET=utf8"),
             'pgsql'=>array(
@@ -268,8 +270,10 @@ class VDB extends DB {
             $cmd=array(
                 'sqlite2?|pgsql'=>array(
                     "ALTER TABLE $this->name RENAME TO $new_name;"),
-                'mysql|ibm'=>array(
+                'mysql'=>array(
                     "RENAME TABLE `$this->name` TO `$new_name`;"),
+                'ibm'=>array(
+                    "RENAME TABLE $this->name TO $new_name;"),
                 'mssql|sybase|dblib'=>array(
                     "sp_rename $this->name, $new_name")
             );
@@ -287,6 +291,7 @@ class VDB extends DB {
      */
     public function dropTable($name = null) {
         $table = ($name)?$name:$this->name;
+        if(!self::valid($table)) return false;
         $cmd=array(
             'mysql|sqlite2?|pgsql|mssql|sybase|dblib|ibm|odbc'=>array(
                 "DROP TABLE IF EXISTS $table;"),
@@ -304,7 +309,7 @@ class VDB extends DB {
     public function getCols($types = false) {
         if(empty($this->name)) trigger_error('No table specified.');
         $columns = array();
-        $schema = $this->schema($this->name,60);
+        $schema = $this->schema($this->name,0);
         foreach($schema['result'] as $cols) {
             if($types) {
                 $default = $cols[$schema['default']];
@@ -362,9 +367,9 @@ class VDB extends DB {
                 $this->findQuery($def_cmds).' '.
                     "'".htmlspecialchars($default,ENT_QUOTES,F3::get('ENCODING'))."'" : '';
         $cmd=array(
-            'sqlite2?'=>array(
+            'mysql|sqlite2?'=>array(
                 "ALTER TABLE `$this->name` ADD `$column` $type_val $null_cmd $def_cmd"),
-            'mysql|pgsql|mssql|sybase|dblib|odbc'=>array(
+            'pgsql|mssql|sybase|dblib|odbc'=>array(
                 "ALTER TABLE $this->name ADD $column $type_val $null_cmd $def_cmd"),
             'ibm'=>array(
                 "ALTER TABLE $this->name ADD COLUMN $column $type_val $null_cmd $def_cmd"),
@@ -380,22 +385,23 @@ class VDB extends DB {
      * @return bool
      */
     public function dropCol($column) {
+        $colTypes = $this->getCols(true);
+        // check if column exists
+        if(!in_array($column,array_keys($colTypes))) return true;
         if(preg_match('/sqlite2?/',$this->backend)) {
             // SQlite does not support drop column directly
-            $newCols = array();
-            $newCols = $this->getCols(true);
             // unset primary-key fields, TODO: support other PKs than ID and multiple PKs
-            unset($newCols['id']);
+            unset($colTypes['id']);
             // unset drop field
-            unset($newCols[$column]);
+            unset($colTypes[$column]);
             $this->begin();
-            $this->create($this->name.'_new',function($table) use($newCols) {
+            $this->create($this->name.'_new',function($table) use($colTypes) {
                 // TODO: add PK fields
-                foreach($newCols as $name => $col)
+                foreach($colTypes as $name => $col)
                     $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
-                $fields = (!empty($newCols)) ? ', '.implode(', ',array_keys($newCols)) : '';
-                $table->exec('INSERT INTO '.$table->name.
-                    ' SELECT id'.$fields.' FROM '.$table->name);
+                $fields = (!empty($colTypes)) ? ', '.implode(', ',array_keys($colTypes)) : '';
+                $table->exec('INSERT INTO `'.$table->name.'` '.
+                    'SELECT id'.$fields.' FROM '.$table->name);
             });
             $tname = $this->name;
             $this->dropTable();
@@ -407,7 +413,7 @@ class VDB extends DB {
         } else {
             $cmd=array(
                 'mysql|mssql|sybase|dblib'=>array(
-                    "ALTER TABLE `$this->name` DROP `$column`"),
+                    "ALTER TABLE $this->name DROP $column"),
                 'pgsql|odbc|ibm'=>array(
                     "ALTER TABLE $this->name DROP COLUMN $column"),
             );
@@ -424,7 +430,7 @@ class VDB extends DB {
      * @return bool
      */
     public function renameCol($column,$column_new) {
-        $colTypes = $this->getCols(true);
+        $colTypes = $cur_fields = $this->getCols(true);
         // check if column is already existing
         if(!in_array($column,array_keys($colTypes))) return false;
         if(preg_match('/sqlite2?/',$this->backend)) {
@@ -436,13 +442,13 @@ class VDB extends DB {
             unset($colTypes[$column]);
             $this->begin();
             $oname = $this->name;
-            $this->create($this->name.'_new',function($table) use($colTypes,$oname) {
+            $this->create($this->name.'_new',function($table) use($colTypes,$cur_fields,$oname) {
                 foreach($colTypes as $name => $col)
                     $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
                 // TODO: add PK fields here
                 $new_fields = (!empty($colTypes)) ? ', '.implode(', ',array_keys($colTypes)) : '';
-                $cur_fields = implode(', ',$table->getCols());
-                $table->exec('INSERT INTO '.$table->name.'(id'.$new_fields.') SELECT '.$cur_fields.' FROM '.$oname);
+                $table->exec('INSERT INTO `'.$table->name.'`(id'.$new_fields.') '.
+                             'SELECT '.implode(', ',array_keys($cur_fields)).' FROM '.$oname);
             });
             $tname = $this->name;
             $this->dropTable();
