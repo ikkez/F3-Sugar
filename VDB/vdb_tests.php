@@ -133,10 +133,65 @@ class VDB_Tests extends F3instance {
                 $type.'cannot not drop table'.$this->getTime()
             );
 
+            // testing primary keys
+            $db->create($tname,function($table){
+                $table->addCol('version','INT8',false,1);
+                $table->addCol('title','TEXT8');
+                $table->addCol('title2','TEXT8');
+                $table->addCol('title_notnull','TEXT8',false,"foo");
+                $table->setPKs(array('id','version'));
+            });
+
+            $ax = new Axon($tname,$db);
+            $ax->title = 'test1';
+            $ax->save();
+
+            $ax->reset(); // PostgreSQL needs reset here
+            $ax->id = $ax->_id;
+            $ax->title = 'test2';
+            $ax->version = 2;
+            $ax->save();
+
+            $ax->reset(); // PostgreSQL needs reset here
+            $ax->title = 'test3';
+            $ax->title2 = 'foobar';
+            $ax->title_notnull = 'bar';
+            $ax->save();
+
+            $result = $ax->afind();
+            $expected = array (
+                array (
+                    'id' => 1,
+                    'version' => 1,
+                    'title' => 'test1',
+                    'title2' => NULL,
+                    'title_notnull' => 'foo',
+                ),
+                array (
+                    'id' => 1,
+                    'version' => 2,
+                    'title' => 'test2',
+                    'title2' => NULL,
+                    'title_notnull' => 'foo',
+                ),
+                array (
+                    'id' => 2,
+                    'version' => 1,
+                    'title' => 'test3',
+                    'title2' => 'foobar',
+                    'title_notnull' => 'bar',
+                ),
+            );
+            $this->expect(
+                json_encode($result) == json_encode($expected),
+                $type.'items with composite primary-keys'.$this->getTime(),
+                $type.'wrong result for composite primary-key items'.$this->getTime()
+            );
+            $db->dropTable($tname);
+
         }
         F3::set('QUIET',false);
         echo $this->render('basic/results.htm');
-        //echo var_dump($this->profile());
 	}
 
     var $roundTime = 0;

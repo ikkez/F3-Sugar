@@ -193,8 +193,11 @@ class VDB extends DB {
             // collect primary key field information
             $colTypes = $this->getCols(true);
             $pk_def = array();
-            foreach($pks as $name)
-                $pk_def[] = $name.' '.$colTypes[$name]['type'];
+            foreach($pks as $name) {
+                $dfv = $colTypes[$name]['default'];
+                $df_def = ($dfv !== false) ? " DEFAULT '".$dfv."'" : '';
+                $pk_def[] = $name.' '.$colTypes[$name]['type'].$df_def;
+            }
             $pk_def = implode(', ',$pk_def);
             // fetch all non primary key fields
             $newCols = array();
@@ -210,7 +213,7 @@ class VDB extends DB {
             // create new origin table, with new private keys and their fields
             $this->exec("CREATE TABLE $oname ( $pk_def, PRIMARY KEY ($pk_string) );");
             // create insert trigger to work-a-round autoincrement in multiple primary keys
-            // is set on first PK if it's an int field
+            // is set on first PK if it's an int field, // TODO: remove trigger if exists before?
             if(strstr(strtolower($colTypes[$pks[0]]['type']),'int'))
                 $this->exec('CREATE TRIGGER '.$oname.'_insert AFTER INSERT ON '.$oname.
                             ' WHEN (NEW.'.$pks[0].' IS NULL) BEGIN'.
