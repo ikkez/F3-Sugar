@@ -11,12 +11,20 @@ class VDB_Tests extends F3instance {
 
         // prevent errors breaking the render process,
         // set this to false for debugging purpose
-       F3::set('QUIET',true);
+       F3::set('QUIET',false);
 
         $dbs = array(
-            'mysql' =>  new VDB('mysql:host=localhost;port=3306;dbname=test','root',''),
-            'sqlite' => new VDB('sqlite::memory:'),
-            'pgsql' => new VDB('pgsql:host=localhost;dbname=test','test','1234'),
+            'mysql' => new VDB(
+                'mysql:host=localhost;port=3306;dbname=test','root','',
+                array(PDO::ATTR_STRINGIFY_FETCHES => true)
+            ),
+            'sqlite' => new VDB(
+                'sqlite::memory:'
+            ),
+            'pgsql' => new VDB(
+                'pgsql:host=localhost;dbname=test','test','1234',
+                array(PDO::ATTR_STRINGIFY_FETCHES => true)
+            ),
         );
 
         $tname = 'test_table';
@@ -50,6 +58,19 @@ class VDB_Tests extends F3instance {
                 );
             }
 
+            // adding some testing data
+            $ax = new Axon($tname,$db);
+            $ax->column_6 = 'hello world';
+            $ax->save();
+            $ax->reset();
+            $result = $ax->afind();
+
+            $this->expect(
+                $result[0]['column_6'] == 'hello world',
+                $type . 'added dummy data' . $this->getTime(),
+                $type . 'no dummy data added' . $this->getTime()
+            );
+
             // default value text, not nullable
             list($r1,$r2) = $db->table($tname,
                 function($table){   return $table->addCol('text_default_not_null','TEXT8',false,'foo bar'); },
@@ -58,6 +79,17 @@ class VDB_Tests extends F3instance {
                 $r1 == true && in_array('text_default_not_null',array_keys($r2)) == true && $r2['text_default_not_null']['default'] == 'foo bar' && $r2['text_default_not_null']['null'] == false,
                 $type.'adding column [TEXT8], not nullable with default value'.$this->getTime(),
                 $type.'missmatching default value in not nullable [TEXT8] column'.$this->getTime()
+            );
+
+            $ax->sync($tname);
+            $ax->column_6 = 'tantuay';
+            $ax->save();
+            $ax->reset();
+            $result = $ax->afind();
+            $this->expect(
+                $result[1]['column_6'] == 'tantuay' && $result[1]['text_default_not_null'] == 'foo bar',
+                $type . 'checking dummy data' . $this->getTime(),
+                $type . 'dummy data broken' . $this->getTime()
             );
 
             // default value numeric, not nullable
@@ -70,6 +102,17 @@ class VDB_Tests extends F3instance {
                 $type.'missmatching default value in not nullable [INT8] column'.$this->getTime()
             );
 
+            $ax->sync($tname);
+            $ax->column_6 = 'test3';
+            $ax->save();
+            $ax->reset();
+            $result = $ax->afind();
+            $this->expect(
+                $result[2]['column_6'] == 'test3' && $result[2]['int_default_not_null'] == '123',
+                $type . 'checking dummy data' . $this->getTime(),
+                $type . 'dummy data broken' . $this->getTime()
+            );
+
             // default value text, nullable
             list($r1,$r2) = $db->table($tname,
                 function($table){   return $table->addCol('text_default_nullable','TEXT8',true,'foo bar'); },
@@ -78,6 +121,25 @@ class VDB_Tests extends F3instance {
                 $r1 == true && in_array('text_default_nullable',array_keys($r2)) == true && $r2['text_default_nullable']['default'] == 'foo bar',
                 $type.'adding column [TEXT8], nullable with default value'.$this->getTime(),
                 $type.'missmatching default value in nullable [TEXT8] column'.$this->getTime()
+            );
+
+            $ax->sync($tname);
+            $ax->column_6 = 'test4';
+            $ax->save();
+            $ax->reset();
+            $ax->column_6 = 'test5';
+//            $ax->text_default_nullable = 'test123'; //TODO: not possible in axon, right now?!
+	        var_dump($ax->text_default_nullable);
+            $ax->text_default_nullable = null; //TODO: not possible in axon, right now?!
+            $ax->save();
+            $ax->reset();
+//            $db->exec("INSERT INTO $tname (column_6, text_default_nullable) VALUES('test5',NULL);");
+            $result = $ax->afind();
+            $this->expect(
+                $result[3]['column_6'] == 'test4' && $result[3]['text_default_nullable'] == 'foo bar' &&
+                $result[4]['column_6'] == 'test5' && $result[4]['text_default_nullable'] == null,
+                $type.'checking dummy data'.$this->getTime(),
+                $type.'dummy data broken'.$this->getTime()
             );
 
             // default value numeric, nullable
@@ -133,66 +195,92 @@ class VDB_Tests extends F3instance {
                 $type.'cannot not drop table'.$this->getTime()
             );
 
-            // testing primary keys
-            $db->create($tname,function($table){
+            // adding composite primary keys
+            $r1 = $db->create($tname,function($table){
                 $table->addCol('version','INT8',false,1);
-                $table->addCol('title','TEXT8');
-                $table->addCol('title2','TEXT8');
-                $table->addCol('title_notnull','TEXT8',false,"foo");
                 $table->setPKs(array('id','version'));
+                return $table->getCols(true);
             });
+            $this->expect(
+                $r1['id']['primary'] == true && $r1['version']['primary'] == true,
+                $type . 'added composite primary-keys' . $this->getTime(),
+                $type . 'composite primary-keys mismatching' . $this->getTime()
+            );
+            $this->expect(
+                $r1['version']['default'] == '1',
+                $type . 'default value on composite primary key' . $this->getTime(),
+                $type . 'wrong default value definition on composite primary-key' . $this->getTime()
+            );
 
+            // more fields to composite primary key table
+            $r1 = $db->table($tname, function ($table) {
+                $table->addCol('title', 'TEXT8');
+                $table->addCol('title2', 'TEXT8');
+                $table->addCol('title_notnull', 'TEXT8', false, "foo");
+                return $table->getCols(true);
+            });
+            $this->expect(
+                array_key_exists('title',$r1) == true && array_key_exists('title_notnull', $r1) == true &&
+                $r1['id']['primary'] == true && $r1['version']['primary'] == true,
+                $type . 'added more fields to composite pk table' . $this->getTime(),
+                $type . 'composite primary-keys failed after inserting more fields' . $this->getTime()
+            );
+
+            // testing primary keys with inserted data
             $ax = new Axon($tname,$db);
             $ax->title = 'test1';
             $ax->save();
+            $ax->reset();
 
-            $ax->reset(); // PostgreSQL needs reset here
             $ax->id = $ax->_id;
             $ax->title = 'test2';
             $ax->version = 2;
             $ax->save();
+            $ax->reset();
 
-            $ax->reset(); // PostgreSQL needs reset here
             $ax->title = 'test3';
             $ax->title2 = 'foobar';
             $ax->title_notnull = 'bar';
             $ax->save();
 
             $result = $ax->afind();
-            $expected = array (
+            $cpk_expected = array (
                 array (
-                    'id' => 1,
-                    'version' => 1,
+                    'id' => '1',
+                    'version' => '1',
                     'title' => 'test1',
                     'title2' => NULL,
                     'title_notnull' => 'foo',
                 ),
                 array (
-                    'id' => 1,
-                    'version' => 2,
+                    'id' => '1',
+                    'version' => '2',
                     'title' => 'test2',
                     'title2' => NULL,
                     'title_notnull' => 'foo',
                 ),
                 array (
-                    'id' => 2,
-                    'version' => 1,
+                    'id' => '2',
+                    'version' => '1',
                     'title' => 'test3',
                     'title2' => 'foobar',
                     'title_notnull' => 'bar',
                 ),
             );
             $this->expect(
-                json_encode($result) == json_encode($expected),
-                $type.'items with composite primary-keys'.$this->getTime(),
+                json_encode($result) == json_encode($cpk_expected),
+                $type.'added items with composite primary-keys'.$this->getTime(),
                 $type.'wrong result for composite primary-key items'.$this->getTime()
             );
+
+
+
             $db->dropTable($tname);
 
         }
         F3::set('QUIET',false);
         echo $this->render('basic/results.htm');
-	}
+    }
 
     var $roundTime = 0;
     private function getTime() {
@@ -200,6 +288,5 @@ class VDB_Tests extends F3instance {
         $this->roundTime = microtime(TRUE)-$this->get('timer');
         return ' [ '.sprintf('%.3f',$time).'s ]';
     }
-
 
 }

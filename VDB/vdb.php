@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/tree/master/VDB
 
         @package VDB
-        @version 0.9.1
+        @version 0.9.2
  **/
 
 class VDB extends DB {
@@ -109,7 +109,7 @@ class VDB extends DB {
     }
 
     /**
-     * parse command array and return backend specifiy query
+     * parse command array and return backend specific query
      * @param $cmd
      * @return bool
      */
@@ -125,6 +125,18 @@ class VDB extends DB {
             return FALSE;
         }
         return $val;
+    }
+
+    /**
+     * execute query stack
+     * @param $query
+     * @return bool
+     */
+    private function execQuerys($query) {
+        if (!$query[0]) return false;
+        foreach ($query as $q)
+            if($this->exec($q) === false) return false;
+        return true;
     }
 
     /**
@@ -222,11 +234,12 @@ class VDB extends DB {
                                 ') WHERE ROWID = NEW.ROWID;'.
                             ' END;');
             // add non-pk fields and import all data
-            $this->table($oname,function($table) use($newCols,$oname) {
+            $this->table($oname,function($table) use($newCols) {
                 foreach($newCols as $name => $col)
                     $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
                 $fields = implode(', ',$table->getCols());
                 $table->exec('INSERT INTO '.$table->name.'('.$fields.') SELECT '.$fields.' FROM '.$table->name.'_temp');
+                // TODO: add check if the data really has been copied, before dropping old table.
             });
             // drop old table
             $this->dropTable($oname.'_temp');
@@ -250,11 +263,7 @@ class VDB extends DB {
                     ""),
             );
             $query = $this->findQuery($cmd);
-            foreach($query as $q) {
-                if(!$q) return false;
-                $this->exec($q);
-            }
-            return TRUE;
+            return $this->execQuerys($query);
         }
     }
 
@@ -283,7 +292,7 @@ class VDB extends DB {
             $query = $this->findQuery($cmd);
             if(!$query[0]) return false;
             $this->name = $new_name;
-            return (!$this->exec($query[0]))?TRUE:FALSE;
+            return $this->execQuerys($query);
         }
     }
 
@@ -300,8 +309,7 @@ class VDB extends DB {
                 "DROP TABLE IF EXISTS $table;"),
         );
         $query = $this->findQuery($cmd);
-        if(!$query[0]) return false;
-        return (!$this->exec($query[0]))?TRUE:FALSE;
+        return $this->execQuerys($query);
     }
 
     /**
@@ -329,6 +337,7 @@ class VDB extends DB {
                     'type'=>$cols[$schema['type']],
                     'null'=>($cols[$schema['nullname']] == $schema['nullval'])?true:false,
                     'default'=>$default,
+                    'primary'=>($cols[$schema['pkname']] == $schema['pkval'])?true:false,
                 );
             } else
                 $columns[] = $cols[$schema['field']];
@@ -378,8 +387,7 @@ class VDB extends DB {
                 "ALTER TABLE $this->name ADD COLUMN $column $type_val $null_cmd $def_cmd"),
         );
         $query = $this->findQuery($cmd);
-        if(!$query[0]) return false;
-        return (!$this->exec($query[0]))?TRUE:FALSE;
+        return $this->execQuerys($query);
     }
 
     /**
@@ -421,8 +429,7 @@ class VDB extends DB {
                     "ALTER TABLE $this->name DROP COLUMN $column"),
             );
             $query = $this->findQuery($cmd);
-            if(!$query[0]) return false;
-            return (!$this->exec($query[0]))?TRUE:FALSE;
+            return $this->execQuerys($query);
         }
     }
 
@@ -480,8 +487,7 @@ class VDB extends DB {
                     "sp_rename $this->name.$column, $column_new"),
             );
             $query = $this->findQuery($cmd);
-            if(!$query[0]) return false;
-            return (!$this->exec($query[0]))?TRUE:FALSE;
+            return $this->execQuerys($query);
         }
     }
 }
