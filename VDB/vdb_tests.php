@@ -128,12 +128,10 @@ class VDB_Tests extends F3instance {
             $ax->save();
             $ax->reset();
             $ax->column_6 = 'test5';
-//            $ax->text_default_nullable = 'test123'; //TODO: not possible in axon, right now?!
-	        var_dump($ax->text_default_nullable);
-            $ax->text_default_nullable = null; //TODO: not possible in axon, right now?!
-            $ax->save();
-            $ax->reset();
-//            $db->exec("INSERT INTO $tname (column_6, text_default_nullable) VALUES('test5',NULL);");
+            // $ax->text_default_nullable = null; //TODO: not possible in axon, right now?!
+            // $ax->save();
+            // $ax->reset();
+            $db->exec("INSERT INTO $tname (column_6, text_default_nullable) VALUES('test5',NULL);");
             $result = $ax->afind();
             $this->expect(
                 $result[3]['column_6'] == 'test4' && $result[3]['text_default_nullable'] == 'foo bar' &&
