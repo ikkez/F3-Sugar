@@ -2,19 +2,7 @@
 some custom helpers and plugins for the PHP Fat-Free Framework
 
 
-### Pagination
-
-A little class that helps you to build a page browser.
-
-***
-
-### FileUnit
-
-F3-Plugin which offers some more file system functionality.
-
-***
-
-### VDB
+### SchemaBuilder
 
 A variable DB extension for managing database structures.
 
