@@ -149,12 +149,12 @@ class Schema extends Controller
 			$ax->text_default_nullable = null; //TODO: not possible in axon, right now?!
 			$ax->save();
 			$ax->reset();
-			// $db->exec("INSERT INTO $tname (column_6, text_default_nullable) VALUES('test5',NULL);");
+//			 $db->exec("INSERT INTO $tname (column_6, text_default_nullable) VALUES('test5',NULL);");
 			$result = $ax->find();
 			foreach ($result as &$r) $r = $r->cast();
 			$test->expect(array_key_exists(3, $result) && array_key_exists(4, $result) &&
 					$result[3]['column_6'] == 'test4' && $result[3]['text_default_nullable'] == 'foo bar' &&
-					$result[4]['column_6'] == 'test5' && $result[4]['text_default_nullable'] == null,
+					$result[4]['column_6'] == 'test5' && $result[4]['text_default_nullable'] == null, // TODO: notice === will not work
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
@@ -258,8 +258,8 @@ class Schema extends Controller
 			$ax->save();
 			$ax->reset();
 
-			$ax->id = $ax->_id;
-			$ax->title = 'test2';
+			$ax->id = 1;
+			$ax->title = 'null';
 			$ax->version = 2;
 			$ax->save();
 			$ax->reset();
@@ -270,31 +270,37 @@ class Schema extends Controller
 			$ax->save();
 
 			$result = $ax->find();
-			foreach ($result as &$r) $r = $r->cast();
+			foreach ($result as &$r) {
+				$r = $r->cast();
+				if ($db->driver() == 'pgsql') $r = array_reverse($r);
+			}
 
 			$cpk_expected = array(
-				array(
-					'id' => '1',
-					'version' => '1',
+				0=>array(
+					'id' => 1,
+					'version' => 1,
 					'title' => 'test1',
-					'title2' => NULL,
+//					'title2' => NULL,
+					'title2' => '',
 					'title_notnull' => 'foo',
 				),
-				array(
-					'id' => '1',
-					'version' => '2',
-					'title' => 'test2',
-					'title2' => NULL,
+				1=>array(
+					'id' => 1,
+					'version' => 2,
+					'title' => 'null',
+//					'title2' => NULL,
+					'title2' => '',
 					'title_notnull' => 'foo',
 				),
-				array(
-					'id' => '2',
-					'version' => '1',
+				2=>array(
+					'id' => 2,
+					'version' => 1,
 					'title' => 'test3',
 					'title2' => 'foobar',
 					'title_notnull' => 'bar',
 				),
 			);
+
 			$test->expect(
 				json_encode($result) == json_encode($cpk_expected),
 				$this->getTime().' '.$type.'adding items with composite primary-keys'
