@@ -10,22 +10,21 @@ class Schema extends Controller
 		$test = new \Test;
 		$f3->set('title', 'Variable DB Schema Builder');
 
-		// prevent errors breaking the render process,
-		// set this to false for debugging purpose
-		$f3->set('QUIET', true); // TODO: does not work :-/
+		$f3->set('QUIET', false);
 
 		$dbs = array(
-			'mysql' => new \DB\SQL(
-				'mysql:host=localhost;port=3306;dbname=test', 'root', '',
-				array(\PDO::ATTR_STRINGIFY_FETCHES => true)
-			),
+//			'mysql' => new \DB\SQL(
+//				'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', '',
+//				array(\PDO::ATTR_STRINGIFY_FETCHES => true)
+//			),
 			'sqlite' => new \DB\SQL(
 				'sqlite::memory:'
+//				'sqlite:db/sqlite.db'
 			),
-			'pgsql' => new \DB\SQL(
-				'pgsql:host=localhost;dbname=test','test','1234',
-				array(\PDO::ATTR_STRINGIFY_FETCHES => true)
-			),
+//			'pgsql' => new \DB\SQL(
+//				'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree',
+//				array(\PDO::ATTR_STRINGIFY_FETCHES => true)
+//			),
 		);
 
 		$this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
@@ -41,7 +40,7 @@ class Schema extends Controller
 			$cr_result = $builder->createTable($tname);
 			$result = $builder->getTables();
 			$test->expect(
-				$cr_result == true && in_array($tname, $result) == true,
+				$cr_result == true && in_array($tname, $result),
 				$this->getTime().' '.$type.'create table'
 			);
 
@@ -55,7 +54,7 @@ class Schema extends Controller
 						return $table->getCols();
 					});
 				$test->expect(
-					$r1 == true && in_array('column_' . $index, $r2) == true,
+					$r1 == true && in_array('column_' . $index, $r2),
 					$this->getTime().' '.$type.'adding column [' . $field . '], nullable'
 				);
 			}
@@ -65,9 +64,7 @@ class Schema extends Controller
 			$ax->column_6 = 'hello world';
 			$ax->save();
 			$ax->reset();
-			$result = $ax->find();
-			foreach ($result as &$r) $r = $r->cast();
-
+			$result = $ax->afind();
 			$test->expect(array_key_exists(0, $result) &&
 				$result[0]['column_6'] == 'hello world',
 				$this->getTime().' '.$type.'mapping dummy data'
@@ -83,21 +80,20 @@ class Schema extends Controller
 				});
 			$test->expect(
 				$r1 == true &&
-					in_array('text_default_not_null', array_keys($r2)) == true &&
+					in_array('text_default_not_null', array_keys($r2)) &&
 					$r2['text_default_not_null']['default'] == 'foo bar' &&
 					$r2['text_default_not_null']['null'] == false,
 				$this->getTime().' '.$type.'adding column [TEXT8], not nullable with default value'
 			);
-
 			unset($ax);
 			$ax = new \DB\SQL\Mapper($db, $tname);
 			$ax->column_6 = 'tanduay';
 			$ax->save();
 			$ax->reset();
-			$result = $ax->find();
-			foreach ($result as &$r) $r = $r->cast();
+			$result = $ax->afind();
 			$test->expect(array_key_exists(1, $result) &&
-					$result[1]['column_6'] == 'tanduay' && $result[1]['text_default_not_null'] == 'foo bar',
+					$result[1]['column_6'] == 'tanduay' &&
+					$result[1]['text_default_not_null'] == 'foo bar',
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
@@ -110,19 +106,22 @@ class Schema extends Controller
 					return $table->getCols(true);
 				});
 			$test->expect(
-				$r1 == true && in_array('int_default_not_null', array_keys($r2)) == true && $r2['int_default_not_null']['default'] == 123 && $r2['int_default_not_null']['null'] == false,
+					$r1 == true &&
+					in_array('int_default_not_null', array_keys($r2)) &&
+					$r2['int_default_not_null']['default'] == 123 &&
+					$r2['int_default_not_null']['null'] == false,
 				$this->getTime().' '.$type.'adding column [INT8], not nullable with default value'
 			);
-
 			unset($ax);
 			$ax = new \DB\SQL\Mapper($db, $tname);
 			$ax->column_6 = 'test3';
 			$ax->save();
 			$ax->reset();
-			$result = $ax->find();
-			foreach ($result as &$r) $r = $r->cast();
-			$test->expect(array_key_exists(2, $result) &&
-					$result[2]['column_6'] == 'test3' && $result[2]['int_default_not_null'] == '123',
+			$result = $ax->afind();
+			$test->expect(
+					array_key_exists(2, $result) &&
+					$result[2]['column_6'] == 'test3' &&
+					$result[2]['int_default_not_null'] === 123,
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
@@ -135,26 +134,25 @@ class Schema extends Controller
 					return $table->getCols(true);
 				});
 			$test->expect(
-				$r1 == true && in_array('text_default_nullable', array_keys($r2)) == true && $r2['text_default_nullable']['default'] == 'foo bar',
+					$r1 == true &&
+					in_array('text_default_nullable', array_keys($r2)) &&
+					$r2['text_default_nullable']['default'] == 'foo bar',
 				$this->getTime().' '.$type.'adding column [TEXT8], nullable with default value'
 			);
-
 			unset($ax);
 			$ax = new \DB\SQL\Mapper($db, $tname);
 			$ax->column_6 = 'test4';
 			$ax->save();
 			$ax->reset();
-
 			$ax->column_6 = 'test5';
-			$ax->text_default_nullable = null; //TODO: not possible in axon, right now?!
+			$ax->text_default_nullable = null;
 			$ax->save();
 			$ax->reset();
-//			 $db->exec("INSERT INTO $tname (column_6, text_default_nullable) VALUES('test5',NULL);");
-			$result = $ax->find();
-			foreach ($result as &$r) $r = $r->cast();
-			$test->expect(array_key_exists(3, $result) && array_key_exists(4, $result) &&
+			$result = $ax->afind();
+			$test->expect(
+					array_key_exists(3, $result) && array_key_exists(4, $result) &&
 					$result[3]['column_6'] == 'test4' && $result[3]['text_default_nullable'] == 'foo bar' &&
-					$result[4]['column_6'] == 'test5' && $result[4]['text_default_nullable'] == null, // TODO: notice === will not work
+					$result[4]['column_6'] == 'test5' && $result[4]['text_default_nullable'] === null,
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
@@ -169,6 +167,22 @@ class Schema extends Controller
 			$test->expect(
 				$r1 == true && in_array('int_default_nullable', array_keys($r2)) == true && $r2['int_default_nullable']['default'] == 123,
 				$this->getTime().' '.$type.'adding column [INT8], nullable with default value'
+			);
+			unset($ax);
+			$ax = new \DB\SQL\Mapper($db, $tname);
+			$ax->column_6 = 'test6';
+			$ax->save();
+			$ax->reset();
+			$ax->column_6 = 'test7';
+			$ax->int_default_nullable = null;
+			$ax->save();
+			$ax->reset();
+//			 $db->exec("INSERT INTO $tname (column_6, int_default_nullable) VALUES('test7',NULL);");
+			$result = $ax->afind();
+			$test->expect(array_key_exists(5, $result) && array_key_exists(6, $result) &&
+					$result[5]['column_6'] == 'test6' && $result[5]['int_default_nullable'] === 123 &&
+					$result[6]['column_6'] == 'test7' && $result[6]['int_default_nullable'] === null,
+				$this->getTime() . ' ' . $type . 'mapping dummy data'
 			);
 
 			// rename column
@@ -185,20 +199,30 @@ class Schema extends Controller
 					in_array('text_default_not_null', $r2) == false,
 				$this->getTime().' '.$type.'renaming column'
 			);
+			unset($ax);
+			$ax = new \DB\SQL\Mapper($db, $tname);
+			$ax->title123 = 'test8';
+			$ax->save();
+			$ax->reset();
+			$result = $ax->afind();
+			$test->expect(array_key_exists(7, $result) && $result[7]['title123'] == 'test8',
+				$this->getTime().' '.$type.'mapping dummy data'
+			);
 			$builder->table($tname, function ($table) {
 				return $table->renameCol('title123', 'text_default_not_null');
 			});
 
+
 			// remove column
 			list($r1, $r2) = $builder->table($tname,
 				function ($table) {
-					return $table->dropCol('title');
+					return $table->dropCol('column_1');
 				},
 				function ($table) {
 					return $table->getCols();
 				});
 			$test->expect(
-				$r1 == true && in_array('title', $r2) == false,
+				$r1 == true && in_array('column_1', $r2) == false,
 				$this->getTime().' '.$type.'removng column'
 			);
 
@@ -269,27 +293,20 @@ class Schema extends Controller
 			$ax->title_notnull = 'bar';
 			$ax->save();
 
-			$result = $ax->find();
-			foreach ($result as &$r) {
-				$r = $r->cast();
-				if ($db->driver() == 'pgsql') $r = array_reverse($r);
-			}
-
+			$result = $ax->afind();
 			$cpk_expected = array(
 				0=>array(
 					'id' => 1,
 					'version' => 1,
 					'title' => 'test1',
-//					'title2' => NULL,
-					'title2' => '',
+					'title2' => NULL,
 					'title_notnull' => 'foo',
 				),
 				1=>array(
 					'id' => 1,
 					'version' => 2,
 					'title' => 'null',
-//					'title2' => NULL,
-					'title2' => '',
+					'title2' => NULL,
 					'title_notnull' => 'foo',
 				),
 				2=>array(
@@ -300,7 +317,10 @@ class Schema extends Controller
 					'title_notnull' => 'bar',
 				),
 			);
-
+			foreach ($result as &$r)
+				ksort($r);
+			foreach ($cpk_expected as &$r)
+				ksort($r);
 			$test->expect(
 				json_encode($result) == json_encode($cpk_expected),
 				$this->getTime().' '.$type.'adding items with composite primary-keys'

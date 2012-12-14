@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/tree/master/VDB
 
         @package DB
-        @version 0.9.3
+        @version 0.9.4
 
  **/
 
@@ -213,9 +213,9 @@ class SchemaBuilder {
      */
     public function setPKs($pks) {
         $pk_string = implode(', ',$pks);
-
         if(preg_match('/sqlite2?/',$this->db->driver())) {
-            // collect primary key field information
+	        $this->db->exec('DROP TRIGGER IF EXISTS '.$this->name.'_insert');
+	        // collect primary key field information
             $colTypes = $this->getCols(true);
             $pk_def = array();
             foreach($pks as $name) {
@@ -223,6 +223,28 @@ class SchemaBuilder {
                 $df_def = ($dfv !== false) ? " DEFAULT '".$dfv."'" : '';
                 $pk_def[] = $name.' '.$colTypes[$name]['type'].$df_def;
             }
+	        $currentPKs = array();
+	        foreach($colTypes as $n=>$t) if($t['primary']) $currentPKs[] = $n;
+
+	        if(count($pks)<=1 && count($currentPKs) >= 1) {
+		        // already the right pk
+		        if((count($pks) == 1 && count($currentPKs) == 1) && $pks[0] == $currentPKs[0])
+			        return true;
+		        // rebuild with single pk
+		        $this->table($this->name, function ($table) {
+			        $table->renameTable($table->name.'_temp');
+		        });
+		        $this->table($this->name, function ($table) use ($colTypes) {
+			        foreach ($colTypes as $name => $col)
+				        $table->addCol($name, $col['type'], $col['null'], $col['default'], true);
+		        });
+		        $fields = implode(', ',array_keys($colTypes));
+		        $this->db->exec('INSERT INTO '.$this->name.'('.$fields.') SELECT '.$fields.' FROM '
+			        .$this->name.'_temp');
+		        // drop old table
+		        $this->dropTable($this->name.'_temp');
+		        return true;
+	        }
             $pk_def = implode(', ',$pk_def);
             // fetch all non primary key fields
             $newCols = array();
@@ -238,7 +260,7 @@ class SchemaBuilder {
             // create new origin table, with new private keys and their fields
             $this->db->exec("CREATE TABLE $oname ( $pk_def, PRIMARY KEY ($pk_string) );");
             // create insert trigger to work-a-round autoincrement in multiple primary keys
-            // is set on first PK if it's an int field, // TODO: remove trigger if exists before?
+            // is set on first PK if it's an int field
             if(strstr(strtolower($colTypes[$pks[0]]['type']),'int'))
                 $this->db->exec('CREATE TRIGGER '.$oname.'_insert AFTER INSERT ON '.$oname.
                             ' WHEN (NEW.'.$pks[0].' IS NULL) BEGIN'.
@@ -247,13 +269,15 @@ class SchemaBuilder {
                                 ') WHERE ROWID = NEW.ROWID;'.
                             ' END;');
             // add non-pk fields and import all data
-            $this->table($oname,function($table) use($newCols) {
+            $db = $this->db;
+            $cols = $this->table($oname,function($table) use($newCols,$db) {
                 foreach($newCols as $name => $col)
                     $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
-                $fields = implode(', ',$table->getCols());
-                $table->db->exec('INSERT INTO '.$table->name.'('.$fields.') SELECT '.$fields.' FROM '.$table->name.'_temp');
-                // TODO: add check if the data really has been copied, before dropping old table.
+	            return $table->getCols();
             });
+	        $fields = implode(', ', $cols);
+	        $db->exec('INSERT INTO '.$oname.'('.$fields.') SELECT '.$fields.' FROM '
+		        .$oname.'_temp');
             // drop old table
             $this->dropTable($oname.'_temp');
             $this->db->commit();
@@ -347,8 +371,7 @@ class SchemaBuilder {
                     elseif(preg_match("/\'(.*)\'/",$default,$match))
                         $default = $match[1];
                 $columns[$name] = array(
-                    // 'type'=>$cols['type'], // TODO: this is no longer the real returned type from db :-/
-                    'type'=>$cols['type_raw'], // need to add this to the schema method
+                    'type'=>$cols['type'],
                     'null'=>$cols['nullable'],
                     'default'=>$default,
                     'primary'=>$cols['pkey'],
@@ -415,19 +438,23 @@ class SchemaBuilder {
         if(!in_array($column,array_keys($colTypes))) return true;
         if(preg_match('/sqlite2?/',$this->db->driver())) {
             // SQlite does not support drop column directly
-            // unset primary-key fields, TODO: support other PKs than ID and multiple PKs
-            unset($colTypes['id']);
-            // unset drop field
-            unset($colTypes[$column]);
+	        // unset dropped field
+	        unset($colTypes[$column]);
+            // remind primary-key fields
+	        foreach ($colTypes as $key => $col)
+		        if ($col['primary']) {
+			        $pkeys[] = $key;
+			        if($key == 'id') unset($colTypes[$key]);
+		        }
             $this->db->begin();
-            $this->create($this->name.'_new',function($table) use($colTypes) {
-                // TODO: add PK fields
+            $this->create($this->name.'_new',function($table) use($colTypes,$pkeys) {
                 foreach($colTypes as $name => $col)
-                    $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
-                $fields = (!empty($colTypes)) ? ', '.implode(', ',array_keys($colTypes)) : '';
-                $table->db->exec('INSERT INTO `'.$table->name.'` '.
-                    'SELECT id'.$fields.' FROM '.$table->name);
+                    $table->addCol($name,$col['type'], $col['null'],$col['default'],true);
+	            $table->setPKs($pkeys);
             });
+	        $fields = !empty($colTypes) ? ', '.implode(', ', array_keys($colTypes)):'';
+	        $this->db->exec('INSERT INTO `'.$this->name .'_new'. '` '.
+		                    'SELECT id' . $fields . ' FROM ' . $this->name);
             $tname = $this->name;
             $this->dropTable();
             $this->table($this->name.'_new',function($table) use($tname){
@@ -459,21 +486,25 @@ class SchemaBuilder {
         if(!in_array($column,array_keys($colTypes))) return false;
         if(preg_match('/sqlite2?/',$this->db->driver())) {
             // SQlite does not support drop or rename column directly
-            // unset primary-key fields, TODO: support other PKs than ID and multiple PKs
-            unset($colTypes['id']);
-            // rename column
-            $colTypes[$column_new] = $colTypes[$column];
-            unset($colTypes[$column]);
+            // remind primary-key fields
+	        foreach ($colTypes as $key => $col)
+		        if ($col['primary'] == true) {
+			        $pkeys[] = (($key == $column) ? $column_new : $key);
+			        if ($key == 'id') unset($colTypes[$key]);
+		        }
             $this->db->begin();
-            $oname = $this->name;
-            $this->create($this->name.'_new',function($table) use($colTypes,$cur_fields,$oname) {
+            $this->create($this->name.'_new',function($table) use($colTypes,$pkeys,$column_new,
+	        $column) {
                 foreach($colTypes as $name => $col)
-                    $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
-                // TODO: add PK fields here
-                $new_fields = (!empty($colTypes)) ? ', '.implode(', ',array_keys($colTypes)) : '';
-                $table->db->exec('INSERT INTO `'.$table->name.'`(id'.$new_fields.') '.
-                             'SELECT '.implode(', ',array_keys($cur_fields)).' FROM '.$oname);
+                    $table->addCol((($name == $column) ? $column_new : $name),
+                        $col['type'],$col['null'],$col['default'],true);
+	            $table->setPKs($pkeys);
             });
+	        foreach(array_keys($colTypes) as $type)
+	            $new_fields[] = ', '.(($type == $column)?$column_new:$type);
+	        $this->db->exec('INSERT INTO `' . $this->name . '_new' . '` ("id"' . implode($new_fields) . ') ' .
+	            'SELECT "' . implode('", "', array_keys($cur_fields)) . '" FROM `' . $this->name .
+		        '`;');
             $tname = $this->name;
             $this->dropTable();
             $this->table($this->name.'_new',
