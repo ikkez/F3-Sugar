@@ -4,7 +4,7 @@ some custom helpers and plugins for the PHP Fat-Free Framework
 
 ### SchemaBuilder
 
-A variable DB extension for managing database structures.
+SQL database extension for managing database table structures.
 
 ***
 
