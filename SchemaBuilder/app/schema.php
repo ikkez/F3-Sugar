@@ -9,19 +9,19 @@ class Schema extends Controller
 		$f3 = \Base::instance();
 		$test = new \Test;
 
-//		$f3->set('QUIET', false);
+		$f3->set('QUIET', false);
 
 		$dbs = array(
-			'mysql' => new \DB\SQL(
-				'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
-			),
+//			'mysql' => new \DB\SQL(
+//				'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
+//			),
 			'sqlite' => new \DB\SQL(
 				'sqlite::memory:'
 //				'sqlite:db/sqlite.db'
 			),
-			'pgsql' => new \DB\SQL(
-				'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree'
-			),
+//			'pgsql' => new \DB\SQL(
+//				'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree'
+//			),
 		);
 
 		$this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');

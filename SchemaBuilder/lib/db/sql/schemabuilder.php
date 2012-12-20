@@ -15,10 +15,10 @@
 
     Copyright (c) 2012 by ikkez
     Christian Knuth <ikkez0n3@gmail.com>
-    https://github.com/ikkez/F3-Sugar/tree/master/VDB
+    https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.9.5
+        @version 1.0.0
  **/
 
 
@@ -82,7 +82,8 @@ namespace DB\SQL {
 
 		const
 			TEXT_NoDatatype = 'The specified datatype %s is not defined in %s driver',
-			TEXT_NotNullFieldNeedsDefault = 'You cannot add the not nullable column `%s´ without specifying a default value';
+			TEXT_NotNullFieldNeedsDefault = 'You cannot add the not nullable column `%s´ without specifying a default value',
+			TEXT_IllegalName='%s is not a valid table or column name';
 
 
 		public function __construct(\DB\SQL $db)
@@ -123,6 +124,20 @@ namespace DB\SQL {
 		}
 
 		/**
+		 * check if valid table / column name
+		 * @param string $key
+		 * @return bool
+		 */
+		public function valid($key)
+		{
+			if (preg_match('/^(\D\w+(?:\_\w+)*)$/', $key))
+				return TRUE;
+			// Invalid name
+			trigger_error(sprintf(self::TEXT_IllegalName, var_export($key, TRUE)));
+			return FALSE;
+		}
+
+		/**
 		 * get all tables of current DB
 		 * @return bool|array list of tables, or false
 		 */
@@ -153,6 +168,7 @@ namespace DB\SQL {
 		 */
 		public function createTable($name)
 		{
+			if (!$this->valid($name)) return false;
 			if (in_array($name, $this->getTables())) return false;
 			$cmd = array(
 				'sqlite2?|sybase|dblib|odbc' => array(
@@ -186,11 +202,10 @@ namespace DB\SQL {
 		 */
 		public function alterTable($name)
 		{
-//        if(!$this->fw->valid($name)) return false;
+        if(!$this->valid($name)) return false;
 			$this->name = $name;
 			return $this;
 		}
-
 
 		/**
 		 * set primary keys
@@ -226,7 +241,7 @@ namespace DB\SQL {
 						$this->addColumn($name, $col['type'], $col['null'], $col['default'], true);
 					$fields = implode(', ', array_keys($colTypes));
 					$this->db->exec('INSERT INTO '.$this->name.'('.$fields.') '.
-									'SELECT '.$fields.' FROM '.$this->name.'_temp');
+					                'SELECT '.$fields.' FROM '.$this->name.'_temp');
 					// drop old table
 					$this->dropTable($this->name.'_temp');
 					return true;
@@ -267,7 +282,7 @@ namespace DB\SQL {
 
 			} else {
 				$cmd = array(
-					'sybase|dblib|odbc' => array(
+					'mssql|sybase|dblib|odbc' => array(
 						"CREATE INDEX ".$this->name."_pkey ON ".$this->name." ( $pk_string );"
 					),
 					'mysql' => array(
@@ -276,10 +291,6 @@ namespace DB\SQL {
 						"ALTER TABLE $this->name DROP CONSTRAINT ".$this->name.'_pkey;',
 						"ALTER TABLE $this->name ADD CONSTRAINT ".$this->name."_pkey PRIMARY KEY ( $pk_string );",
 					),
-					'mssql' => array(
-						""),
-					'ibm' => array(
-						""),
 				);
 				$query = $this->findQuery($cmd);
 				return $this->execQuerys($query);
@@ -293,6 +304,7 @@ namespace DB\SQL {
 		 */
 		public function renameTable($new_name)
 		{
+			if (!$this->valid($new_name)) return false;
 			if (preg_match('/odbc/', $this->db->driver())) {
 				$this->db->exec("SELECT * INTO $new_name FROM $this->name");
 				$this->dropTable();
@@ -324,7 +336,6 @@ namespace DB\SQL {
 		public function dropTable($name = null)
 		{
 			$table = ($name) ? $name : $this->name;
-//        if(!self::valid($table)) return false;
 			$cmd = array(
 				'mysql|sqlite2?|pgsql|mssql|sybase|dblib|ibm|odbc' => array(
 					"DROP TABLE IF EXISTS $table;"),
@@ -369,18 +380,19 @@ namespace DB\SQL {
 
 		/**
 		 * add a column to a table
-		 * @param string     $column   name
-		 * @param string     $type     datatype definition
-		 * @param bool       $nullable allow NULL values
-		 * @param bool|mixed $default  default insert value
-		 * @param bool       $passThrough
+		 * @param string     $name        name
+		 * @param string     $type        DataType definition
+		 * @param bool       $nullable    allow NULL values
+		 * @param bool|mixed $default     default insert value
+		 * @param bool       $passThrough don't match $type against DT array
 		 * @return bool
 		 */
-		public function addColumn($column, $type, $nullable = true,
+		public function addColumn($name, $type, $nullable = true,
 		                          $default = false, $passThrough = false)
 		{
+			if (!$this->valid($name)) return false;
 			// check if column is already existing
-			if (in_array($column, $this->getCols())) return false;
+			if (in_array($name, $this->getCols())) return false;
 			// prepare column types
 			if ($passThrough == false) {
 				if (!array_key_exists(strtoupper($type), $this->dataTypes)) {
@@ -397,18 +409,18 @@ namespace DB\SQL {
 			);
 			// not nullable fields should have a default value [SQlite]
 			if ($default === false && $nullable === false)
-				trigger_error(sprintf(self::TEXT_NotNullFieldNeedsDefault, $column));
+				trigger_error(sprintf(self::TEXT_NotNullFieldNeedsDefault, $name));
 			else
 				$def_cmd = ($default !== false) ?
 					$this->findQuery($def_cmds).' '.
 						"'".htmlspecialchars($default, ENT_QUOTES, $this->fw->get('ENCODING'))."'" : '';
 			$cmd = array(
 				'mysql|sqlite2?' => array(
-					"ALTER TABLE `$this->name` ADD `$column` $type_val $null_cmd $def_cmd"),
+					"ALTER TABLE `$this->name` ADD `$name` $type_val $null_cmd $def_cmd"),
 				'pgsql|mssql|sybase|dblib|odbc' => array(
-					"ALTER TABLE $this->name ADD $column $type_val $null_cmd $def_cmd"),
+					"ALTER TABLE $this->name ADD $name $type_val $null_cmd $def_cmd"),
 				'ibm' => array(
-					"ALTER TABLE $this->name ADD COLUMN $column $type_val $null_cmd $def_cmd"),
+					"ALTER TABLE $this->name ADD COLUMN $name $type_val $null_cmd $def_cmd"),
 			);
 			$query = $this->findQuery($cmd);
 			return $this->execQuerys($query);
@@ -468,6 +480,7 @@ namespace DB\SQL {
 		 */
 		public function renameColumn($column, $column_new)
 		{
+			if (!$this->valid($column_new)) return false;
 			$colTypes = $cur_fields = $this->getCols(true);
 			// check if column is already existing
 			if (!in_array($column, array_keys($colTypes))) return false;
