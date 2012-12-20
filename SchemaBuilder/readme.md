@@ -75,8 +75,7 @@ The class prodives you the following simple methods for
 	``` php
 	$builder->dropTable('news');
     // this is also possible
-    $builder->alterTable('news')->dropTable();
-	});	
+    $builder->alterTable('news')->dropTable();	
 	```	
 	You can also use a shorter syntax for it, like `$db->dropTable( $tableName );`
     	
@@ -97,9 +96,9 @@ The class prodives you the following simple methods for
 		</tr>
 		<tr>
 			<td>DT::BOOL<br/>DT::BOOLEAN</td>
-			<td>resolves in an numeric (0,1)</td>
-			<td></td>
-			<td></td>
+			<td>resolves in a numeric</td>
+			<td>at least 1 byte</td>
+			<td>0,1</td>
 		</tr>
 		<tr>
 			<td>DT::TINYINT<br/>DT::INT8</td>
@@ -132,7 +131,7 @@ The class prodives you the following simple methods for
 			<td>±10^38+1</td>
 		</tr>
 		<tr>
-			<td>DT::TEXT8<br/>DT::VARCAHR</td>
+			<td>DT::TEXT8<br/>DT::VARCHAR</td>
 			<td>character string</td>
 			<td>1 byte</td>
 			<td>max length 255</td>
