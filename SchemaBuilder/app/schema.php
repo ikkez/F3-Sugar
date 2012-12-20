@@ -192,7 +192,7 @@ class Schema extends Controller
 			$builder->dropTable('test123');
 			$r1 = $builder->renameTable('test123');
 			$test->expect(
-				$r1 == true && in_array('test123', $builder->getTables()) == true &&
+				$r1 == true && in_array('test123', $builder->getTables()) &&
 					in_array($tname, $builder->getTables()) == false,
 				$this->getTime().' '.$type.'renaming table'
 			);
@@ -226,8 +226,9 @@ class Schema extends Controller
 			$builder->addColumn('title_notnull', 'TEXT8', false, "foo");
 			$r1 = $builder->getCols(true);
 			$test->expect(
-				array_key_exists('title', $r1) == true && array_key_exists('title_notnull', $r1) == true &&
-					$r1['id']['primary'] == true && $r1['version']['primary'] == true,
+				array_key_exists('title', $r1) &&
+				array_key_exists('title_notnull', $r1) &&
+				$r1['id']['primary'] == true && $r1['version']['primary'] == true,
 				$this->getTime().' '.$type.'adding more fields to composite pk table'
 			);
 
