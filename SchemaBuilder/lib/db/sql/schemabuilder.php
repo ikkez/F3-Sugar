@@ -18,12 +18,36 @@
     https://github.com/ikkez/F3-Sugar/tree/master/VDB
 
         @package DB
-        @version 0.9.4
+        @version 0.9.5
 
  **/
 
-namespace DB\SQL;
 
+namespace {
+	class DT {
+		const
+			BOOL = 'BOOLEAN',
+			BOOLEAN = 'BOOLEAN',
+			INT8 = 'INT8',
+			TINYINT = 'INT8',
+			INT16 = 'INT16',
+			INT = 'INT16',
+			INT32 = 'INT32',
+			BIGINT = 'INT32',
+			FLOAT = 'FLOAT',
+			DOUBLE = 'DOUBLE',
+			DECIMAL = 'DOUBLE',
+			TEXT8 = 'TEXT8',
+			VARCHAR = 'TEXT8',
+			TEXT16 = 'TEXT16',
+			TEXT = 'TEXT16',
+			TEXT32 = 'TEXT32',
+			DATE = 'DATE',
+			DATETIME = 'DATETIME';
+	}
+}
+
+namespace DB\SQL {
 class SchemaBuilder {
 
     public
@@ -91,39 +115,6 @@ class SchemaBuilder {
 		$this->fw = \Base::instance();
 	}
 
-	/**
-     * alter table operation stack wrapper
-     * @param $name
-     * @param $func
-     * @return mixed
-     */
-    public function table($name,$func) {
-
-//        if(!$this->fw->valid($name)) return false;
-        $func = func_get_args();
-        array_shift($func);
-        $tmp = $this->name;
-        $this->name = $name;
-        if(count($func)>1)
-            foreach($func as $f)
-                $return[] = call_user_func($f,$this);
-        else    $return = call_user_func($func[0],$this);
-        $this->name = $tmp;
-        return $return;
-    }
-
-    /**
-     * create table operation stack wrapper
-     * @param $name
-     * @param $func
-     * @return mixed
-     */
-    public function create($name,$func){
-//        if(!self::valid($name)) return false;
-        $this->createTable($name);
-        return $this->table($name,$func);
-    }
-
     /**
      * parse command array and return backend specific query
      * @param $cmd
@@ -177,33 +168,47 @@ class SchemaBuilder {
     }
 
     /**
-     * create a basic table, containing ID field
-     * @param $table
-     * @return bool
+     * create a basic table, containing required ID serial field
+     * @param $name
+     * @return bool|SchemaBuilder
      */
-    public function createTable($table) {
-        if(in_array($table,$this->getTables())) return true;
+    public function createTable($name) {
+        if(in_array($name,$this->getTables())) return false;
         $cmd=array(
             'sqlite2?|sybase|dblib|odbc'=>array(
-                "CREATE TABLE $table (
+                "CREATE TABLE $name (
                     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT )"),
             'mysql'=>array(
-                "CREATE TABLE `$table` (
+                "CREATE TABLE `$name` (
                     id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT
                 ) DEFAULT CHARSET=utf8"),
             'pgsql'=>array(
-                "CREATE TABLE $table (id SERIAL PRIMARY KEY)"),
+                "CREATE TABLE $name (id SERIAL PRIMARY KEY)"),
             'mssql'=>array(
-                "CREATE TABLE $table (id INT PRIMARY KEY);"
+                "CREATE TABLE $name (id INT PRIMARY KEY);"
             ),
             'ibm'=>array(
-                "CREATE TABLE $table (
+                "CREATE TABLE $name (
                     id INTEGER AS IDENTITY NOT NULL, PRIMARY KEY(id));"
             ),
         );
         $query = $this->findQuery($cmd);
-	    return $this->execQuerys($query);
+	    $this->execQuerys($query);
+	    $this->alterTable($name);
+	    return $this;
     }
+
+	/**
+	 * select table for altering operations
+	 *
+	 * @param $name
+	 * @return mixed
+	 */
+	public function alterTable($name) {
+//        if(!$this->fw->valid($name)) return false;
+		$this->name = $name;
+		return $this;
+	}
 
 
     /**
@@ -224,20 +229,18 @@ class SchemaBuilder {
                 $pk_def[] = $name.' '.$colTypes[$name]['type'].$df_def;
             }
 	        $currentPKs = array();
-	        foreach($colTypes as $n=>$t) if($t['primary']) $currentPKs[] = $n;
-
+	        foreach($colTypes as $colname=> $conf) if($conf['primary']) $currentPKs[] = $colname;
+			// from comp to single pkey
 	        if(count($pks)<=1 && count($currentPKs) >= 1) {
 		        // already the right pk
 		        if((count($pks) == 1 && count($currentPKs) == 1) && $pks[0] == $currentPKs[0])
 			        return true;
 		        // rebuild with single pk
-		        $this->table($this->name, function ($table) {
-			        $table->renameTable($table->name.'_temp');
-		        });
-		        $this->table($this->name, function ($table) use ($colTypes) {
-			        foreach ($colTypes as $name => $col)
-				        $table->addCol($name, $col['type'], $col['null'], $col['default'], true);
-		        });
+		        $oname = $this->name;
+		        $this->renameTable($this->name.'_temp');
+		        $this->createTable($oname);
+		        foreach ($colTypes as $name => $col)
+			        $this->addColumn($name, $col['type'], $col['null'], $col['default'], true);
 		        $fields = implode(', ',array_keys($colTypes));
 		        $this->db->exec('INSERT INTO '.$this->name.'('.$fields.') SELECT '.$fields.' FROM '
 			        .$this->name.'_temp');
@@ -246,7 +249,7 @@ class SchemaBuilder {
 		        return true;
 	        }
             $pk_def = implode(', ',$pk_def);
-            // fetch all non primary key fields
+            // fetch all new non primary key fields
             $newCols = array();
             foreach ( $colTypes as $colname => $conf)
                 if(!in_array($colname,$pks)) $newCols[$colname] = $conf;
@@ -254,9 +257,7 @@ class SchemaBuilder {
             $this->db->begin();
             $oname = $this->name;
             // rename to temp
-            $this->table($this->name, function($table){
-                $table->renameTable($table->name.'_temp');
-            });
+	        $this->renameTable($this->name.'_temp');
             // create new origin table, with new private keys and their fields
             $this->db->exec("CREATE TABLE $oname ( $pk_def, PRIMARY KEY ($pk_string) );");
             // create insert trigger to work-a-round autoincrement in multiple primary keys
@@ -270,11 +271,10 @@ class SchemaBuilder {
                             ' END;');
             // add non-pk fields and import all data
             $db = $this->db;
-            $cols = $this->table($oname,function($table) use($newCols,$db) {
-                foreach($newCols as $name => $col)
-                    $table->addCol($name,$col['type'],$col['null'],$col['default'],true);
-	            return $table->getCols();
-            });
+            $this->alterTable($oname);
+            foreach($newCols as $name => $col)
+                $this->addColumn($name,$col['type'],$col['null'],$col['default'],true);
+            $cols = $this->getCols();
 	        $fields = implode(', ', $cols);
 	        $db->exec('INSERT INTO '.$oname.'('.$fields.') SELECT '.$fields.' FROM '
 		        .$oname.'_temp');
@@ -367,7 +367,7 @@ class SchemaBuilder {
                 // extract value from character_data in postgre
                 if(preg_match('/pgsql/',$this->db->driver()) && !is_null($default))
                     if(is_int(strpos($default,'nextval')))
-                        $default=null; // set autoincrement defaults to null
+                        $default=null; // drop autoincrement default
                     elseif(preg_match("/\'(.*)\'/",$default,$match))
                         $default = $match[1];
                 $columns[$name] = array(
@@ -391,7 +391,7 @@ class SchemaBuilder {
      * @param bool $passThrough
      * @return bool
      */
-    public function addCol($column,$type,$nullable = true,$default = false,$passThrough = false) {
+    public function addColumn($column,$type,$nullable = true,$default = false,$passThrough = false) {
         // check if column is already existing
         if(in_array($column,$this->getCols())) return false;
         // prepare columntypes
@@ -432,7 +432,7 @@ class SchemaBuilder {
      * @param $column
      * @return bool
      */
-    public function dropCol($column) {
+    public function dropColumn($column) {
         $colTypes = $this->getCols(true);
         // check if column exists
         if(!in_array($column,array_keys($colTypes))) return true;
@@ -440,26 +440,24 @@ class SchemaBuilder {
             // SQlite does not support drop column directly
 	        // unset dropped field
 	        unset($colTypes[$column]);
-            // remind primary-key fields
+            // remember primary-key fields
 	        foreach ($colTypes as $key => $col)
 		        if ($col['primary']) {
 			        $pkeys[] = $key;
 			        if($key == 'id') unset($colTypes[$key]);
 		        }
             $this->db->begin();
-            $this->create($this->name.'_new',function($table) use($colTypes,$pkeys) {
-                foreach($colTypes as $name => $col)
-                    $table->addCol($name,$col['type'], $col['null'],$col['default'],true);
-	            $table->setPKs($pkeys);
-            });
+            $new= new self($this->db);
+            $new->createTable($this->name.'_new');
+            foreach($colTypes as $name => $col)
+                $new->addColumn($name,$col['type'], $col['null'],$col['default'],true);
+            $new->setPKs($pkeys);
 	        $fields = !empty($colTypes) ? ', '.implode(', ', array_keys($colTypes)):'';
-	        $this->db->exec('INSERT INTO `'.$this->name .'_new'. '` '.
+	        $this->db->exec('INSERT INTO `'.$new->name . '` '.
 		                    'SELECT id' . $fields . ' FROM ' . $this->name);
             $tname = $this->name;
             $this->dropTable();
-            $this->table($this->name.'_new',function($table) use($tname){
-                $table->renameTable($tname);
-            });
+            $new->renameTable($tname);
             $this->db->commit();
             return true;
         } else {
@@ -480,7 +478,7 @@ class SchemaBuilder {
      * @param $column_new
      * @return bool
      */
-    public function renameCol($column,$column_new) {
+    public function renameColumn($column,$column_new) {
         $colTypes = $cur_fields = $this->getCols(true);
         // check if column is already existing
         if(!in_array($column,array_keys($colTypes))) return false;
@@ -493,32 +491,29 @@ class SchemaBuilder {
 			        if ($key == 'id') unset($colTypes[$key]);
 		        }
             $this->db->begin();
-            $this->create($this->name.'_new',function($table) use($colTypes,$pkeys,$column_new,
-	        $column) {
-                foreach($colTypes as $name => $col)
-                    $table->addCol((($name == $column) ? $column_new : $name),
-                        $col['type'],$col['null'],$col['default'],true);
-	            $table->setPKs($pkeys);
-            });
+	        $new = new self($this->db);
+	        $new->createTable($this->name.'_new');
+            foreach($colTypes as $name => $col)
+                $new->addColumn((($name == $column) ? $column_new : $name),
+                    $col['type'],$col['null'],$col['default'],true);
+            $new->setPKs($pkeys);
 	        foreach(array_keys($colTypes) as $type)
 	            $new_fields[] = ', '.(($type == $column)?$column_new:$type);
-	        $this->db->exec('INSERT INTO `' . $this->name . '_new' . '` ("id"' . implode($new_fields) . ') ' .
+	        $this->db->exec('INSERT INTO `' . $new->name . '` ("id"' . implode($new_fields) . ') ' .
 	            'SELECT "' . implode('", "', array_keys($cur_fields)) . '" FROM `' . $this->name .
 		        '`;');
             $tname = $this->name;
             $this->dropTable();
-            $this->table($this->name.'_new',
-                function($table) use($tname){ $table->renameTable($tname); });
+            $this->alterTable($new->name)->renameTable($tname);
             $this->db->commit();
             return true;
         } elseif(preg_match('/odbc/',$this->db->driver())) {
-            // no rename column for odbc
+            // no rename column for odbc, create temp column
             $this->db->begin();
-            $this->table($this->name,function($table) use($column, $colTypes){
-                $table->addCol($column.'_new',$colTypes[$column]['type'],$colTypes[$column]['null'],$colTypes[$column]['default'],true);
-            });
+	        $this->addColumn($column_new,$colTypes[$column]['type'],
+	                $colTypes[$column]['null'],$colTypes[$column]['default'],true);
             $this->db->exec("UPDATE $this->name SET $column_new = $column");
-            $this->dropCol($column);
+            $this->dropColumn($column);
             $this->db->commit();
             return true;
         } else {
@@ -535,4 +530,5 @@ class SchemaBuilder {
             return $this->execQuerys($query);
         }
     }
+}
 }

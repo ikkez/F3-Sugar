@@ -8,23 +8,20 @@ class Schema extends Controller
 	{
 		$f3 = \Base::instance();
 		$test = new \Test;
-		$f3->set('title', 'Variable DB Schema Builder');
 
-		$f3->set('QUIET', false);
+//		$f3->set('QUIET', false);
 
 		$dbs = array(
-//			'mysql' => new \DB\SQL(
-//				'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', '',
-//				array(\PDO::ATTR_STRINGIFY_FETCHES => true)
-//			),
+			'mysql' => new \DB\SQL(
+				'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
+			),
 			'sqlite' => new \DB\SQL(
 				'sqlite::memory:'
 //				'sqlite:db/sqlite.db'
 			),
-//			'pgsql' => new \DB\SQL(
-//				'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree',
-//				array(\PDO::ATTR_STRINGIFY_FETCHES => true)
-//			),
+			'pgsql' => new \DB\SQL(
+				'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree'
+			),
 		);
 
 		$this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
@@ -46,13 +43,8 @@ class Schema extends Controller
 
 			foreach (array_keys($builder->dataTypes) as $index => $field) {
 				// testing column types
-				list($r1, $r2) = $builder->table($tname,
-					function ($table) use ($index, $field) {
-						return $table->addCol('column_' . $index, $field);
-					},
-					function ($table) {
-						return $table->getCols();
-					});
+				$r1 = $builder->addColumn('column_'.$index, $field);
+				$r2 = $builder->getCols();
 				$test->expect(
 					$r1 == true && in_array('column_' . $index, $r2),
 					$this->getTime().' '.$type.'adding column [' . $field . '], nullable'
@@ -71,13 +63,8 @@ class Schema extends Controller
 			);
 
 			// default value text, not nullable
-			list($r1, $r2) = $builder->table($tname,
-				function ($table) {
-					return $table->addCol('text_default_not_null', 'TEXT8', false, 'foo bar');
-				},
-				function ($table) {
-					return $table->getCols(true);
-				});
+			$r1 = $builder->addColumn('text_default_not_null', 'TEXT8', false, 'foo bar');
+			$r2 = $builder->getCols(true);
 			$test->expect(
 				$r1 == true &&
 					in_array('text_default_not_null', array_keys($r2)) &&
@@ -98,13 +85,8 @@ class Schema extends Controller
 			);
 
 			// default value numeric, not nullable
-			list($r1, $r2) = $builder->table($tname,
-				function ($table) {
-					return $table->addCol('int_default_not_null', 'INT8', false, 123);
-				},
-				function ($table) {
-					return $table->getCols(true);
-				});
+			$r1 = $builder->addColumn('int_default_not_null', 'INT8', false, 123);
+			$r2 = $builder->getCols(true);
 			$test->expect(
 					$r1 == true &&
 					in_array('int_default_not_null', array_keys($r2)) &&
@@ -126,13 +108,8 @@ class Schema extends Controller
 			);
 
 			// default value text, nullable
-			list($r1, $r2) = $builder->table($tname,
-				function ($table) {
-					return $table->addCol('text_default_nullable', 'TEXT8', true, 'foo bar');
-				},
-				function ($table) {
-					return $table->getCols(true);
-				});
+			$r1 = $builder->addColumn('text_default_nullable', 'TEXT8', true, 'foo bar');
+			$r2 = $builder->getCols(true);
 			$test->expect(
 					$r1 == true &&
 					in_array('text_default_nullable', array_keys($r2)) &&
@@ -157,13 +134,8 @@ class Schema extends Controller
 			);
 
 			// default value numeric, nullable
-			list($r1, $r2) = $builder->table($tname,
-				function ($table) {
-					return $table->addCol('int_default_nullable', 'INT8', true, 123);
-				},
-				function ($table) {
-					return $table->getCols(true);
-				});
+			$r1 = $builder->addColumn('int_default_nullable', 'INT8', true, 123);
+			$r2 = $builder->getCols(true);
 			$test->expect(
 				$r1 == true && in_array('int_default_nullable', array_keys($r2)) == true && $r2['int_default_nullable']['default'] == 123,
 				$this->getTime().' '.$type.'adding column [INT8], nullable with default value'
@@ -186,13 +158,8 @@ class Schema extends Controller
 			);
 
 			// rename column
-			list($r1, $r2) = $builder->table($tname,
-				function ($table) {
-					return $table->renameCol('text_default_not_null', 'title123');
-				},
-				function ($table) {
-					return $table->getCols();
-				});
+			$r1 = $builder->renameColumn('text_default_not_null', 'title123');
+			$r2 = $builder->getCols();
 			$test->expect(
 				$r1 == true &&
 					in_array('title123', $r2) == true &&
@@ -208,38 +175,28 @@ class Schema extends Controller
 			$test->expect(array_key_exists(7, $result) && $result[7]['title123'] == 'test8',
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
-			$builder->table($tname, function ($table) {
-				return $table->renameCol('title123', 'text_default_not_null');
+			$builder->alterTable($tname, function ($table) {
+				return $table->renameColumn('title123', 'text_default_not_null');
 			});
 
 
 			// remove column
-			list($r1, $r2) = $builder->table($tname,
-				function ($table) {
-					return $table->dropCol('column_1');
-				},
-				function ($table) {
-					return $table->getCols();
-				});
+			$r1 = $builder->dropColumn('column_1');
+			$r2 = $builder->getCols();
 			$test->expect(
-				$r1 == true && in_array('column_1', $r2) == false,
+				$r1 == true && !empty($r2) && in_array('column_1', $r2) == false,
 				$this->getTime().' '.$type.'removng column'
 			);
 
 			// rename table
 			$builder->dropTable('test123');
-			$valid = $builder->table($tname,
-				function ($table) {
-					return $table->renameTable('test123');
-				});
+			$r1 = $builder->renameTable('test123');
 			$test->expect(
-				$valid == true && in_array('test123', $builder->getTables()) == true && in_array($tname, $builder->getTables()) == false,
+				$r1 == true && in_array('test123', $builder->getTables()) == true &&
+					in_array($tname, $builder->getTables()) == false,
 				$this->getTime().' '.$type.'renaming table'
 			);
-			$builder->table('test123',
-				function ($table) use ($tname) {
-					$table->renameTable($tname);
-				});
+			$builder->renameTable($tname);
 
 			// drop table
 			$builder->dropTable($tname);
@@ -249,11 +206,11 @@ class Schema extends Controller
 			);
 
 			// adding composite primary keys
-			$r1 = $builder->create($tname, function ($table) {
-				$table->addCol('version', 'INT8', false, 1);
-				$table->setPKs(array('id', 'version'));
-				return $table->getCols(true);
-			});
+			$builder->createTable($tname);
+			$builder->addColumn('version', 'INT8', false, 1);
+			$builder->setPKs(array('id', 'version'));
+			$r1 = $builder->getCols(true);
+
 			$test->expect(!empty($r1) &&
 				$r1['id']['primary'] == true && $r1['version']['primary'] == true,
 				$this->getTime().' '.$type.'adding composite primary-keys'
@@ -264,12 +221,10 @@ class Schema extends Controller
 			);
 
 			// more fields to composite primary key table
-			$r1 = $builder->table($tname, function ($table) {
-				$table->addCol('title', 'TEXT8');
-				$table->addCol('title2', 'TEXT8');
-				$table->addCol('title_notnull', 'TEXT8', false, "foo");
-				return $table->getCols(true);
-			});
+			$builder->addColumn('title', 'TEXT8');
+			$builder->addColumn('title2', 'TEXT8');
+			$builder->addColumn('title_notnull', 'TEXT8', false, "foo");
+			$r1 = $builder->getCols(true);
 			$test->expect(
 				array_key_exists('title', $r1) == true && array_key_exists('title_notnull', $r1) == true &&
 					$r1['id']['primary'] == true && $r1['version']['primary'] == true,
@@ -329,7 +284,7 @@ class Schema extends Controller
 			$builder->dropTable($tname);
 
 		}
-		$f3->set('QUIET', false);
+//		$f3->set('QUIET', false);
 		$f3->set('results', $test->results());
 	}
 
