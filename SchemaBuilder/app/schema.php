@@ -12,16 +12,16 @@ class Schema extends Controller
 		$f3->set('QUIET', false);
 
 		$dbs = array(
-//			'mysql' => new \DB\SQL(
-//				'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
-//			),
+			'mysql' => new \DB\SQL(
+				'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
+			),
 			'sqlite' => new \DB\SQL(
 				'sqlite::memory:'
 //				'sqlite:db/sqlite.db'
 			),
-//			'pgsql' => new \DB\SQL(
-//				'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree'
-//			),
+			'pgsql' => new \DB\SQL(
+				'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree'
+			),
 		);
 
 		$this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
@@ -69,7 +69,7 @@ class Schema extends Controller
 				$r1 == true &&
 					in_array('text_default_not_null', array_keys($r2)) &&
 					$r2['text_default_not_null']['default'] == 'foo bar' &&
-					$r2['text_default_not_null']['null'] == false,
+					$r2['text_default_not_null']['nullable'] == false,
 				$this->getTime().' '.$type.'adding column [TEXT8], not nullable with default value'
 			);
 			unset($ax);
@@ -91,7 +91,7 @@ class Schema extends Controller
 					$r1 == true &&
 					in_array('int_default_not_null', array_keys($r2)) &&
 					$r2['int_default_not_null']['default'] == 123 &&
-					$r2['int_default_not_null']['null'] == false,
+					$r2['int_default_not_null']['nullable'] == false,
 				$this->getTime().' '.$type.'adding column [INT8], not nullable with default value'
 			);
 			unset($ax);
@@ -157,6 +157,16 @@ class Schema extends Controller
 				$this->getTime() . ' ' . $type . 'mapping dummy data'
 			);
 
+			// current timestamp
+			$r1 = $builder->addColumn('stamp', \DT::TIMESTAMP, false, \DF::CURRENT_TIMESTAMP);
+			$r2 = $builder->getCols(true);
+			$test->expect(
+				$r1 == true && in_array('stamp',array_keys($r2)) == true &&
+				$r2['stamp']['default'] == \DF::CURRENT_TIMESTAMP,
+				$this->getTime().' '.$type.
+					'adding column [TIMESTAMP], not nullable with current_timestamp default value'
+			);
+
 			// rename column
 			$r1 = $builder->renameColumn('text_default_not_null', 'title123');
 			$r2 = $builder->getCols();
@@ -212,7 +222,7 @@ class Schema extends Controller
 			$r1 = $builder->getCols(true);
 
 			$test->expect(!empty($r1) &&
-				$r1['id']['primary'] == true && $r1['version']['primary'] == true,
+				$r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
 				$this->getTime().' '.$type.'adding composite primary-keys'
 			);
 			$test->expect(!empty($r1) &&
@@ -228,7 +238,7 @@ class Schema extends Controller
 			$test->expect(
 				array_key_exists('title', $r1) &&
 				array_key_exists('title_notnull', $r1) &&
-				$r1['id']['primary'] == true && $r1['version']['primary'] == true,
+				$r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
 				$this->getTime().' '.$type.'adding more fields to composite pk table'
 			);
 
@@ -239,7 +249,7 @@ class Schema extends Controller
 			$ax->reset();
 
 			$ax->id = 1;
-			$ax->title = 'null';
+			$ax->title = 'nullable';
 			$ax->version = 2;
 			$ax->save();
 			$ax->reset();
@@ -261,7 +271,7 @@ class Schema extends Controller
 				1=>array(
 					'id' => 1,
 					'version' => 2,
-					'title' => 'null',
+					'title' => 'nullable',
 					'title2' => NULL,
 					'title_notnull' => 'foo',
 				),
