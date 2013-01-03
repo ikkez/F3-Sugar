@@ -69,8 +69,9 @@ namespace DB\SQL {
 				                     'mysql|sqlite2?|mssql|sybase|dblib|odbc|sqlsrv' => 'datetime',
 				                     'ibm' => 'timestamp',
 				),
-				'TIMESTAMP' => array('mysql|pgsql' => 'timestamp',
-				                     'sqlite2?'=>'DATETIME',
+				'TIMESTAMP' => array('mysql|dblib|sqlsrv|ibm' => 'timestamp',
+				                     'pgsql|odbc' => 'timestamp without time zone',
+				                     'sqlite2?|mssql|sybase'=>'DATETIME',
 				),
 			),
 			$defaultTypes = array(
@@ -379,9 +380,9 @@ namespace DB\SQL {
 			else
 				foreach ($schema as $name => &$cols) {
 						$default = $cols['default'];
-						if(!is_null($default) &&
-							is_int(strpos($this->findQuery(
-								$this->defaultTypes['CUR_STAMP']),$default))){
+						if(!is_null($default) && (
+							is_int(strpos($this->findQuery($this->defaultTypes['CUR_STAMP']),$default))
+							|| $default == "('now'::text)::timestamp(0) without time zone")){
 							$default = 'CUR_STAMP';
 						} else {
 							// remove single-qoutes in sqlite
@@ -466,6 +467,7 @@ namespace DB\SQL {
 							$new->addColumn($name, $col['type'], $col['nullable'], $col['default'], true);
 						$fields = !empty($colTypes) ? implode(', ', array_keys($colTypes)) : '';
 						$new->setPKs($pkeys);
+						if(!empty($fields))
 						$new->db->exec('INSERT INTO `'.$new->name.'` ('.$fields.') '.
 						               'SELECT '.$fields.' FROM `'.$this->name.'`;');
 						$this->dropTable();
