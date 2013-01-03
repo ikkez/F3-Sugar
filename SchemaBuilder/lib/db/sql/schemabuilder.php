@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.0.0
+        @version 1.1.2
  **/
 
 
@@ -28,9 +28,9 @@ namespace DB\SQL {
 		public
 			$dataTypes = array(
 				'BOOLEAN' =>    array('mysql|sqlite2?' => 'BOOLEAN',
-					                  'pgsql' => 'text',
-					                  'mssql|sybase|dblib|odbc|sqlsrv' => 'bit',
-					                  'ibm' => 'numeric(1,0)',
+				                      'pgsql' => 'text',
+				                      'mssql|sybase|dblib|odbc|sqlsrv' => 'bit',
+				                      'ibm' => 'numeric(1,0)',
 				),
 				'INT8' =>       array('mysql' => 'TINYINT(3)',
 				                      'sqlite2?|pgsql' => 'integer',
@@ -69,6 +69,16 @@ namespace DB\SQL {
 				                     'mysql|sqlite2?|mssql|sybase|dblib|odbc|sqlsrv' => 'datetime',
 				                     'ibm' => 'timestamp',
 				),
+				'TIMESTAMP' => array('mysql|pgsql' => 'timestamp',
+				                     'sqlite2?'=>'DATETIME',
+				),
+			),
+			$defaultTypes = array(
+				'CUR_STAMP' => array(
+					'mysql|mssql|sybase|dblib|odbc|sqlsrv' => 'CURRENT_TIMESTAMP',
+					'pgsql' => 'LOCALTIMESTAMP(0)',
+					'sqlite2?' => "(datetime('now','localtime'))",
+				),
 			);
 
 		public
@@ -83,7 +93,8 @@ namespace DB\SQL {
 		const
 			TEXT_NoDatatype = 'The specified datatype %s is not defined in %s driver',
 			TEXT_NotNullFieldNeedsDefault = 'You cannot add the not nullable column `%s´ without specifying a default value',
-			TEXT_IllegalName='%s is not a valid table or column name';
+			TEXT_IllegalName='%s is not a valid table or column name',
+			TEXT_CurrentStampDataType = 'Current timestamp as column default is only possible for TIMESTAMP datatype';
 
 
 		public function __construct(\DB\SQL $db)
@@ -94,9 +105,9 @@ namespace DB\SQL {
 
 		/**
 		 * parse command array and return backend specific query
-		 * @param $cmd
-		 * @return bool
-		 */
+		 * @param $cmd array
+		 * @return bool|string
+		 **/
 		private function findQuery($cmd)
 		{
 			$match = FALSE;
@@ -106,7 +117,7 @@ namespace DB\SQL {
 					break;
 				}
 			if (!$match) {
-				trigger_error('DB Engine not supported');
+				trigger_error('DB Engine not supported for this Query');
 				return FALSE;
 			}
 			return $val;
@@ -172,20 +183,17 @@ namespace DB\SQL {
 			if (in_array($name, $this->getTables())) return false;
 			$cmd = array(
 				'sqlite2?|sybase|dblib|odbc' => array(
-					"CREATE TABLE $name (
-                    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT )"),
+					"CREATE TABLE $name (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT )"),
 				'mysql' => array(
-					"CREATE TABLE `$name` (
-                    id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT
-                ) DEFAULT CHARSET=utf8"),
+					"CREATE TABLE `$name` (id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT)
+ 					DEFAULT CHARSET=utf8"),
 				'pgsql' => array(
 					"CREATE TABLE $name (id SERIAL PRIMARY KEY)"),
 				'mssql' => array(
 					"CREATE TABLE $name (id INT PRIMARY KEY);"
 				),
 				'ibm' => array(
-					"CREATE TABLE $name (
-                    id INTEGER AS IDENTITY NOT NULL, PRIMARY KEY(id));"
+					"CREATE TABLE $name (id INTEGER AS IDENTITY NOT NULL, PRIMARY KEY(id));"
 				),
 			);
 			$query = $this->findQuery($cmd);
@@ -227,7 +235,7 @@ namespace DB\SQL {
 				}
 				$currentPKs = array();
 				foreach ($colTypes as $colname => $conf)
-					if ($conf['primary']) $currentPKs[] = $colname;
+					if ($conf['pkey']) $currentPKs[] = $colname;
 				// from comp to single pkey
 				if (count($pks) <= 1 && count($currentPKs) >= 1) {
 					// already the right pk
@@ -238,7 +246,7 @@ namespace DB\SQL {
 					$this->renameTable($this->name.'_temp');
 					$this->createTable($oname);
 					foreach ($colTypes as $name => $col)
-						$this->addColumn($name, $col['type'], $col['null'], $col['default'], true);
+						$this->addColumn($name, $col['type'], $col['nullable'], $col['default'], true);
 					$fields = implode(', ', array_keys($colTypes));
 					$this->db->exec('INSERT INTO '.$this->name.'('.$fields.') '.
 					                'SELECT '.$fields.' FROM '.$this->name.'_temp');
@@ -251,33 +259,45 @@ namespace DB\SQL {
 				$newCols = array();
 				foreach ($colTypes as $colname => $conf)
 					if (!in_array($colname, $pks)) $newCols[$colname] = $conf;
-				$this->db->begin();
+				if(!$this->db->inTransaction())
+					$this->db->begin();
 				$oname = $this->name;
 				// rename to temp
 				$this->renameTable($this->name.'_temp');
+				// find dynamic defaults
+				foreach($newCols as $name=>$col)
+					if($col['default'] == \DF::CURRENT_TIMESTAMP) $dyndef[$name] = $col;
+				$dynfields = '';
+				if(!empty($dyndef))
+					foreach($dyndef as $n=>$col) {
+						$dynfields.= $n.' '.$col['type'].' '.(($col['nullable']) ? 'NULL' : 'NOT NULL').
+							' DEFAULT '.$this->findQuery($this->defaultTypes[$col['default']]).',';
+						unset($newCols[$n]);
+					}
 				// create new origin table, with new private keys and their fields
-				$this->db->exec("CREATE TABLE $oname ( $pk_def, PRIMARY KEY ($pk_string) );");
+				$this->db->exec("CREATE TABLE $oname ( $pk_def, $dynfields PRIMARY KEY ($pk_string) );");
+				// add non-pk fields
+				$this->alterTable($oname);
+				foreach ($newCols as $name => $col)
+					$this->addColumn($name, $col['type'], $col['nullable'], $col['default'], true);
 				// create insert trigger to work-a-round autoincrement in multiple primary keys
 				// is set on first PK if it's an int field
 				if (strstr(strtolower($colTypes[$pks[0]]['type']), 'int'))
 					$this->db->exec('CREATE TRIGGER '.$oname.'_insert AFTER INSERT ON '.$oname.
-						' WHEN (NEW.'.$pks[0].' IS NULL) BEGIN'.
-						' UPDATE '.$oname.' SET '.$pks[0].' = ('.
-						' select coalesce( max( '.$pks[0].' ), 0 ) + 1 from '.$oname.
-						') WHERE ROWID = NEW.ROWID;'.
-						' END;');
-				// add non-pk fields and import all data
-				$db = $this->db;
-				$this->alterTable($oname);
-				foreach ($newCols as $name => $col)
-					$this->addColumn($name, $col['type'], $col['null'], $col['default'], true);
+					                ' WHEN (NEW.'.$pks[0].' IS NULL) BEGIN'.
+					                ' UPDATE '.$oname.' SET '.$pks[0].' = ('.
+					                ' select coalesce( max( '.$pks[0].' ), 0 ) + 1 from '.$oname.
+					                ') WHERE ROWID = NEW.ROWID;'.
+					                ' END;');
+				// import all data
 				$cols = $this->getCols();
 				$fields = implode(', ', $cols);
-				$db->exec('INSERT INTO '.$oname.'('.$fields.') '.
+				$this->db->exec('INSERT INTO '.$oname.'('.$fields.') '.
 						  'SELECT '.$fields.' FROM '.$oname.'_temp');
 				// drop old table
 				$this->dropTable($oname.'_temp');
-				$this->db->commit();
+				if (!$this->db->inTransaction())
+					$this->db->commit();
 				return true;
 
 			} else {
@@ -354,28 +374,29 @@ namespace DB\SQL {
 			if (empty($this->name)) trigger_error('No table specified.');
 			$columns = array();
 			$schema = $this->db->schema($this->name, 0);
-			foreach ($schema as $name => $cols) {
-				if ($types) {
-					$default = $cols['default'];
-					// remove single-qoutes in sqlite
-					if (preg_match('/sqlite2?/', $this->db->driver()))
-						$default = substr($default, 1, -1);
-					// extract value from character_data in postgre
-					if (preg_match('/pgsql/', $this->db->driver()) && !is_null($default))
-						if (is_int(strpos($default, 'nextval')))
-							$default = null; // drop autoincrement default
-						elseif (preg_match("/\'(.*)\'/", $default, $match))
-							$default = $match[1];
-					$columns[$name] = array(
-						'type' => $cols['type'],
-						'null' => $cols['nullable'],
-						'default' => $default,
-						'primary' => $cols['pkey'],
-					);
-				} else
-					$columns[] = $name;
-			}
-			return $columns;
+			if (!$types)
+				return array_keys($schema);
+			else
+				foreach ($schema as $name => &$cols) {
+						$default = $cols['default'];
+						if(!is_null($default) &&
+							is_int(strpos($this->findQuery(
+								$this->defaultTypes['CUR_STAMP']),$default))){
+							$default = 'CUR_STAMP';
+						} else {
+							// remove single-qoutes in sqlite
+							if (preg_match('/sqlite2?/', $this->db->driver()))
+								$default = substr($default, 1, -1);
+							// extract value from character_data in postgre
+							if (preg_match('/pgsql/', $this->db->driver()) && !is_null($default))
+								if (is_int(strpos($default, 'nextval')))
+									$default = null; // drop autoincrement default
+								elseif (preg_match("/\'(.*)\'/", $default, $match))
+									$default = $match[1];
+						}
+					$cols['default'] = $default;
+				}
+			return $schema;
 		}
 
 		/**
@@ -408,12 +429,60 @@ namespace DB\SQL {
 				'ibm' => 'WITH DEFAULT',
 			);
 			// not nullable fields should have a default value [SQlite]
-			if ($default === false && $nullable === false)
+			if ($default === false && $nullable === false) {
 				trigger_error(sprintf(self::TEXT_NotNullFieldNeedsDefault, $name));
-			else
-				$def_cmd = ($default !== false) ?
-					$this->findQuery($def_cmds).' '.
-						"'".htmlspecialchars($default, ENT_QUOTES, $this->fw->get('ENCODING'))."'" : '';
+				return false;
+			}
+			// default value
+			if($default !== false) {
+				$def_cmd = $this->findQuery($def_cmds).' ';
+				if ($default == 'CUR_STAMP') {
+					// timestamp default
+					$stamp_type = $this->findQuery($this->dataTypes['TIMESTAMP']);
+					if ($type != 'TIMESTAMP' &&
+						($passThrough && strtoupper($type) != strtoupper($stamp_type))
+					) {
+						trigger_error(self::TEXT_CurrentStampDataType);
+						return false;
+					}
+					if (preg_match('/sqlite2?/', $this->db->driver())) {
+						// sqlite: dynamic column default only works when rebuilding the table
+						$colTypes = $this->getCols(true);
+						// remember primary-key fields
+						foreach ($colTypes as $key => $col)
+							if ($col['pkey']) {
+								$pkeys[] = $key;
+								if ($key == 'id') unset($colTypes[$key]);
+							}
+						$oname = $this->name;
+						$this->renameTable($oname.'_temp_stamp');
+						$new = new self($this->db);
+						$new->db->exec('CREATE TABLE '.$oname.' ('.
+						               'id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,'.
+						               "$name $type_val $null_cmd DEFAULT ".
+						               $this->findQuery($this->defaultTypes[strtoupper($default)]).")");
+						$new->alterTable($oname);
+						foreach ($colTypes as $name => $col)
+							$new->addColumn($name, $col['type'], $col['nullable'], $col['default'], true);
+						$fields = !empty($colTypes) ? implode(', ', array_keys($colTypes)) : '';
+						$new->setPKs($pkeys);
+						$new->db->exec('INSERT INTO `'.$new->name.'` ('.$fields.') '.
+						               'SELECT '.$fields.' FROM `'.$this->name.'`;');
+						$this->dropTable();
+						$this->alterTable($oname);
+						return true;
+					} else {
+						$def_cmd .= $this->findQuery($this->defaultTypes[strtoupper($default)]);
+					}
+				} else {
+					// static default
+					$pdo_type = preg_match('/int|bool/i', $type_val, $parts) ?
+						constant('\PDO::PARAM_'.strtoupper($parts[0])) : \PDO::PARAM_STR;
+					$def_cmd .= $this->db->quote(htmlspecialchars($default, ENT_QUOTES,
+						$this->fw->get('ENCODING')), $pdo_type);
+				}
+			} else
+				$def_cmd = '';
 			$cmd = array(
 				'mysql|sqlite2?' => array(
 					"ALTER TABLE `$this->name` ADD `$name` $type_val $null_cmd $def_cmd"),
@@ -442,23 +511,26 @@ namespace DB\SQL {
 				unset($colTypes[$column]);
 				// remember primary-key fields
 				foreach ($colTypes as $key => $col)
-					if ($col['primary']) {
+					if ($col['pkey']) {
 						$pkeys[] = $key;
 						if ($key == 'id') unset($colTypes[$key]);
 					}
-				$this->db->begin();
 				$new = new self($this->db);
-				$new->createTable($this->name.'_new');
+				if (!$new->db->inTransaction())
+					$new->db->begin();
+				$new->createTable($this->name.'_temp_drop');
 				foreach ($colTypes as $name => $col)
-					$new->addColumn($name, $col['type'], $col['null'], $col['default'], true);
-				$new->setPKs($pkeys);
+					$new->addColumn($name, $col['type'], $col['nullable'], $col['default'], true);
 				$fields = !empty($colTypes) ? ', '.implode(', ', array_keys($colTypes)) : '';
-				$this->db->exec('INSERT INTO `'.$new->name.'` '.
+				$new->setPKs($pkeys);
+				$new->db->exec('INSERT INTO `'.$new->name.'` '.
 					'SELECT id'.$fields.' FROM '.$this->name);
 				$tname = $this->name;
 				$this->dropTable();
 				$new->renameTable($tname);
-				$this->db->commit();
+				if (!$new->db->inTransaction())
+					$new->db->commit();
+				$this->alterTable($tname);
 				return true;
 			} else {
 				$cmd = array(
@@ -488,34 +560,39 @@ namespace DB\SQL {
 				// SQlite does not support drop or rename column directly
 				// remind primary-key fields
 				foreach ($colTypes as $key => $col)
-					if ($col['primary'] == true) {
+					if ($col['pkey'] == true) {
 						$pkeys[] = (($key == $column) ? $column_new : $key);
 						if ($key == 'id') unset($colTypes[$key]);
 					}
-				$this->db->begin();
+				$oname=$this->name;
+				$this->renameTable($oname.'_temp_rename');
 				$new = new self($this->db);
-				$new->createTable($this->name.'_new');
+				if (!$new->db->inTransaction())
+					$new->db->begin();
+				$new->createTable($oname);
 				foreach ($colTypes as $name => $col)
 					$new->addColumn((($name == $column) ? $column_new : $name),
-						$col['type'], $col['null'], $col['default'], true);
-				$new->setPKs($pkeys);
+						$col['type'], $col['nullable'], $col['default'], true);
 				foreach (array_keys($colTypes) as $type)
 					$new_fields[] = ', '.(($type == $column) ? $column_new : $type);
-				$this->db->exec('INSERT INTO `'.$new->name.'` ("id"'.implode($new_fields).') '.
+				$new->setPKs($pkeys);
+				$new->db->exec('INSERT INTO `'.$new->name.'` ("id"'.implode($new_fields).') '.
 					'SELECT "'.implode('", "', array_keys($cur_fields)).'" FROM `'.$this->name.'`;');
-				$tname = $this->name;
-				$this->dropTable();
-				$this->alterTable($new->name)->renameTable($tname);
-				$this->db->commit();
+				$new->dropTable($this->name);
+				if (!$new->db->inTransaction())
+					$new->db->commit();
+				$this->alterTable($oname);
 				return true;
 			} elseif (preg_match('/odbc/', $this->db->driver())) {
 				// no rename column for odbc, create temp column
-				$this->db->begin();
+				if (!$this->db->inTransaction())
+					$this->db->begin();
 				$this->addColumn($column_new, $colTypes[$column]['type'],
-					$colTypes[$column]['null'], $colTypes[$column]['default'], true);
+					$colTypes[$column]['nullable'], $colTypes[$column]['default'], true);
 				$this->db->exec("UPDATE $this->name SET $column_new = $column");
 				$this->dropColumn($column);
-				$this->db->commit();
+				if (!$this->db->inTransaction())
+					$this->db->commit();
 				return true;
 			} else {
 				$colTypes = $this->getCols(true);
@@ -559,6 +636,16 @@ namespace {
 			TEXT = 'TEXT16',
 			TEXT32 = 'TEXT32',
 			DATE = 'DATE',
-			DATETIME = 'DATETIME';
+			DATETIME = 'DATETIME',
+			TIMESTAMP = 'TIMESTAMP';
+	}
+
+	/**
+	 * global class for column default values
+ 	 */
+	class DF
+	{
+		const
+			CURRENT_TIMESTAMP = 'CUR_STAMP';
 	}
 }
