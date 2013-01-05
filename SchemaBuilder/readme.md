@@ -150,13 +150,19 @@ The class prodives you the following simple methods for
 		</tr>
 		<tr>
 			<td>DT::DATE</td>
-			<td></td>
+			<td>Y-m-d</td>
 			<td>3 bytes</td>
 			<td></td>
 		</tr>
 		<tr>
 			<td>DT::DATETIME</td>
+			<td>Y-m-d H:i:s</td>
+			<td>8 bytes</td>
 			<td></td>
+		</tr>
+		<tr>
+			<td>DT::TIMESTAMP</td>
+			<td>Y-m-d H:i:s</td>
 			<td>8 bytes</td>
 			<td></td>
 		</tr>
@@ -172,7 +178,7 @@ The class prodives you the following simple methods for
     $builder->alterTable('news')->addCol('author',DT:TEXT8);	
 	```	
 	
-	If `$nullable` is false, the field is added as NOT NULL field, so i cannot contain null value and therefore needs a default
+	If `$nullable` is false, the field is added as NOT NULL field, so it cannot contain a null value and therefore needs a default.
     
     example:
     ``` php    
@@ -182,6 +188,17 @@ The class prodives you the following simple methods for
 	```	
     
     But you can set defaults to nullable fields as well.
+    
+    **CURRENT_TIMESTAMP as dynamic default value**
+    If you like to add a timestamp of the current time to new inserted records, you can add a TIMESTAMP field with a special default value to achieve this.
+    
+    example:
+    ``` php    
+    $builder->alterTable('news')->addColumn('creation_date',\DT::TIMESTAMP,false,\DF::CURRENT_TIMESTAMP);
+	```	
+	
+	Notice: Class DF holds constants for default values, class DT is for DataTypes.
+	
 
 -	**$builder->getCols( $types [false] );**
 
@@ -209,4 +226,19 @@ The class prodives you the following simple methods for
 	``` php
 	$builder->alterTable('news')->renameColumn('name','title');
 	```
+
+-	**$builder->setPKs( $pkeyArray );**
+
+	You can define an Array of existing column names, that are going to be used as a composite primary key. If your table contains an auto incremented field (usually `id`), than it should always be the first element in $pkeyArray.
+	
+	usage:
+	``` php
+	$builder->createTable('news');
+	$builder->addColumn('title', \DT::TEXT8);
+	$builder->addColumn('bodytext', \DT::TEXT16);
+	$builder->addColumn('version', \DT::INT8, false, 1);
+	$builder->setPKs(array('id', 'version'));
+	```
+	
+	Now your primary key is build upon 2 columns, to use records like `id=1, version=1` and `id=1, version=2`.
 
