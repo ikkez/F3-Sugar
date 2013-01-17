@@ -198,25 +198,21 @@ class Pagination {
      * @return string
      */
     static public function renderTag($args){
-        var_dump($args);
-
         $attr = $args['@attrib'];
-        if(!array_key_exists('items',$attr))
-            trigger_error(TEXT_MissingItemsAttr);
-        $f3 = Base::instance();
-        $itemval = $f3->get($attr['items']); // TODO: does not work
-//        $itemval = self::resolve($attr['items']);
-        $items = is_array($itemval)?count($itemval):$itemval;
-        $pn = new self($items);
+        $tmp = Template::instance();
+        foreach($attr as &$att)
+            $att = $tmp->token($att);
+        $items = is_array($attr['items'])?count($attr['items']):$attr['items'];
+        $pn_code = '$pn = new Pagination('.$items.');';
         if(array_key_exists('limit',$attr))
-            $pn->setLimit($f3->get($attr['limit']));
+            $pn_code .= '$pn->setLimit('.$attr['limit'].');';
         if(array_key_exists('range',$attr))
-            $pn->setRange($f3->get($attr['range']));
+            $pn_code .= '$pn->setRange('.$attr['range'].');';
         if(array_key_exists('src',$attr))
-            $pn->setTemplate($f3->get($attr['src']));
+            $pn_code .= '$pn->setTemplate('.$attr['src'].');';
         if(array_key_exists('token',$attr))
-            $pn->routeKey($f3->get($attr['token']));
-
-        return $pn->serve();
+            $pn_code .= '$pn->routeKey('.$attr['token'].');';
+        $pn_code .= 'echo $pn->serve();';
+        return '<?php '.$pn_code.' ?>';
     }
 }
