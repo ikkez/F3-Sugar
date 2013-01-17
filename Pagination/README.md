@@ -18,7 +18,7 @@ create a quick and easy pagination with pagebrowser for your F3 application.
 
 Within your Controller you can use the following basic code to let the magic begin ;)
 
-´´´ php
+``` php
 $f3 = \Base::instance();
 
 // set maximus items to be shown per page
@@ -54,15 +54,15 @@ Is that easy?!
 ### Configuration
 
 Of course you can define another token key in your route, instead of `@page`. Therefor just set it as third argument on instantiation (here without @-symbol).
-``` php	
+``` php
 $pages = new Pagination($article_count, $items_per_page, 'paginationToken');
 ```	
 If your template is within another subdirectory, or you want to use different templates, you can change the template path with:
-``` php	
-	$pages->setTemplate('templates/pagebrowser.html');
+``` php
+$pages->setTemplate('templates/pagebrowser.html');
 ```
 The Paginator builds links, depending on the current route. But sometimes you maybe want to serve other pagebrowser link. You can set another link path like this:
-``` php	
+``` php
 $pages->setLinkPath('search/results/');
 ```	
 It will now build URLs like `search/results/1`, `search/results/2`, `search/results/3`.
@@ -72,7 +72,7 @@ It will now build URLs like `search/results/1`, `search/results/2`, `search/resu
 
 Since F3 v2.0.13 it is possible to setup your own template tags. You can use that shortcut for the Pagination Plugin too. Just register the plugin in the responsible controller like this:
 ``` php	
-Template::extend('pagebrowser','Pagination::renderTag');
+Template::instance()->extend('pagebrowser','Pagination::renderTag');
 ```
 	
 You can now use `<pagination items="{{@maxItems}}"></pagination>` to generate the pagination directly form the inside of your template file.
@@ -89,11 +89,11 @@ With a bit of basic CSS styling, the output could look like this:
 ![pagebrowser](http://img7.imagebanana.com/img/4j8o59n4/pagebrowser.png)
 
 ``` css
-div.paginator {
+div.pagebrowser {
 	overflow: hidden;
 	margin-bottom: 10px;
 }
-	div.paginator a {
+	div.pagebrowser a {
 		display: block;
 		width: 30px;
 		height: 20px;
@@ -107,16 +107,16 @@ div.paginator {
 		border-radius: 4px;  
 		font-size: 0.8em;
 	}			
-		div.paginator a:hover {
+		div.pagebrowser a:hover {
 			background: #821109;
 			color: #fff !important;
 			text-decoration: none;
 		}
 		
-	div.paginator a.active {
+	div.pagebrowser a.active {
 		background: #ddd;
 	}
-		div.paginator a.active:hover {
+		div.pagebrowser a.active:hover {
 			color: #821109 !important;			
 		}
 ```
