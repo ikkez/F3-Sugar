@@ -202,8 +202,7 @@ class Pagination {
         $tmp = Template::instance();
         foreach($attr as &$att)
             $att = $tmp->token($att);
-        $items = is_array($attr['items'])?count($attr['items']):$attr['items'];
-        $pn_code = '$pn = new Pagination('.$items.');';
+        $pn_code = '$pn = new Pagination('.$attr['items'].');';
         if(array_key_exists('limit',$attr))
             $pn_code .= '$pn->setLimit('.$attr['limit'].');';
         if(array_key_exists('range',$attr))
