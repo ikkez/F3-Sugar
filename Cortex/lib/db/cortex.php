@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.6.7
+        @version 0.7.0
         @date 17.01.2013
  **/
 
@@ -28,8 +28,8 @@ class Cortex extends \DB\Cursor {
 
     protected
         $mapper,    // ORM object
-        $table,     // selected table
         $db,        // DB object
+        $table,     // selected table
         $dbsType;   // mapper engine type [Jig, SQL, Mongo]
 
     /**
@@ -47,7 +47,7 @@ class Cortex extends \DB\Cursor {
                 $this->mapper = new \DB\Jig\Mapper($this->db, $this->table);
                 break;
             case 'DB\SQL':
-                $this->mapper = new \DB\SQL\Mapper($this->db, $this->table);
+            	$this->mapper = new \DB\SQL\Mapper($this->db, $this->table);
                 break;
             case 'DB\Mongo':
                 $this->mapper = new \DB\Mongo\Mapper($this->db, $this->table);
@@ -64,6 +64,13 @@ class Cortex extends \DB\Cursor {
     public function __destruct()
     {
         unset($this->mapper);
+    }
+    
+    /**
+    * set model definition
+    */
+    function setFields() {
+    	
     }
 
     /**
@@ -101,22 +108,26 @@ class Cortex extends \DB\Cursor {
     /**
      * erase all model data, handle with care
      */
-    public function setoff()
+    static public function setdown($db, $table)
     {
-        switch ($this->dbsType) {
+        $table = strtolower($table);
+        $dbsType = get_class($db);
+        switch ($dbsType) {
             case 'DB\Jig':
-                $refl = new \ReflectionObject($this->db);
+                $refl = new \ReflectionObject($db);
                 $prop = $refl->getProperty('dir');
                 $prop->setAccessible(true);
-                $dir = $prop->getValue($this->db);
-                unlink($dir.$this->table);
+                $dir = $prop->getValue($db);
+                if(file_exists($dir.$table))
+                    unlink($dir.$table);
                 break;
             case 'DB\SQL':
-                $schema = new \DB\SQL\SchemaBuilder($this->db);
-                $schema->dropTable($this->table);
+                $schema = new \DB\SQL\SchemaBuilder($db);
+                if(in_array($table, $schema->getTables()))
+                    $schema->dropTable($table);
                 break;
             case 'DB\Mongo':
-                $this->db->{$this->table}->drop();
+                $db->{$table}->drop();
                 break;
         }
     }
@@ -127,6 +138,7 @@ class Cortex extends \DB\Cursor {
      * example filter:
      *   array('text = ? AND num = ?','bar',5)
      *   array('num > ? AND num2 <= ?',5,10)
+     *   array('num1 > num2')
      *   array('text like ?','%foo%')
      *   array('(text like ? OR text like ?) AND num != ?','foo%','%bar',23)
      *
@@ -142,43 +154,15 @@ class Cortex extends \DB\Cursor {
 
         switch ($this->dbsType) {
             case 'DB\Jig':
-                // prefix field names
-                $where = preg_replace('/(\w+)(?=\s*('.$op_quote.'))/i', '@$1',
-                    array_shift($cond));
-                // like search syntax
-                $parts = preg_split("/\s*(\)|\(|AND|OR)\s*/i", $where, -1,
-                    PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
-                $ncond = array();
-                foreach ($parts as &$part)
-                    if (is_int(strpos($part, '?'))) {
-                        // find like operator
-                        $val = array_shift($cond);
-                        if (is_int(strpos(strtoupper($part), ' LIKE '))) {
-                            // %var% -> /var/
-                            if (substr($val, 0, 1) == '%' && substr($val, -1, 1) == '%')
-                                $val = str_replace('%', '/', $val);
-                            // var%  -> /^var/
-                            elseif (substr($val, -1, 1) == '%')
-                                $val = '/^'.str_replace('%', '', $val).'/'; // %var  -> /var$/
-                            elseif (substr($val, 0, 1) == '%')
-                                $val = '/'.substr($val, 1).'$/';
-                            preg_match('/(@\w+_*\d*_*)/i', $part, $match);
-                            $part = 'preg_match(?,'.$match[0].')';
-                        }
-                        $ncond[] = $val;
-                    }
-                array_unshift($ncond, implode(' ', $parts));
-                return $ncond;
+                return $this->_jig_parse_filter($cond);
                 break;
 
             case 'DB\Mongo':
                 $parts = preg_split("/\s*(\)|\(|AND|OR)\s*/i", array_shift($cond), -1,
                     PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
-                // find operators
                 foreach ($parts as &$part)
                     if (preg_match('/'.$op_quote.'/i', $part, $match))
                         $part = $this->_mongo_parse_relational_op($part, array_shift($cond));
-                // find conditions
                 $ncond = $this->_mongo_parse_logical_op($parts);
                 return $ncond;
                 break;
@@ -188,6 +172,51 @@ class Cortex extends \DB\Cursor {
                 return $cond;
                 break;
         }
+    }
+
+    /**
+     * convert filter array to jig syntax
+     * @param $cond
+     * @return array
+     */
+    private function _jig_parse_filter($cond){
+        // split logical
+        $parts = preg_split("/\s*(\)|\(|AND|OR)\s*/i", array_shift($cond), -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+        $ncond = array();
+        foreach ($parts as &$part) {
+            if (in_array(strtoupper($part), array('AND', 'OR')))
+                continue;
+            // prefix field names
+            $part = preg_replace('/(\w+)/i', '@$1', $part, -1, $count);
+            // value comparison
+            if (is_int(strpos($part, '?'))) {
+                $val = array_shift($cond);
+                preg_match('/(@\w+)/i', $part, $match);
+                // find like operator
+                if (is_int(strpos(strtoupper($part), ' @LIKE '))) {
+                    // %var% -> /var/
+                    if (substr($val, 0, 1) == '%' && substr($val, -1, 1) == '%')
+                        $val = str_replace('%', '/', $val);
+                    // var%  -> /^var/
+                    elseif (substr($val, -1, 1) == '%')
+                        $val = '/^'.str_replace('%', '', $val).'/';
+                    // %var  -> /var$/
+                    elseif (substr($val, 0, 1) == '%')
+                        $val = '/'.substr($val, 1).'$/';
+                    $part = 'preg_match(?,'.$match[0].')';
+                }
+                // add existence check
+                $part = '(isset('.$match[0].') && '.$part.')';
+                $ncond[] = $val;
+            } elseif ($count == 2) {
+                // field comparison
+                preg_match_all('/(@\w+)/i', $part, $matches);
+                $part = '(isset('.$matches[0][0].') && isset('.$matches[0][1].') && ('.$part.'))';
+            }
+        }
+        array_unshift($ncond, implode(' ', $parts));
+        return $ncond;
     }
 
     /**
@@ -326,7 +355,6 @@ class Cortex extends \DB\Cursor {
      */
     public function find($filter = NULL, array $options = NULL)
     {
-        var_dump('find');
         $filter = $this->prepareFilter($filter);
         $options = $this->prepareOptions($options);
         $result = $this->mapper->find($filter, $options);
