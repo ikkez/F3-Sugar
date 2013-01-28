@@ -2,15 +2,29 @@
 some custom helpers and plugins for the PHP Fat-Free Framework
 
 
+### FileUnit
+
+A Plugin which offers some more file system functionality.
+
+***
+
+
+### Pagination
+
+A little class that helps you to build a pagebrowser for your template and setup specific pagination routing.
+
+***
+
+
 ### SchemaBuilder
 
-SQL database extension for managing database table structures.
+A SQL database extension for managing database table structures.
 
 ***
 
 
 
-#### Licence
+#### License
 
 Copyright (C) 2012 Christian Knuth
 
