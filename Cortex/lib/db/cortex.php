@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.7.0
+        @version 0.7.1
         @date 17.01.2013
  **/
 
@@ -377,6 +377,8 @@ namespace DB {
             $filter = $this->prepareFilter($filter);
             $options = $this->prepareOptions($options);
             $result = $this->mapper->find($filter, $options);
+            foreach($result as &$mapper)
+                $mapper = $this->factory($mapper);
             return $result;
         }
 
@@ -419,13 +421,14 @@ namespace DB {
          */
         function set($key, $val)
         {
-            if (is_array($val) && $this->dbsType == 'DB\SQL')
+            if (is_array($val) && $this->dbsType == 'DB\SQL') {
                 if(self::$fieldConf[$key]['type']==\DT_CORTEX::TEXT_SERIALIZED)
                     $val = serialize($val);
                 elseif(self::$fieldConf[$key]['type'] == \DT_CORTEX::TEXT_JSON)
                     $val = json_encode($val);
                 else
                     trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
+            }
             return $this->mapper->{$key} = $val;
         }
 
@@ -454,10 +457,26 @@ namespace DB {
         {
             $fields = $this->mapper->cast($obj);
             if ($this->dbsType == 'DB\SQL')
-                foreach ($fields as $key => &$val) {
-                    if (substr($val, 0, 2) == 'a:') $val = unserialize($val);
-                }
+                foreach ($fields as $key => &$val)
+                    if(array_key_exists($key, self::$fieldConf))
+                        if (self::$fieldConf[$key]['type'] == \DT_CORTEX::TEXT_SERIALIZED)
+                            $val=unserialize($this->mapper->{$key});
+                        elseif (self::$fieldConf[$key]['type'] == \DT_CORTEX::TEXT_JSON)
+                            $val=json_decode($this->mapper->{$key}, true);
             return $fields;
+        }
+
+        /**
+         * wrap result mapper
+         * @param $mapper
+         * @return Cortex
+         */
+        protected function factory($mapper)
+        {
+            $cx = clone($this);
+            $cx->reset();
+            $cx->mapper = $mapper;
+            return $cx;
         }
 
         public function dry() {
@@ -516,7 +535,7 @@ namespace DB {
 
 namespace {
     /**
-     * global class for column default values
+     * global class for special datatypes
      */
     class DT_CORTEX {
         const
