@@ -306,7 +306,8 @@ namespace DB {
                         $rgx = str_replace('%', '/', $var);
                     // var%  -> /^var/
                     elseif (substr($var, -1, 1) == '%')
-                        $rgx = '/^'.str_replace('%', '', $var).'/'; // %var  -> /var$/
+                        $rgx = '/^'.str_replace('%', '', $var).'/';
+                    // %var  -> /var$/
                     elseif (substr($var, 0, 1) == '%')
                         $rgx = '/'.substr($var, 1).'$/';
                     $var = new \MongoRegex($rgx);
@@ -315,7 +316,8 @@ namespace DB {
                     $opr = str_replace(array('<>', '<', '>', '!', '='),
                         array('$ne', '$lt', '$gt', '$n', 'e'), $match[0]);
                     $var = array($opr => (strtolower($var) == 'null') ? null : $var + 0);
-                }
+                } elseif(trim($exp[0]) == '_id' && !$var instanceof \MongoId)
+                    $var = new \MongoId($var);
                 return array(trim($exp[0]) => $var);
             }
             return $cond;
@@ -428,7 +430,8 @@ namespace DB {
                     $val = json_encode($val);
                 else
                     trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
-            }
+            } elseif($this->dbsType == '\DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
+                $val = new \MongoId($val);
             return $this->mapper->{$key} = $val;
         }
 
