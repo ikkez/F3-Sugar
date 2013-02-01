@@ -24,9 +24,9 @@ class Cortex extends Controller
 			\DB\Cortex::setdown($db, $tname);
 			
 			$fields = array(
-				'title'=>array('type'=>\DT::TEXT8),
-				'num1'=>array('type'=>\DT::INT8),
-				'num2'=>array('type'=>\DT::INT8),
+				'title'=>array('type'=>\DB\SQL\Schema::DT_TEXT8),
+				'num1'=>array('type'=> \DB\SQL\Schema::DT_INT8),
+				'num2'=>array('type'=> \DB\SQL\Schema::DT_INT8),
 			);
 			\DB\Cortex::setup($db, $tname,$fields);
 			
