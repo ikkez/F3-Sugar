@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.1.3
+        @version 1.2.0
  **/
 
 
@@ -125,11 +125,11 @@ class Schema {
         DF_CURRENT_TIMESTAMP = 'CUR_STAMP',
 
         // error messages
-        TEXT_NoDatatype = 'The specified datatype %s is not defined in %s driver',
+        TEXT_NoDataType = 'The specified datatype %s is not defined in %s driver',
         TEXT_NotNullFieldNeedsDefault = 'You cannot add the not nullable column `%s´ without specifying a default value',
         TEXT_IllegalName='%s is not a valid table or column name',
-        TEXT_CurrentStampDataType = 'Current timestamp as column default is only possible for TIMESTAMP datatype';
-
+        TEXT_CurrentStampDataType = 'Current timestamp as column default is only possible for TIMESTAMP datatype',
+        TEXT_ENGINE_NOT_SUPPORTED = 'DB Engine `%s´ is not supported for this action.';
 
     public function __construct(\DB\SQL $db)
     {
@@ -151,7 +151,7 @@ class Schema {
                 break;
             }
         if (!$match) {
-            trigger_error('DB Engine not supported for this Query');
+            trigger_error(sprintf(self::TEXT_ENGINE_NOT_SUPPORTED, $this->db->driver()));
             return FALSE;
         }
         return $val;
@@ -460,8 +460,7 @@ class Schema {
      * @param bool       $passThrough don't match $type against DT array
      * @return bool
      */
-    public function addColumn($name, $type, $nullable = true,
-                              $default = false, $passThrough = false)
+    public function addColumn($name, $type, $nullable = true, $default = false, $passThrough = false)
     {
         if (!$this->valid($name)) return false;
         // check if column is already existing
@@ -469,7 +468,7 @@ class Schema {
         // prepare column types
         if ($passThrough == false) {
             if (!array_key_exists(strtoupper($type), $this->dataTypes)) {
-                trigger_error(sprintf(self::TEXT_NoDatatype, strtoupper($type), $this->db->driver()));
+                trigger_error(sprintf(self::TEXT_NoDataType, strtoupper($type), $this->db->driver()));
                 return FALSE;
             }
             $type_val = $this->findQuery($this->dataTypes[strtoupper($type)]);
