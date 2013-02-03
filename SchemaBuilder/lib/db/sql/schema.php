@@ -183,6 +183,24 @@ class Schema {
     }
 
     /**
+     * get a list of all databases
+     * @return array|bool
+     */
+    public function getDatabases() {
+        $cmd = array(
+            'mysql' => 'SHOW DATABASES',
+            'pgsql' => 'SELECT datname FROM pg_catalog.pg_database',
+            'mssql|sybase|dblib|sqlsrv' => 'EXEC SP_HELPDB',
+        );
+        $query = $this->findQuery($cmd);
+        if (!$query) return false;
+        $result = $this->db->exec($query);
+        foreach($result as &$db)
+            if(is_array($db)) $db = array_shift($db);
+        return $result;
+    }
+
+    /**
      * get all tables of current DB
      * @return bool|array list of tables, or false
      */
