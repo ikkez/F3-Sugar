@@ -74,6 +74,11 @@ class Schema {
                                  'pgsql|odbc' => 'timestamp without time zone',
                                  'sqlite2?|mssql|sybase'=>'DATETIME',
             ),
+            'BLOB' =>      array('mysql|odbc|sqlite2?|ibm' => 'blob',
+                                 'pgsql' => 'bytea',
+                                 'mssql|sybase|dblib' => 'image',
+                                 'sqlsrv' => 'varbinary(max)',
+            ),
         ),
         $defaultTypes = array(
             'CUR_STAMP' => array(
@@ -113,6 +118,8 @@ class Schema {
         DT_DATE = 'DATE',
         DT_DATETIME = 'DATETIME',
         DT_TIMESTAMP = 'TIMESTAMP',
+        DT_BLOB = 'BLOB',
+        DT_BINARY = 'BLOB',
 
         // column default values
         DF_CURRENT_TIMESTAMP = 'CUR_STAMP',
