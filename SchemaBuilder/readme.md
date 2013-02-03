@@ -1,4 +1,4 @@
-## SchemaBuilder
+## SQL Schema Builder
 #### An F3 extension for managing database structures.
 
 This F3-Plugin provides you a SQL table schema builder for the PHP Fat-Free Framework. It might be useful for installation scripts and dynamic applications, you might need have in cms enviroments.
@@ -10,17 +10,17 @@ This Plugin is made for F3 version 3.x
 ***
 ### Installation
 
-Just copy schemabuilder.php into F3's lib/db/sql Folder. Done.
+Just copy schema.php into F3's lib/db/sql Folder. Done.
 
 ### Usage
 
-To work with the SchemaBuilder, you need an active SQL Connection. Create one like this:
+To work with the Schema builder, you need an active SQL Connection. Create one like this:
 ``` php
 $db = new \DB\SQL('mysql:host=localhost;port=3306;dbname='.$DBname, $user, $pass);
 ```
-Now create a SchemaBuilder object to work on. Inject the DB object into its constructor:
+Now create a Schema object to work on. Inject the DB object into its constructor:
 ``` php
-$builder = new \DB\SQL\SchemaBuilder( $db );
+$builder = new \DB\SQL\Schema( $db );
 ```
 
 The class prodives you the following simple methods for
@@ -38,8 +38,8 @@ The class prodives you the following simple methods for
 	example:	
 	``` php
 	$builder->createTable('products');
-    $builder->addColumn('title',DT:TEXT8);
-    $builder->addColumn('description',DT:TEXT16);
+    $builder->addColumn('title',\DB\SQL\Schema::DT_TEXT8);
+    $builder->addColumn('description',\DB\SQL\Schema::DT_TEXT16);
 	```
 
 - 	**$builder->alterTable( $tableName );**
@@ -49,8 +49,8 @@ The class prodives you the following simple methods for
     example:	
 	``` php
 	$builder->alterTable('products');
-    $builder->addColumn('prize',DT:DECIMAL);
-    $builder->addColumn('stock',DT:INT);
+    $builder->addColumn('prize',\DB\SQL\Schema::DT_DECIMAL);
+    $builder->addColumn('stock',\DB\SQL\Schema::DT_INT);
 	```
 
 -   **$builder->renameTable( $newTableName );**
@@ -85,7 +85,7 @@ The class prodives you the following simple methods for
 - 	**$table->addColumn( $columnName, $dataType, $nullable [true], $default [false] );**
 	
 	Adds a further column field to the selected table. The $dataType argument defines the type for the new field.
-	You can find these available mapped types as constants in DT class so far:
+	You can find these available mapped types as constants in \DB\SQL\Schema so far:
 	
 	<table>
 		<tr>
@@ -95,73 +95,73 @@ The class prodives you the following simple methods for
 			<th>bound</th>
 		</tr>
 		<tr>
-			<td>DT::BOOL<br/>DT::BOOLEAN</td>
+			<td>DT_BOOL<br/>DT_BOOLEAN</td>
 			<td>resolves in a numeric</td>
 			<td>at least 1 byte</td>
 			<td>0,1</td>
 		</tr>
 		<tr>
-			<td>DT::TINYINT<br/>DT::INT8</td>
+			<td>DT_TINYINT<br/>DT_INT8</td>
 			<td></td>
 			<td>at least 1 byte</td>
 			<td>lower: 0, upper; 255</td>
 		</tr>
 		<tr>
-			<td>DT::INT<br/>DT::INT16</td>
+			<td>DT_INT<br/>DT_INT16</td>
 			<td></td>
 			<td>at least 4 bytes</td>
 			<td>±2,147,483,648</td>
 		</tr>
 		<tr>
-			<td>DT::BIGINT<br/>DT::INT32</td>
+			<td>DT_BIGINT<br/>DT_INT32</td>
 			<td></td>
 			<td>at most 8 bytes</td>
 			<td>±2^63</td>
 		</tr>
 		<tr>
-			<td>DT::FLOAT</td>
+			<td>DT_FLOAT</td>
 			<td>approximate numeric</td>
 			<td>4 bytes</td>
 			<td>±1.79E + 308</td>
 		</tr>
 		<tr>
-			<td>DT::DECIMAL<br/>DT::DOUBLE</td>
+			<td>DT_DECIMAL<br/>DT_DOUBLE</td>
 			<td>exact numeric</td>
 			<td>at least 5 bytes</td>
 			<td>±10^38+1</td>
 		</tr>
 		<tr>
-			<td>DT::TEXT8<br/>DT::VARCHAR</td>
+			<td>DT_TEXT8<br/>DT_VARCHAR</td>
 			<td>character string</td>
 			<td>1 byte</td>
 			<td>max length 255</td>
 		</tr>
 		<tr>
-			<td>DT::TEXT<br/>DT::TEXT16</td>
+			<td>DT_TEXT<br/>DT_TEXT16</td>
 			<td>character string</td>
 			<td>2 bytes</td>
 			<td>max length 2,147,483,647</td>
 		</tr>
 		<tr>
-			<td>DT::TEXT32</td>
+			<td>DT_TEXT32</td>
 			<td>character string</td>
 			<td>4 bytes</td>
 			<td>max length 4,294,967,295</td>
 		</tr>
 		<tr>
-			<td>DT::DATE</td>
+			<td>DT_DATE</td>
 			<td>Y-m-d</td>
 			<td>3 bytes</td>
 			<td></td>
 		</tr>
 		<tr>
-			<td>DT::DATETIME</td>
+			<td>DT_DATETIME</td>
 			<td>Y-m-d H:i:s</td>
 			<td>8 bytes</td>
 			<td></td>
 		</tr>
 		<tr>
-			<td>DT::TIMESTAMP</td>
+			<td>DT_TIMESTAMP</td>
 			<td>Y-m-d H:i:s</td>
 			<td>8 bytes</td>
 			<td></td>
@@ -171,11 +171,11 @@ The class prodives you the following simple methods for
 	usage:
 	``` php    
     $builder->alterTable('news');
-    $builder->addColumn('author',DT::TEXT8);
-    $builder->addColumn('bodytext',DT::TEXT16);
+    $builder->addColumn('author',\DB\SQL\Schema::DT_TEXT8);
+    $builder->addColumn('bodytext',\DB\SQL\Schema::DT_TEXT16);
 
     // or even chained for one field
-    $builder->alterTable('news')->addCol('author',DT:TEXT8);	
+    $builder->alterTable('news')->addCol('author',\DB\SQL\Schema::DT_TEXT8);	
 	```	
 	
 	If `$nullable` is false, the field is added as NOT NULL field, so it cannot contain a null value and therefore needs a default.
@@ -183,8 +183,8 @@ The class prodives you the following simple methods for
     example:
     ``` php    
     $builder->alterTable('news');
-    $builder->addColumn('version',DT::INT,false,1);
-    $builder->addColumn('title',DT::TEXT16,false,'new untitled news item');
+    $builder->addColumn('version',\DB\SQL\Schema::DT_INT,false,1);
+    $builder->addColumn('title',\DB\SQL\Schema::DT_TEXT16,false,'new untitled news item');
 	```	
     
     But you can set defaults to nullable fields as well.
@@ -194,7 +194,7 @@ The class prodives you the following simple methods for
     
     example:
     ``` php    
-    $builder->alterTable('news')->addColumn('creation_date',\DT::TIMESTAMP,false,\DF::CURRENT_TIMESTAMP);
+    $builder->alterTable('news')->addColumn('creation_date',\DB\SQL\Schema::DT_TIMESTAMP,false,\DB\SQL\Schema::DF_CURRENT_TIMESTAMP);
 	```	
 	
 	Notice: Class DF holds constants for default values, class DT is for DataTypes.
@@ -234,9 +234,9 @@ The class prodives you the following simple methods for
 	usage:
 	``` php
 	$builder->createTable('news');
-	$builder->addColumn('title', \DT::TEXT8);
-	$builder->addColumn('bodytext', \DT::TEXT16);
-	$builder->addColumn('version', \DT::INT8, false, 1);
+	$builder->addColumn('title', \DB\SQL\Schema::DT_TEXT8);
+	$builder->addColumn('bodytext', \DB\SQL\Schema::DT_TEXT16);
+	$builder->addColumn('version', \DB\SQL\Schema::DT_INT8, false, 1);
 	$builder->setPKs(array('id', 'version'));
 	```
 	

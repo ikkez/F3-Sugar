@@ -29,7 +29,7 @@ class Schema extends Controller
 
 		foreach ($dbs as $type => $db) {
 
-			$builder = new \DB\SQL\SchemaBuilder($db);
+			$builder = new \DB\SQL\Schema($db);
 			$type .= ': ';
 			$builder->dropTable($tname);
 
@@ -56,14 +56,18 @@ class Schema extends Controller
 			$ax->column_6 = 'hello world';
 			$ax->save();
 			$ax->reset();
-			$result = $ax->afind();
+			$result = $ax->find();
+			foreach ($result as &$r) {
+				$r = $r->cast();
+			}
 			$test->expect(array_key_exists(0, $result) &&
 				$result[0]['column_6'] == 'hello world',
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
 			// default value text, not nullable
-			$r1 = $builder->addColumn('text_default_not_null', 'TEXT8', false, 'foo bar');
+			$r1 = $builder->addColumn('text_default_not_null', \DB\SQL\Schema::DT_TEXT8, false,
+                'foo bar');
 			$r2 = $builder->getCols(true);
 			$test->expect(
 				$r1 == true &&
@@ -77,7 +81,10 @@ class Schema extends Controller
 			$ax->column_6 = 'tanduay';
 			$ax->save();
 			$ax->reset();
-			$result = $ax->afind();
+			$result = $ax->find();
+			foreach ($result as &$r) {
+				$r = $r->cast();
+			}
 			$test->expect(array_key_exists(1, $result) &&
 					$result[1]['column_6'] == 'tanduay' &&
 					$result[1]['text_default_not_null'] == 'foo bar',
@@ -85,7 +92,7 @@ class Schema extends Controller
 			);
 
 			// default value numeric, not nullable
-			$r1 = $builder->addColumn('int_default_not_null', 'INT8', false, 123);
+			$r1 = $builder->addColumn('int_default_not_null', \DB\SQL\Schema::DT_INT8, false, 123);
 			$r2 = $builder->getCols(true);
 			$test->expect(
 					$r1 == true &&
@@ -99,7 +106,10 @@ class Schema extends Controller
 			$ax->column_6 = 'test3';
 			$ax->save();
 			$ax->reset();
-			$result = $ax->afind();
+			$result = $ax->find();
+			foreach ($result as &$r) {
+				$r = $r->cast();
+			}
 			$test->expect(
 					array_key_exists(2, $result) &&
 					$result[2]['column_6'] == 'test3' &&
@@ -108,7 +118,7 @@ class Schema extends Controller
 			);
 
 			// default value text, nullable
-			$r1 = $builder->addColumn('text_default_nullable', 'TEXT8', true, 'foo bar');
+			$r1 = $builder->addColumn('text_default_nullable', \DB\SQL\Schema::DT_TEXT8, true, 'foo bar');
 			$r2 = $builder->getCols(true);
 			$test->expect(
 					$r1 == true &&
@@ -125,7 +135,10 @@ class Schema extends Controller
 			$ax->text_default_nullable = null;
 			$ax->save();
 			$ax->reset();
-			$result = $ax->afind();
+			$result = $ax->find();
+			foreach ($result as &$r) {
+				$r = $r->cast();
+			}
 			$test->expect(
 					array_key_exists(3, $result) && array_key_exists(4, $result) &&
 					$result[3]['column_6'] == 'test4' && $result[3]['text_default_nullable'] == 'foo bar' &&
@@ -134,7 +147,7 @@ class Schema extends Controller
 			);
 
 			// default value numeric, nullable
-			$r1 = $builder->addColumn('int_default_nullable', 'INT8', true, 123);
+			$r1 = $builder->addColumn('int_default_nullable', \DB\SQL\Schema::DT_INT8, true, 123);
 			$r2 = $builder->getCols(true);
 			$test->expect(
 				$r1 == true && in_array('int_default_nullable', array_keys($r2)) == true && $r2['int_default_nullable']['default'] == 123,
@@ -150,7 +163,10 @@ class Schema extends Controller
 			$ax->save();
 			$ax->reset();
 //			 $db->exec("INSERT INTO $tname (column_6, int_default_nullable) VALUES('test7',NULL);");
-			$result = $ax->afind();
+			$result = $ax->find();
+			foreach ($result as &$r) {
+				$r = $r->cast();
+			}
 			$test->expect(array_key_exists(5, $result) && array_key_exists(6, $result) &&
 					$result[5]['column_6'] == 'test6' && $result[5]['int_default_nullable'] === 123 &&
 					$result[6]['column_6'] == 'test7' && $result[6]['int_default_nullable'] === null,
@@ -158,11 +174,12 @@ class Schema extends Controller
 			);
 
 			// current timestamp
-			$r1 = $builder->addColumn('stamp', \DT::TIMESTAMP, false, \DF::CURRENT_TIMESTAMP);
+			$r1 = $builder->addColumn('stamp', \DB\SQL\Schema::DT_TIMESTAMP, false,
+                \DB\SQL\Schema::DF_CURRENT_TIMESTAMP);
 			$r2 = $builder->getCols(true);
 			$test->expect(
 				$r1 == true && in_array('stamp',array_keys($r2)) == true &&
-				$r2['stamp']['default'] == \DF::CURRENT_TIMESTAMP,
+				$r2['stamp']['default'] == \DB\SQL\Schema::DF_CURRENT_TIMESTAMP,
 				$this->getTime().' '.$type.
 					'adding column [TIMESTAMP], not nullable with current_timestamp default value'
 			);
@@ -181,14 +198,16 @@ class Schema extends Controller
 			$ax->title123 = 'test8';
 			$ax->save();
 			$ax->reset();
-			$result = $ax->afind();
+			$result = $ax->find();
+			foreach ($result as &$r) {
+				$r = $r->cast();
+			}
 			$test->expect(array_key_exists(7, $result) && $result[7]['title123'] == 'test8',
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 			$builder->alterTable($tname, function ($table) {
 				return $table->renameColumn('title123', 'text_default_not_null');
 			});
-
 
 			// remove column
 			$r1 = $builder->dropColumn('column_1');
@@ -217,7 +236,7 @@ class Schema extends Controller
 
 			// adding composite primary keys
 			$builder->createTable($tname);
-			$builder->addColumn('version', 'INT8', false, 1);
+			$builder->addColumn('version', \DB\SQL\Schema::DT_INT8, false, 1);
 			$builder->setPKs(array('id', 'version'));
 			$r1 = $builder->getCols(true);
 
@@ -231,9 +250,9 @@ class Schema extends Controller
 			);
 
 			// more fields to composite primary key table
-			$builder->addColumn('title', 'TEXT8');
-			$builder->addColumn('title2', 'TEXT8');
-			$builder->addColumn('title_notnull', 'TEXT8', false, "foo");
+			$builder->addColumn('title', \DB\SQL\Schema::DT_TEXT8);
+			$builder->addColumn('title2', \DB\SQL\Schema::DT_TEXT8);
+			$builder->addColumn('title_notnull', \DB\SQL\Schema::DT_TEXT8, false, "foo");
 			$r1 = $builder->getCols(true);
 			$test->expect(
 				array_key_exists('title', $r1) &&
@@ -259,7 +278,10 @@ class Schema extends Controller
 			$ax->title_notnull = 'bar';
 			$ax->save();
 
-			$result = $ax->afind();
+			$result = $ax->find();
+			foreach ($result as &$r) {
+				$r = $r->cast();
+			}
 			$cpk_expected = array(
 				0=>array(
 					'id' => 1,
@@ -295,7 +317,6 @@ class Schema extends Controller
 			$builder->dropTable($tname);
 
 		}
-//		$f3->set('QUIET', false);
 		$f3->set('results', $test->results());
 	}
 
