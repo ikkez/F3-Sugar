@@ -50,12 +50,7 @@ class Dropbox implements FileSystem {
      */
     public function requestToken(){
         $url = 'https://api.dropbox.com/1/oauth/request_token';
-        $params = $this->authParams;
-        unset($params['oath_token']);
-        $result = $this->web->request($url,array(
-            'method'=>'POST',
-            'content'=> http_build_query($params)
-        ));
+        $result = $this->doOAuthCall($url, 'POST');
         parse_str($result['body'], $output);
         if (array_key_exists('oauth_token_secret',$output) &&
             array_key_exists('oauth_token', $output))
@@ -90,11 +85,7 @@ class Dropbox implements FileSystem {
      */
     public function accessToken(){
         $url = 'https://api.dropbox.com/1/oauth/access_token';
-
-        $result = $this->web->request($url, array(
-             'method' => 'POST',
-             'content' => http_build_query($this->authParams)
-        ));
+        $result = $this->doOAuthCall($url,'POST');
         parse_str($result['body'], $output);
         if (!count(array_diff(array('oauth_token','oauth_token_secret','uid'),
             array_keys($output))))
@@ -113,15 +104,48 @@ class Dropbox implements FileSystem {
     }
 
     /**
+     * perform a signed oauth request
+     * @param       $url
+     * @param       $method
+     * @param array $params
+     * @param null  $type
+     * @param null  $file
+     * @param null  $content
+     * @return bool
+     */
+    protected function doOAuthCall($url, $method, $params=null,
+                                   $type=NULL, $file=NULL, $content=NULL) {
+        if(is_null($params)) $params = array();
+        $method = strtoupper($method);
+        $options = array('method' => $method);
+        if ($method == 'GET') {
+            if($file)
+                $url .= $type.'/'.$file;
+            $url .= '?'.http_build_query($this->authParams + $params);
+        }
+        elseif ($method == 'POST') {
+            $params = $this->authParams + $params + array('root' => $type);
+            $options['content'] = http_build_query($params);
+        }
+        elseif ($method == 'PUT') {
+            $url .= $type.'/'.$file.'?'.http_build_query($this->authParams + $params);
+            $options['content'] = $content;
+            $options['header'] = array('Content-Type: application/octet-stream');
+        }
+        else {
+            trigger_error('unknown METHOD');
+            return false;
+        }
+        return $this->web->request($url, $options);
+    }
+
+    /**
      * gather user account information
      * @return bool|mixed
      */
     public function getAccountInfo() {
         $url = 'https://api.dropbox.com/1/account/info';
-        $result = $this->web->request($url, array(
-         'method' => 'POST',
-         'content' => http_build_query($this->authParams)
-        ));
+        $result = $this->doOAuthCall($url,'POST');
         $result_body = json_decode($result['body'], true);
         if (!array_key_exists('error', $result_body)) {
             return $result_body;
@@ -140,16 +164,15 @@ class Dropbox implements FileSystem {
      */
     public function read($file, $rev=NUll, $type='sandbox')
     {
-        $url = 'https://api-content.dropbox.com/1/files/'.$type.'/'.$file;
-        $params = $this->authParams;
-        if($rev) $params['rev'] = $rev;
-        $url .= '?'.http_build_query($params);
-        $result = $this->web->request($url, array(
-             'method' => 'GET',
-        ));
-        if(!$result_body = json_decode($result['body'], true))
+        $url = 'https://api-content.dropbox.com/1/files/';
+        $params = array();
+        if ($rev) $params['rev'] = $rev;
+        $result = $this->doOAuthCall($url,'GET',$params, $type, $file);
+        // if file not found, response is json, otherwise just file contents
+        if(!in_array('HTTP/1.1 404 Not Found', $result['headers']))
             return $result['body'];
         else {
+            $result_body = json_decode($result['body'], true);
             trigger_error(sprintf(self::E_APIERROR, $result_body['error']));
             return false;
         }
@@ -205,13 +228,12 @@ class Dropbox implements FileSystem {
     protected function metadata($file,$list=true,$existCheck=false,
                                 $hidden=false,$rev=NULL, $type='sandbox')
     {
-        $url = 'https://api.dropbox.com/1/metadata/'.$type.'/'.$file;
-        $params = $this->authParams;
+        $url = 'https://api.dropbox.com/1/metadata/';
+        $params = array();
         $params['list'] = $list;
         if ($rev) $params['rev'] = $rev;
         if ($list) $params['include_deleted'] = 'false';
-        $url .= '?'.http_build_query($params);
-        $result = $this->web->request($url, array('method' => 'GET'));
+        $result = $this->doOAuthCall($url, 'GET', $params, $type,$file);
         $result_body = json_decode($result['body'], true);
         if (!array_key_exists('error', $result_body)) {
             if($existCheck) {
@@ -236,13 +258,8 @@ class Dropbox implements FileSystem {
      */
     public function write($file, $content, $type='sandbox')
     {
-        $url = 'https://api-content.dropbox.com/1/files_put/'.$type.'/'.$file.
-               '?'.http_build_query($this->authParams);
-        $result = $this->web->request($url, array(
-            'method' => 'PUT',
-            'content' => $content,
-            'header' => array( 'Content-Type: application/octet-stream' ),
-        ));
+        $url = 'https://api-content.dropbox.com/1/files_put/';
+        $result = $this->doOAuthCall($url,'PUT',null,$type,$file,$content);
         $result_body = json_decode($result['body'],true);
         if (!array_key_exists('error', $result_body)) {
             return $result_body;
@@ -261,11 +278,7 @@ class Dropbox implements FileSystem {
     public function delete($file,$type='sandbox')
     {
         $url = 'https://api.dropbox.com/1/fileops/delete';
-        $params = $this->authParams + array('root'=>$type,'path'=>$file);
-        $result = $this->web->request($url, array(
-             'method' => 'POST',
-             'content' => http_build_query($params),
-        ));
+        $result = $this->doOAuthCall($url,'POST',array('path' => $file),$type);
         $result_body = json_decode($result['body'], true);
         if (!array_key_exists('error', $result_body)) {
             return $result_body;
@@ -285,11 +298,8 @@ class Dropbox implements FileSystem {
     public function move($from, $to, $type='sandbox')
     {
         $url = 'https://api.dropbox.com/1/fileops/move';
-        $params = $this->authParams + array('root' => $type, 'from_path' => $from,'to_path'=>$to);
-        $result = $this->web->request($url, array(
-             'method' => 'POST',
-             'content' => http_build_query($params),
-        ));
+        $params = array('from_path' => $from,'to_path'=>$to);
+        $result = $this->doOAuthCall($url, 'POST', $params, $type);
         $result_body = json_decode($result['body'], true);
         if (!array_key_exists('error', $result_body)) {
             return $result_body;
@@ -347,11 +357,7 @@ class Dropbox implements FileSystem {
     public function createDir($dir,$type='sandbox')
     {
         $url = 'https://api.dropbox.com/1/fileops/create_folder';
-        $params = $this->authParams + array('root' => $type, 'path' => $dir);
-        $result = $this->web->request($url, array(
-             'method' => 'POST',
-             'content' => http_build_query($params),
-        ));
+        $result = $this->doOAuthCall($url, 'POST', array('path'=>$dir), $type);
         $result_body = json_decode($result['body'], true);
         if (!array_key_exists('error', $result_body)) {
             return $result_body;
