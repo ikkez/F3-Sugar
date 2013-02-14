@@ -37,11 +37,17 @@ class Dropbox implements FileSystem {
         );
     }
 
+    /**
+     * perform external authorisation
+     */
     public function login() {
         $this->requestToken();
         $this->authorize('http://localhost/web/git/fatfree_ikkez/dropbox-login-complete');
     }
 
+    /**
+     * AUTH Step 1: request a token for authorisation process
+     */
     public function requestToken(){
         $url = 'https://api.dropbox.com/1/oauth/request_token';
         $params = $this->authParams;
@@ -64,6 +70,10 @@ class Dropbox implements FileSystem {
         }
     }
 
+    /**
+     * AUTH Step 2: reroute to auth page
+     * @param null $callback_url
+     */
     public function authorize($callback_url = NULL){
         $url = 'https://www.dropbox.com/1/oauth/authorize';
         $params = array(
@@ -71,10 +81,13 @@ class Dropbox implements FileSystem {
             'locale ' => $this->f3->get('LANGUAGE'),
         );
         if($callback_url) $params['oauth_callback'] = $callback_url;
-        header('Location: '.$url.'?'.http_build_query($params));
-        exit();
+        $this->f3->reroute($url.'?'.http_build_query($params));
     }
 
+    /**
+     * AUTH Step 3: request access token, used to sign all resource requests
+     * @return bool
+     */
     public function accessToken(){
         $url = 'https://api.dropbox.com/1/oauth/access_token';
 
@@ -99,6 +112,10 @@ class Dropbox implements FileSystem {
         }
     }
 
+    /**
+     * gather user account information
+     * @return bool|mixed
+     */
     public function getAccountInfo() {
         $url = 'https://api.dropbox.com/1/account/info';
         $result = $this->web->request($url, array(
@@ -198,7 +215,7 @@ class Dropbox implements FileSystem {
         $result_body = json_decode($result['body'], true);
         if (!array_key_exists('error', $result_body)) {
             if($existCheck) {
-                if($result_body['is_deleted'])
+                if(array_key_exists('is_deleted',$result_body) && $result_body['is_deleted'])
                     return ($hidden) ? true : false;
                 else return true;
             }
@@ -236,7 +253,7 @@ class Dropbox implements FileSystem {
     }
 
     /**
-     * delete a file
+     * delete a file or dir
      * @param        $file
      * @param string $type
      * @return mixed
@@ -256,67 +273,102 @@ class Dropbox implements FileSystem {
             trigger_error(sprintf(self::E_APIERROR, $result_body['error']));
             return false;
         }
-
     }
 
     /**
      * rename a file or directory
-     * @param $from
-     * @param $to
+     * @param        $from
+     * @param        $to
+     * @param string $type
      * @return mixed
      */
-    public function rename($from, $to)
+    public function move($from, $to, $type='sandbox')
     {
-        // TODO: Implement rename() method.
+        $url = 'https://api.dropbox.com/1/fileops/move';
+        $params = $this->authParams + array('root' => $type, 'from_path' => $from,'to_path'=>$to);
+        $result = $this->web->request($url, array(
+             'method' => 'POST',
+             'content' => http_build_query($params),
+        ));
+        $result_body = json_decode($result['body'], true);
+        if (!array_key_exists('error', $result_body)) {
+            return $result_body;
+        } else {
+            trigger_error(sprintf(self::E_APIERROR, $result_body['error']));
+            return false;
+        }
     }
 
     /**
      * get last modified date
-     * @param $file
+     * @param        $file
+     * @param null   $rev
+     * @param string $type
      * @return mixed
      */
-    public function modified($file)
+    public function modified($file, $rev = NULL, $type = 'sandbox')
     {
-        // TODO: Implement modified() method.
+        $result = $this->metadata($file, false, false, true, $rev, $type);
+        return strtotime($result['modified']);
     }
 
     /**
      * get filesize in bytes
-     * @param $file
+     * @param        $file
+     * @param null   $rev
+     * @param string $type
      * @return mixed
      */
-    public function size($file)
+    public function size($file, $rev = NULL, $type = 'sandbox')
     {
-        // TODO: Implement size() method.
+        $result = $this->metadata($file, false, false, true, $rev, $type);
+        return strtotime($result['bytes']);
     }
 
     /**
      * return whether the item is a directory
-     * @param $dir
+     * @param        $dir
+     * @param null   $rev
+     * @param string $type
      * @return mixed
      */
-    public function isDir($dir)
+    public function isDir($dir, $rev = NULL, $type = 'sandbox')
     {
-        // TODO: Implement isDir() method.
+        $result = $this->metadata($dir, false, true, false, $rev, $type);
+        return (bool)$result;
     }
 
     /**
      * create new directory
-     * @param $dir
+     * @param        $dir
+     * @param string $type
      * @return mixed
      */
-    public function createDir($dir)
+    public function createDir($dir,$type='sandbox')
     {
-        // TODO: Implement createDir() method.
+        $url = 'https://api.dropbox.com/1/fileops/create_folder';
+        $params = $this->authParams + array('root' => $type, 'path' => $dir);
+        $result = $this->web->request($url, array(
+             'method' => 'POST',
+             'content' => http_build_query($params),
+        ));
+        $result_body = json_decode($result['body'], true);
+        if (!array_key_exists('error', $result_body)) {
+            return $result_body;
+        } else {
+            trigger_error(sprintf(self::E_APIERROR, $result_body['error']));
+            return false;
+        }
     }
 
     /**
      * remove a directory
-     * @param $dir
+     * @param        $dir
+     * @param string $type
      * @return mixed
      */
-    public function removeDir($dir)
+    public function removeDir($dir,$type='sandbox')
     {
-        // TODO: Implement removeDir() method.
+        $this->delete($dir,$type);
     }
 }
