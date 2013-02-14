@@ -95,7 +95,7 @@ class FTP implements FileSystem
         return ftp_delete($this->getConnection(), $file);
     }
 
-    public function rename($from, $to)
+    public function move($from, $to)
     {
         return ftp_rename($this->getConnection(),$from, $to);
     }

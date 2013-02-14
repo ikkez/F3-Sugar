@@ -87,7 +87,7 @@ class MetaFileStorage implements MetaStorageInterface {
     {
         $metaFile = $this->getMetaFilePath($current);
     	if ($this->fs->exists($metaFile)) {
-            $this->fs->rename($metaFile,$this->getMetaFilePath($new));
+            $this->fs->move($metaFile,$this->getMetaFilePath($new));
             if ($this->f3->get('CACHE')) {
                 $cache = \Cache::instance();
                 if ($cache->exists($cacheHash = $this->getCacheHash($current)))

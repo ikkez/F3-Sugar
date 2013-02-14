@@ -31,7 +31,7 @@ class LocalFS implements FileSystem
         return @unlink($this->path.$file);
     }
 
-    public function rename($from, $to)
+    public function move($from, $to)
     {
         return @rename($this->path.$from, $this->path.$to);
     }

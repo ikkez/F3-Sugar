@@ -181,7 +181,7 @@ class FAL extends Magic
     public function rename($newFile)
     {
         if(!empty($this->file)) {
-            $this->fs->rename($this->file,$newFile);
+            $this->fs->move($this->file,$newFile);
             if ($this->f3->get('CACHE')) {
                 $cache = \Cache::instance();
                 if ($cache->exists($cacheHash = $this->getCacheHash($this->file)))

@@ -39,7 +39,7 @@ interface FileSystem
      * @param $to
      * @return mixed
      */
-    public function rename($from, $to);
+    public function move($from, $to);
 
     /**
      * get last modified date
