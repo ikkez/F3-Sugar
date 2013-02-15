@@ -50,6 +50,17 @@ class FAL extends Magic
     }
 
     /**
+     * create FAL on local filesystem as prefab default
+     * @return mixed
+     */
+    static public function instance() {
+        if (!Registry::exists($class = get_called_class()))
+            $localFS = new \FAL\LocalFS(\Base::instance()->get('UI'));
+            Registry::set($class, new self($localFS));
+        return Registry::get($class);
+    }
+
+    /**
      * update file contents and meta
      * or create new file, if not existing
      * @param int $ttl
