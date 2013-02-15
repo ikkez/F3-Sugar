@@ -1,5 +1,25 @@
 <?php
 
+/**
+    DropBox filesystem adapter
+
+    You need a valid app-key and app-secret in order to use this
+    Get them right here: https://www.dropbox.com/developers/apps
+    ================================================
+
+    The contents of this file are subject to the terms of the GNU General
+    Public License Version 3.0. You may not use this file except in
+    compliance with the license. Any of the license terms and conditions
+    can be waived if you get permission from the copyright holder.
+
+        Copyright (c) 2013 by ikkez
+        Christian Knuth <ikkez0n3@gmail.com>
+        https://github.com/ikkez/F3-Sugar/
+
+        @version 0.8.0
+        @date 15.02.2013
+ **/
+
 namespace FAL;
 
 class Dropbox implements FileSystem {
@@ -11,6 +31,7 @@ class Dropbox implements FileSystem {
         $authSecret,
         $reqParams,
         $authParams;
+
     /** @var \Base */
     protected $f3;
 
@@ -18,7 +39,9 @@ class Dropbox implements FileSystem {
     protected $web;
 
     const
-        E_APIERROR = 'Dropbox API Error: %s';
+        E_APIERROR = 'Dropbox API Error: %s',
+        E_AUTHERROR = 'OAuth failed: %s',
+        E_METHODNOTSUPPORTED = 'METHOD %s not supported';
 
     public function __construct($appKey,$appSecret) {
         $this->appKey = $appKey;
@@ -67,7 +90,7 @@ class Dropbox implements FileSystem {
             $this->f3->set('SESSION.dropbox.authSecret',$this->authSecret);
         } else {
             $result = json_decode($result['body'], true);
-            trigger_error('OAuth failed: '.$result['error']);
+            trigger_error(sprintf(self::E_AUTHERROR,$result['error']));
         }
     }
 
@@ -88,7 +111,6 @@ class Dropbox implements FileSystem {
     /**
      * AUTH Step 3: request access token, used to sign all resource requests
      * @return bool
-     * @return bool
      */
     public function accessToken(){
         $url = 'https://api.dropbox.com/1/oauth/access_token';
@@ -105,19 +127,19 @@ class Dropbox implements FileSystem {
             return true;
         } else {
             $result = json_decode($result['body'], true);
-            trigger_error('OAuth failed: '.$result['error']);
+            trigger_error(sprintf(self::E_AUTHERROR, $result['error']));
             return false;
         }
     }
 
     /**
      * perform a signed oauth request
-     * @param       $url
-     * @param       $method
-     * @param array $params
-     * @param null  $type
-     * @param null  $file
-     * @param null  $content
+     * @param string $url      request url
+     * @param string $method   method type
+     * @param array  $params   additional params
+     * @param null   $type     storage type [sandbox|dropbox]
+     * @param null   $file     full file pathname
+     * @param null   $content  file content
      * @return bool
      */
     protected function doOAuthCall($url, $method, $params=null,
@@ -140,7 +162,7 @@ class Dropbox implements FileSystem {
             $options['header'] = array('Content-Type: application/octet-stream');
         }
         else {
-            trigger_error('unknown METHOD');
+            trigger_error(sprintf(self::E_METHODNOTSUPPORTED,$method));
             return false;
         }
         return $this->web->request($url, $options);
@@ -218,18 +240,19 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return bool|mixed
      */
-    public function fileInfo($file,$rev = NUll, $type = 'sandbox') {
+    public function fileInfo($file,$rev = NUll, $type = 'sandbox')
+    {
         return $this->metadata($file,false,false,true,$rev,$type);
     }
 
     /**
      * perform meta request
-     * @param        $file
-     * @param bool   $list
-     * @param bool   $existCheck
-     * @param bool   $hidden
-     * @param null   $rev
-     * @param string $type
+     * @param        $file          full file pathname
+     * @param bool   $list          include file list, if $file is a dir
+     * @param bool   $existCheck    return bool instead of json or error
+     * @param bool   $hidden        include deleted files
+     * @param null   $rev           select file version
+     * @param string $type          storage type [sandbox|dropbox]
      * @return bool|mixed
      */
     protected function metadata($file,$list=true,$existCheck=false,
