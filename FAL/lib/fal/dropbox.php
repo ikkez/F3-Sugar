@@ -9,6 +9,7 @@ class Dropbox implements FileSystem {
         $appSecret,
         $authToken,
         $authSecret,
+        $reqParams,
         $authParams;
     /** @var \Base */
     protected $f3;
@@ -27,14 +28,15 @@ class Dropbox implements FileSystem {
         $this->web->engine('curl');
         $this->authToken = $this->f3->get('SESSION.dropbox.authToken');
         $this->authSecret = $this->f3->get('SESSION.dropbox.authSecret');
-        $this->authParams = array(
+        $this->reqParams = array(
             'oauth_consumer_key' => $this->appKey,
-            'oauth_token' => $this->authToken,
             'oauth_version' => '1.0',
-            'oauth_signature' => $this->appSecret.'&'.$this->authSecret,
+            'oauth_signature' => $this->appSecret.'&',
             'oauth_signature_method' => 'PLAINTEXT',
-         // 'oauth_timestamp' => strftime("%a, %d %b %Y %H:%M:%S %Z",time()),
+            // 'oauth_timestamp' => strftime("%a, %d %b %Y %H:%M:%S %Z",time()),
         );
+        $this->authParams = $this->reqParams + array('oauth_token' => $this->authToken);
+        $this->authParams['oauth_signature'] .= $this->authSecret;
     }
 
     /**
@@ -50,7 +52,11 @@ class Dropbox implements FileSystem {
      */
     public function requestToken(){
         $url = 'https://api.dropbox.com/1/oauth/request_token';
-        $result = $this->doOAuthCall($url, 'POST');
+        $params = $this->reqParams;
+        $result = $this->web->request($url,array(
+            'method'=>'POST',
+            'content'=> http_build_query($params)
+        ));
         parse_str($result['body'], $output);
         if (array_key_exists('oauth_token_secret',$output) &&
             array_key_exists('oauth_token', $output))
@@ -81,6 +87,7 @@ class Dropbox implements FileSystem {
 
     /**
      * AUTH Step 3: request access token, used to sign all resource requests
+     * @return bool
      * @return bool
      */
     public function accessToken(){
