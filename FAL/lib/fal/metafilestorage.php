@@ -44,7 +44,7 @@ class MetaFileStorage implements MetaStorageInterface {
     public function save($file, $data, $ttl)
     {
         $cacheHash = $this->getCacheHash($file);
-        if($this->fs->setContent($this->getMetaFilePath($file), json_encode($data))) {
+        if($this->fs->write($this->getMetaFilePath($file), json_encode($data))) {
             if ($this->f3->get('CACHE')) {
                 $cache = \Cache::instance();
                 if ($ttl)
@@ -72,7 +72,7 @@ class MetaFileStorage implements MetaStorageInterface {
         ) {
             $this->data = $content;
         } elseif ($this->fs->exists($metaFile = $this->getMetaFilePath($file))) {
-            $this->data = json_decode($this->fs->getContent($metaFile), true);
+            $this->data = json_decode($this->fs->read($metaFile), true);
             if ($this->f3->get('CACHE') && $ttl)
                 $cache->set($cacheHash, $this->data, $ttl);
         }
