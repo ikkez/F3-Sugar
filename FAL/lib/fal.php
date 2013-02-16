@@ -17,7 +17,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.5.0
+        @version 0.7.0
         @date 08.02.2013
  **/
 
@@ -54,10 +54,8 @@ class FAL extends Magic
      * @return mixed
      */
     static public function instance() {
-        if (!Registry::exists($class = get_called_class()))
-            $localFS = new \FAL\LocalFS(\Base::instance()->get('UI'));
-            Registry::set($class, new self($localFS));
-        return Registry::get($class);
+        $localFS = new \FAL\LocalFS(\Base::instance()->get('UI'));
+        return new self($localFS);
     }
 
     /**
@@ -186,21 +184,21 @@ class FAL extends Magic
         return array_key_exists($key, $this->meta);
     }
 
-    // TODO: filesize info etc. mime-type
-    //TODO getFileStream
-
-    public function rename($newFile)
+    /**
+     * @param $newPath
+     */
+    public function move($newPath)
     {
         if(!empty($this->file)) {
-            $this->fs->move($this->file,$newFile);
+            $this->fs->move($this->file,$newPath);
             if ($this->f3->get('CACHE')) {
                 $cache = \Cache::instance();
                 if ($cache->exists($cacheHash = $this->getCacheHash($this->file)))
                     $cache->clear($cacheHash);
             }
-            if (method_exists($this->metaHandle, 'rename'))
-                $this->metaHandle->rename($this->file,$newFile);
-            $this->file = $newFile;
+            if (method_exists($this->metaHandle, 'move'))
+                $this->metaHandle->rename($this->file,$newPath);
+            $this->file = $newPath;
         }
     }
 
@@ -249,5 +247,16 @@ class FAL extends Magic
     {
         $this->changed = true;
         $this->content = $data;
+    }
+
+    /**
+     * return file stream path
+     * @return string
+     */
+    public function getFileStream() {
+        $stream = new \FAL\FileStream();
+        $pt = $stream->getProtocolName();
+        file_put_contents($path = $pt.'://'.$this->file,$this->getContent());
+        return $path;
     }
 }

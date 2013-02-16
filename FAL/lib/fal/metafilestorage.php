@@ -1,5 +1,22 @@
 <?php
 
+/**
+    MetaFileStorage saves a json encoded meta file
+    beside the regular resource file to store user defined key-value pairs
+
+    The contents of this file are subject to the terms of the GNU General
+    Public License Version 3.0. You may not use this file except in
+    compliance with the license. Any of the license terms and conditions
+    can be waived if you get permission from the copyright holder.
+
+    Copyright (c) 2013 by ikkez
+    Christian Knuth <ikkez0n3@gmail.com>
+    https://github.com/ikkez/F3-Sugar/
+
+        @version 1.0.0
+        @date 15.02.2013
+ **/
+
 namespace FAL;
 
 class MetaFileStorage implements MetaStorageInterface {
@@ -83,7 +100,7 @@ class MetaFileStorage implements MetaStorageInterface {
      * @param $current
      * @param $new
      */
-    public function rename($current,$new)
+    public function move($current,$new)
     {
         $metaFile = $this->getMetaFilePath($current);
     	if ($this->fs->exists($metaFile)) {
