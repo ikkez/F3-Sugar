@@ -154,6 +154,24 @@ class FAL extends Magic
     }
 
     /**
+     * @param $newPath
+     */
+    public function move($newPath)
+    {
+        if(!empty($this->file)) {
+            $this->fs->move($this->file,$newPath);
+            if ($this->f3->get('CACHE')) {
+                $cache = \Cache::instance();
+                if ($cache->exists($cacheHash = $this->getCacheHash($this->file)))
+                    $cache->clear($cacheHash);
+            }
+            if (method_exists($this->metaHandle, 'move'))
+                $this->metaHandle->rename($this->file,$newPath);
+            $this->file = $newPath;
+        }
+    }
+
+    /**
      * get meta data field
      * @param $key
      * @return bool
@@ -182,24 +200,6 @@ class FAL extends Magic
     {
         if(empty($this->meta)) return false;
         return array_key_exists($key, $this->meta);
-    }
-
-    /**
-     * @param $newPath
-     */
-    public function move($newPath)
-    {
-        if(!empty($this->file)) {
-            $this->fs->move($this->file,$newPath);
-            if ($this->f3->get('CACHE')) {
-                $cache = \Cache::instance();
-                if ($cache->exists($cacheHash = $this->getCacheHash($this->file)))
-                    $cache->clear($cacheHash);
-            }
-            if (method_exists($this->metaHandle, 'move'))
-                $this->metaHandle->rename($this->file,$newPath);
-            $this->file = $newPath;
-        }
     }
 
     /**

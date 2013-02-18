@@ -16,7 +16,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.8.0
+        @version 0.8.1
         @date 15.02.2013
  **/
 
@@ -56,18 +56,40 @@ class Dropbox implements FileSystem {
             'oauth_version' => '1.0',
             'oauth_signature' => $this->appSecret.'&',
             'oauth_signature_method' => 'PLAINTEXT',
-            // 'oauth_timestamp' => strftime("%a, %d %b %Y %H:%M:%S %Z",time()),
+            'oauth_timestamp' => strftime("%a, %d %b %Y %H:%M:%S %Z",time()),
         );
         $this->authParams = $this->reqParams + array('oauth_token' => $this->authToken);
         $this->authParams['oauth_signature'] .= $this->authSecret;
     }
 
     /**
-     * perform external authorisation
+     * set auth tokens
+     * @param $token
+     * @param $secret
      */
-    public function login() {
-        $this->requestToken();
-        $this->authorize('http://localhost/web/git/fatfree_ikkez/dropbox-login-complete');
+    public function setAuthToken($token, $secret) {
+        $this->authToken = $token;
+        $this->authSecret = $secret;
+        $this->f3->set('SESSION.dropbox.authToken', $this->authToken);
+        $this->f3->set('SESSION.dropbox.authSecret', $this->authSecret);
+    }
+
+    /**
+     * perform external authorisation, return access token
+     * @param null $callback_url
+     * @return array|bool
+     */
+    public function login($callback_url = NULL) {
+        if (!$this->f3->exists('GET.oauth_token')) {
+            $tokens = $this->requestToken();
+            $this->setAuthToken($tokens['oauth_token'], $tokens['oauth_token_secret']);
+            if(is_null($callback_url))
+                $callback_url = $this->f3->get('SCHEME').'://'.$this->f3->get('HOST').
+                    $this->f3->get('URI');
+            $this->authorize($callback_url);
+        } else {
+            return $this->accessToken();
+        }
     }
 
     /**
@@ -84,10 +106,7 @@ class Dropbox implements FileSystem {
         if (array_key_exists('oauth_token_secret',$output) &&
             array_key_exists('oauth_token', $output))
         {
-            $this->authToken = $output['oauth_token'];
-            $this->authSecret = $output['oauth_token_secret'];
-            $this->f3->set('SESSION.dropbox.authToken',$this->authToken);
-            $this->f3->set('SESSION.dropbox.authSecret',$this->authSecret);
+            return $output;
         } else {
             $result = json_decode($result['body'], true);
             trigger_error(sprintf(self::E_AUTHERROR,$result['error']));
@@ -101,7 +120,7 @@ class Dropbox implements FileSystem {
     public function authorize($callback_url = NULL){
         $url = 'https://www.dropbox.com/1/oauth/authorize';
         $params = array(
-            'oauth_token' => $this->f3->get('SESSION.dropbox.authToken'),
+            'oauth_token' => $this->authToken,
             'locale ' => $this->f3->get('LANGUAGE'),
         );
         if($callback_url) $params['oauth_callback'] = $callback_url;
@@ -110,7 +129,7 @@ class Dropbox implements FileSystem {
 
     /**
      * AUTH Step 3: request access token, used to sign all resource requests
-     * @return bool
+     * @return bool|array
      */
     public function accessToken(){
         $url = 'https://api.dropbox.com/1/oauth/access_token';
@@ -119,12 +138,8 @@ class Dropbox implements FileSystem {
         if (!count(array_diff(array('oauth_token','oauth_token_secret','uid'),
             array_keys($output))))
         {
-            $this->authToken = $output['oauth_token'];
-            $this->authSecret = $output['oauth_token_secret'];
-            $this->uid = $output['uid'];
-            $this->f3->set('SESSION.dropbox.authToken', $this->authToken);
-            $this->f3->set('SESSION.dropbox.authSecret', $this->authSecret);
-            return true;
+            $this->setAuthToken($output['oauth_token'], $output['oauth_token_secret']);
+            return $output;
         } else {
             $result = json_decode($result['body'], true);
             trigger_error(sprintf(self::E_AUTHERROR, $result['error']));
@@ -230,7 +245,8 @@ class Dropbox implements FileSystem {
      */
     public function listDir($file='', $hidden=false, $rev = NUll, $type = 'sandbox')
     {
-        return $this->metadata($file, true, false, $hidden, $rev, $type);
+        $result = $this->metadata($file, true, false, $hidden, $rev, $type);
+        return $result['contents'];
     }
 
     /**
