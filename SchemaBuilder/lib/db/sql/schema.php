@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.2.0
+        @version 1.2.1
  **/
 
 
@@ -487,7 +487,7 @@ class Schema {
         // default value
         if($default !== false) {
             $def_cmd = $this->findQuery($def_cmds).' ';
-            if ($default == 'CUR_STAMP') {
+            if ($default === self::DF_CURRENT_TIMESTAMP) {
                 // timestamp default
                 $stamp_type = $this->findQuery($this->dataTypes['TIMESTAMP']);
                 if ($type != 'TIMESTAMP' &&
