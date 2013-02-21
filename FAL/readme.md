@@ -26,21 +26,28 @@ You can also use this Prefab shortcut. It will mount on your layout directory de
 ``` php
 $myFS = \FAL::instance();
 ```
-**FTP Adapter **
+
+**FTP Adapter**
+
 ``` php
 $myFS = new \FAL\FTP('html/files/','ftp.mydomain.com','user','pass');
 ```
 
-**DropBox Adapter **
+**DropBox Adapter**
+
 ``` php
-$myFS = new \FAL\Dropbox($appKey,$appSecret);```
+$myFS = new \FAL\Dropbox($appKey,$appSecret);
+```
+
 To gain access to the users DropBox account, you need a _KEY_ and a _SECRET_ token for your app first. You can register a new app and get the keys for free right here: https://www.dropbox.com/developers/apps
 
 Now the User has to authenticate with your new App. Therefor he'll be redirected to the DropBox Auth page, where he must agree. To run the login procedure, do the following:
+
 ``` php
 $dropbox = new \FAL\Dropbox($appKey,$appSecret);
 $authTokens = $dropbox->login();
 ```
+
 If the login was successful, `$authTokens` will contain an array of `oauth_token` and `oauth_token_secret`. Save them beside your user data and set them with `$dropbox->setAuthToken($token, $secret);` the next time, to reuse that token-pair. Overwise you'll need to login on every request again. (Currently, the token-pair is also cached and reused from the browser SESSION. This may change in progress of development.)
 
 
