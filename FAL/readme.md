@@ -22,7 +22,7 @@ Mount on your `files/` folder:
 $myFS = new \FAL\LocalFS('files/');
 ```
 
-You can also use this Prefab shortcut. It will mount on your layout directory defined in F3 **UI** var. **TODO: If UI contains separated values, the whole thing blows up.**
+You can also use this Prefab shortcut. It will mount on your layout directory defined in F3 **UI** var.
 ``` php
 $myFS = \FAL::instance();
 ```
