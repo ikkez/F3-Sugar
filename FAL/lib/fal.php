@@ -17,7 +17,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.7.0
+        @version 0.7.1
         @date 08.02.2013
  **/
 
@@ -168,7 +168,7 @@ class FAL extends Magic
                     $cache->clear($cacheHash);
             }
             if (method_exists($this->metaHandle, 'move'))
-                $this->metaHandle->rename($this->file,$newPath);
+                $this->metaHandle->move($this->file,$newPath);
             $this->file = $newPath;
         }
     }
