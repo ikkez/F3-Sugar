@@ -132,8 +132,8 @@ $xml = simplexml_load_file($xmlFile);
     Hydrate mapper with meta data and file contents of the specified file. If $ttl is set (in seconds) and F3 Caching is on, it'll also load the file contents from cache. If caching is off, the file contents is lazy loaded, when you call getContent()
 -   **$fal->delete( $file );** delete file and meta data
 -   **$fal->move( $from, $to );** move the file, and call a _move_ hook in the used MetaStorage handler, if existing
--   **$fal->getContent();** set new file content
--   **$fal->setContent( $data );** write new data into file. refreshe cache record if $ttl
+-   **$fal->getContent();** return file content. If not already loaded, the filesystem is used to read the file
+-   **$fal->setContent( $data );** set file content
 -   **$fal->getFileStream()** register fal:// stream wrapper, if not defined, load file into it and return stream path
 -   **$fal->save( $ttl );** write new data into file and meta, if changed. It also refreshes cache record if $ttl is set
 -   **get(); set(); clear(); exists();** for handling meta key fields
