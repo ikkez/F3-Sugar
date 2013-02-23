@@ -54,7 +54,9 @@ class FAL extends Magic
      * @return mixed
      */
     static public function instance() {
-        $localFS = new \FAL\LocalFS(\Base::instance()->get('UI'));
+        $f3 = \Base::instance();
+        $dir = $f3->split($f3->get('UI'));
+        $localFS = new \FAL\LocalFS($dir[0]);
         return new self($localFS);
     }
 
