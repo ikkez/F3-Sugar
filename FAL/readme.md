@@ -22,7 +22,7 @@ Mount on your `files/` folder:
 $myFS = new \FAL\LocalFS('files/');
 ```
 
-You can also use this Prefab shortcut. It will mount on your layout directory defined in F3 **UI** var. **TODO: If UI contains separated values, the whole thing blows up.**
+You can also use this Prefab shortcut. It will mount on your layout directory defined in F3 **UI** var.
 ``` php
 $myFS = \FAL::instance();
 ```
@@ -118,14 +118,27 @@ ListOptions  "-la"
 
 #### File Streams
 
-Sometimes you may consider to work with files. Therefor FAL can creates a StreamWrapper and loads the file into it. You can now use this file stream to run all other common operations that requires a valid file path.
+Sometimes you may consider to work with files. Therefor FAL creates a StreamWrapper and loads the file into it. You can now use this file stream to run all other common operations that requires a valid file path.
 ``` php
 $fal->load('data/categories.xml');
 $xmlFile = $fal->getFileStream(); // fal://data/categories.xml
 $xml = simplexml_load_file($xmlFile);
 ```
 
+#### Function Overview
+
+-   **$fal->load( $file, $ttl);**
+
+    Hydrate mapper with meta data and file contents of the specified file. If $ttl is set (in seconds) and F3 Caching is on, it'll also load the file contents from cache. If caching is off, the file contents is lazy loaded, when you call getContent()
+-   **$fal->delete( $file );** delete file and meta data
+-   **$fal->move( $from, $to );** move the file, and call a _move_ hook in the used MetaStorage handler, if existing
+-   **$fal->getContent();** return file content. If not already loaded, the filesystem is used to read the file
+-   **$fal->setContent( $data );** set file content
+-   **$fal->getFileStream()** register fal:// stream wrapper, if not defined, load file into it and return stream path
+-   **$fal->save( $ttl );** write new data into file and meta, if changed. It also refreshes cache record if $ttl is set
+-   **get(); set(); clear(); exists();** for handling meta key fields
 
 ### Roadmap
+-   complete a unified listDir() method
 -   create a DB meta storage handler, to get rid of meta files
 -   add filesystem adapter for Google Drive and Amazon S3
