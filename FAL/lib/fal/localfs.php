@@ -50,6 +50,29 @@ class LocalFS implements FileSystem
         return is_dir($this->path.$dir);
     }
 
+    public function listDir($dir=null,$filter=null,$recursive=false) {
+        if(is_null($dir) || $dir = '/') $dir = '';
+        if (!$this->isDir($dir))
+            trigger_error('Scan path is not a valid directory');
+
+        $list = array();
+        $it = new FileFilter($this->path.$dir, $filter, $recursive);
+        foreach ($it as $node) {
+            $path = $node->getPathname();
+            if(strpos($path,$this->path.$dir) === 0)
+                $path = substr($path, strlen($this->path.$dir));
+            $list[$path] = array(
+                'filename' => $node->getFilename(),
+                'basename' => $node->getBasename(),
+                'path' => $node->getPathname(),
+                'type' => $node->getType(),
+                'extension' => $node->getExtension(),
+                'size' => $node->getSize(),
+            );
+        }
+        return $list;
+    }
+
     public function createDir($dir)
     {
         if(!$this->isDir($dir)) {
@@ -67,5 +90,33 @@ class LocalFS implements FileSystem
     public function removeDir($dir)
     {
         return @rmdir($this->path.$dir);
+    }
+}
+
+
+class FileFilter extends \FilterIterator {
+
+    protected
+        $recursive,
+        $pattern;
+
+    public function __construct($dir='.', $pattern=null, $recursive=false)
+    {
+        $this->recursive = $recursive;
+        $this->pattern = $pattern;
+        if (is_string($dir))
+            $dir = ($recursive)
+                ? new \RecursiveDirectoryIterator($dir, \FilesystemIterator::UNIX_PATHS)
+                : new \FilesystemIterator($dir, \FilesystemIterator::UNIX_PATHS);
+        if ($dir instanceof \RecursiveIterator)
+                parent::__construct(new \RecursiveIteratorIterator($dir));
+        else    parent::__construct($dir);
+    }
+
+    public function accept()
+    {
+        if ($this->isDot()) return false;
+        if ($this->pattern) return preg_match($this->pattern, $this->getFilename());
+        return true;
     }
 }
