@@ -119,10 +119,49 @@ class FTP implements FileSystem
         ftp_chdir($this->getConnection(), $this->path);
         return true;
     }
+    
+    public function listDir($dir=null, $pattern=null, $recursive=false)
+    {
+        if (is_null($dir) || $dir == '/') $dir = $this->path;
+        if (!$this->isDir($dir))
+            trigger_error('Scan path is not a valid directory');
+
+        if (is_array($rawlist = @ftp_rawlist($this->getConnection(), $dir, $recursive))) {
+            ftp_chdir($this->getConnection(), $this->path);
+            $list = array();
+            $subdir = '';
+            foreach ($rawlist as $node) {
+                if(empty($node)) continue;
+                if(substr($node,-1)==':') {
+                    $subdir = substr($node,0,-1).'/';
+                    continue;
+                }
+                $chunks = preg_split("/\s+/", $node);
+                list($item['rights'], $item['num'], $item['owner'], $item['group'],
+                     $item['size'], $item['month'], $item['day'], $item['time']) = $chunks;
+                $item['type'] = ($chunks[0]{0} === 'd') ? 'dir' : 'file';
+                array_splice($chunks, 0, 8);
+                $name = implode(" ", $chunks);
+                if($name != '.' && $name != '..') {
+                    if(!preg_match($pattern,$name)) continue;
+                    $item['filename'] = $name;
+                    $ext = explode('.',$name);
+                    $item['basename'] = $ext[0];
+                    $item['extension'] = array_key_exists(1,$ext) ? $ext[1] : '';
+                    $relpath = $subdir;
+                    if (strpos($relpath, $dir) === 0)
+                        $relpath = substr($relpath, strlen($dir));
+                    $item['path'] = $this->path.$dir.$relpath.$name;
+                    $list[$relpath.$name] = $item;
+                }
+            }
+            return $list;
+        }
+    }
 
     public function createDir($dir)
     {
-        if(!$this->isDir($dir)) {
+        if(!$this->isDir($this->path.$dir)) {
             $success = ftp_mkdir($this->getConnection(), $dir);
             if (!$success) {
                 trigger_error(sprintf('Unable to create directory `%s´.', $dir));
@@ -134,7 +173,7 @@ class FTP implements FileSystem
 
     public function removeDir($dir)
     {
-        if ($this->isDir($dir))
+        if ($this->isDir($this->path.$dir))
             return ftp_rmdir($this->getConnection(), $dir);
         else
             return false;
