@@ -75,7 +75,7 @@ Since F3 v2.0.13 it is possible to setup your own template tags. You can use tha
 Template::instance()->extend('pagebrowser','Pagination::renderTag');
 ```
 	
-You can now use `<pagination items="{{@maxItems}}"></pagination>` to generate the pagination directly form the inside of your template file.
+You can now use `<pagebrowser items="{{@maxItems}}"></pagebrowser>` to generate the pagination directly from the inside of your template file.
 There are also some more options you can pass through the arguments of that tag to the plugin. A fully configured tag could look like this:
 `<pagebrowser items="253" limit="15" range="5" src="tmpl/foo/bar/pagination.html" token="articlePage"></pagebrowser>`
 
