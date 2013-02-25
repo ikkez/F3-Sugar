@@ -36,12 +36,8 @@ $f3->set('pagebrowser', $pages->serve());
 // use {{ @pagebrowser | raw }} in your template
 
 // get all items for current page
-$articleList = $article->afind(
-	NULL, array(
-		'sort' => 'headline asc', 
-		'limit' => $items_per_page, 
-		'offset' => $pages->getItemOffset()
-	));
+$articleList = $article->paginate($pages->getItemOffset(),$items_per_page
+	NULL, array('sort' => 'headline asc'));
 
 // do whatever you like with your fetched data
 // and serve it to template
@@ -68,7 +64,7 @@ $pages->setLinkPath('search/results/');
 It will now build URLs like `search/results/1`, `search/results/2`, `search/results/3`.
 
 
-### Using <pagination> TAG in Templates
+### Using <pagebrowser> TAG in Templates
 
 Since F3 v2.0.13 it is possible to setup your own template tags. You can use that shortcut for the Pagination Plugin too. Just register the plugin in the responsible controller like this:
 ``` php	
