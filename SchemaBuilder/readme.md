@@ -23,7 +23,7 @@ Now create a Schema object to work on. Inject the DB object into its constructor
 $builder = new \DB\SQL\Schema( $db );
 ```
 
-The class prodives you the following simple methods for
+The class prodives you the following simple methods for:
 
 #### managing tables
 
@@ -102,19 +102,19 @@ The class prodives you the following simple methods for
 		</tr>
 		<tr>
 			<td>DT_TINYINT<br/>DT_INT8</td>
-			<td></td>
+			<td>exact integer</td>
 			<td>at least 1 byte</td>
 			<td>lower: 0, upper; 255</td>
 		</tr>
 		<tr>
 			<td>DT_INT<br/>DT_INT16</td>
-			<td></td>
+			<td>exact integer</td>
 			<td>at least 4 bytes</td>
 			<td>±2,147,483,648</td>
 		</tr>
 		<tr>
 			<td>DT_BIGINT<br/>DT_INT32</td>
-			<td></td>
+			<td>exact integer</td>
 			<td>at most 8 bytes</td>
 			<td>±2^63</td>
 		</tr>
@@ -166,6 +166,12 @@ The class prodives you the following simple methods for
 			<td>8 bytes</td>
 			<td></td>
 		</tr>
+		<tr>
+			<td>DT_BLOB<br/>DT_BINARY</td>
+			<td>bytes</td>
+			<td></td>
+			<td></td>
+		</tr>
 	</table>	
 	
 	usage:
@@ -197,7 +203,7 @@ The class prodives you the following simple methods for
     $builder->alterTable('news')->addColumn('creation_date',\DB\SQL\Schema::DT_TIMESTAMP,false,\DB\SQL\Schema::DF_CURRENT_TIMESTAMP);
 	```	
 	
-	Notice: Class DF holds constants for default values, class DT is for DataTypes.
+	Notice: constants with DF_ prefix are default values, DT_ is for DataTypes.
 	
 
 -	**$builder->getCols( $types [false] );**
