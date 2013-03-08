@@ -1,5 +1,21 @@
 <?php
 
+/**
+    Local filesystem adapter
+
+    The contents of this file are subject to the terms of the GNU General
+    Public License Version 3.0. You may not use this file except in
+    compliance with the license. Any of the license terms and conditions
+    can be waived if you get permission from the copyright holder.
+
+        Copyright (c) 2013 by ikkez
+        Christian Knuth <ikkez0n3@gmail.com>
+        https://github.com/ikkez/F3-Sugar/
+
+        @version 0.9.0
+        @date 08.02.2013
+ **/
+ 
 namespace FAL;
 
 class LocalFS implements FileSystem
@@ -66,7 +82,9 @@ class LocalFS implements FileSystem
                 'basename' => $node->getBasename(),
                 'path' => $node->getPathname(),
                 'type' => $node->getType(),
-                'extension' => $node->getExtension(),
+                'extension' => (strnatcmp(phpversion(),'5.3.6') >= 0)
+		                       ? $node->getExtension()
+		                       : pathinfo($node->getFilename(), PATHINFO_EXTENSION),
                 'size' => $node->getSize(),
             );
         }
