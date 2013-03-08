@@ -12,7 +12,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.9.0
+        @version 0.9.1
         @date 08.02.2013
  **/
  
@@ -26,6 +26,16 @@ class FTP implements FileSystem
         $passive,
         $mode,
         $cn;
+
+    const
+        TEXT_CONNECT = 'Unable to connect to `%s [%s]´.',
+        TEXT_LOGIN_FAILED = 'Fail to login as %s.',
+        TEXT_PASSIVE_MODE = 'Failed to turn on passive mode.',
+        TEXT_MOUNT_DIR = 'Unable to find or create directory to mount on.',
+        TEXT_CHANGE_DIR = 'Could not switch directory to `%s´.',
+        TEXT_CREATE_DIR = 'Unable to create directory `%s´.',
+        TEXT_CONNECTION_RESOURCE = 'Connection problem. Enable PASSIVE mode to solve that.',
+        TEXT_EXIST_DIR = 'Connection problem. Enable PASSIVE mode to solve that.';
 
     public function __construct($path,$host,$user='anonymous',$pass='',
                                 $port=21,$passive=false, $mode=FTP_BINARY)
@@ -43,29 +53,27 @@ class FTP implements FileSystem
     {
         // open connection
         if (!$this->cn = ftp_connect($this->host, $this->port))
-            trigger_error(sprintf('Unable to connect to `%s [%s]´.',
-                $this->host, $this->port));
+            trigger_error(sprintf(self::TEXT_CONNECT, $this->host, $this->port));
         // login
         if (!ftp_login($this->getConnection(), $this->user, $this->pass)) {
             $this->disconnect();
-            trigger_error(sprintf('Fail to login as %s.', $this->user));
+            trigger_error(sprintf(self::TEXT_LOGIN_FAILED, $this->user));
         }
         // passive mode
         if ($this->passive && !ftp_pasv($this->getConnection(), true)) {
             $this->disconnect();
-            trigger_error('Failed to turn on passive mode.');
+            trigger_error(self::TEXT_PASSIVE_MODE);
         }
         // check path
         if ($this->path != '/') {
-            if(!$this->isDir($this->path) && !$this->createDir($this->path)) {                
+            if(!$this->isDir($this->path) && !$this->createDir($this->path)) {
                 $this->disconnect();
-                trigger_error('unable to find or create directory');                
+                trigger_error(self::TEXT_MOUNT_DIR);
             }
             // switch directory
             if (!ftp_chdir($this->getConnection(), $this->path)) {
                 $this->disconnect();
-                trigger_error(sprintf('Could not switch directory to `%s´',
-                    $this->path));
+                trigger_error(sprintf(self::TEXT_CHANGE_DIR, $this->path));
             }
         }
     }
@@ -90,7 +98,8 @@ class FTP implements FileSystem
     public function read($file)
     {
         $handle = fopen('php://temp', 'r+');
-        if(!is_resource($this->getConnection())) die('narf');
+        if(!is_resource($this->getConnection()))
+            trigger_error(self::TEXT_CONNECTION_RESOURCE);
         if (!ftp_fget($this->getConnection(), $handle, $file, $this->mode))
             return false;
         rewind($handle);
@@ -103,6 +112,8 @@ class FTP implements FileSystem
         $handle = fopen('php://temp', 'r+');
         fwrite($handle, $data);
         rewind($handle);
+        if (!is_resource($this->getConnection()))
+            trigger_error(self::TEXT_CONNECTION_RESOURCE);
         return ftp_fput($this->getConnection(), $file, $handle, $this->mode);
     }
 
@@ -140,8 +151,7 @@ class FTP implements FileSystem
     {
         if (is_null($dir) || $dir == '/') $dir = $this->path;
         if (!$this->isDir($dir))
-            trigger_error('Scan path is not a valid directory');
-
+            trigger_error(sprintf(self::TEXT_EXIST_DIR, $dir));
         if (is_array($rawlist = @ftp_rawlist($this->getConnection(), $dir, $recursive))) {
             ftp_chdir($this->getConnection(), $this->path);
             $list = array();
@@ -180,7 +190,7 @@ class FTP implements FileSystem
         if(!$this->isDir($this->path.$dir)) {
             $success = ftp_mkdir($this->getConnection(), $dir);
             if (!$success) {
-                trigger_error(sprintf('Unable to create directory `%s´.', $dir));
+                trigger_error(sprintf(self::TEXT_CREATE_DIR, $dir));
                 return false;
             }
         }
