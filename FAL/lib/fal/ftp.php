@@ -1,5 +1,21 @@
 <?php
 
+/**
+    FTP filesystem adapter
+
+    The contents of this file are subject to the terms of the GNU General
+    Public License Version 3.0. You may not use this file except in
+    compliance with the license. Any of the license terms and conditions
+    can be waived if you get permission from the copyright holder.
+
+        Copyright (c) 2013 by ikkez
+        Christian Knuth <ikkez0n3@gmail.com>
+        https://github.com/ikkez/F3-Sugar/
+
+        @version 0.9.0
+        @date 08.02.2013
+ **/
+ 
 namespace FAL;
 
 class FTP implements FileSystem
@@ -146,8 +162,8 @@ class FTP implements FileSystem
                     if(!preg_match($pattern,$name)) continue;
                     $item['filename'] = $name;
                     $ext = explode('.',$name);
-                    $item['basename'] = $ext[0];
-                    $item['extension'] = array_key_exists(1,$ext) ? $ext[1] : '';
+                    $item['extension'] = (count($ext)>1) ? array_pop($ext) : null;
+                    $item['basename'] = implode('.',$ext);
                     $relpath = $subdir;
                     if (strpos($relpath, $dir) === 0)
                         $relpath = substr($relpath, strlen($dir));
