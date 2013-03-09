@@ -169,7 +169,7 @@ class FTP implements FileSystem
                 array_splice($chunks, 0, 8);
                 $name = implode(" ", $chunks);
                 if($name != '.' && $name != '..') {
-                    if(!preg_match($pattern,$name)) continue;
+                    if($pattern && !preg_match($pattern,$name)) continue;
                     $item['filename'] = $name;
                     $ext = explode('.',$name);
                     $item['extension'] = (count($ext)>1) ? array_pop($ext) : null;
