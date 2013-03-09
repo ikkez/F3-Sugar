@@ -580,7 +580,7 @@ class Schema {
             $tname = $this->name;
             $this->dropTable();
             $new->renameTable($tname);
-            if (!$new->db->inTransaction())
+            if ($new->db->inTransaction())
                 $new->db->commit();
             $this->alterTable($tname);
             return true;
@@ -631,7 +631,7 @@ class Schema {
             $new->db->exec('INSERT INTO `'.$new->name.'` ("id"'.implode($new_fields).') '.
                 'SELECT "'.implode('", "', array_keys($cur_fields)).'" FROM `'.$this->name.'`;');
             $new->dropTable($this->name);
-            if (!$new->db->inTransaction())
+            if ($new->db->inTransaction())
                 $new->db->commit();
             $this->alterTable($oname);
             return true;
@@ -643,7 +643,7 @@ class Schema {
                 $colTypes[$column]['nullable'], $colTypes[$column]['default'], true);
             $this->db->exec("UPDATE $this->name SET $column_new = $column");
             $this->dropColumn($column);
-            if (!$this->db->inTransaction())
+            if ($this->db->inTransaction())
                 $this->db->commit();
             return true;
         } else {
