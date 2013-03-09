@@ -83,8 +83,8 @@ class LocalFS implements FileSystem
                 'path' => $node->getPathname(),
                 'type' => $node->getType(),
                 'extension' => (strnatcmp(phpversion(),'5.3.6') >= 0)
-		                       ? $node->getExtension()
-		                       : pathinfo($node->getFilename(), PATHINFO_EXTENSION),
+                               ? $node->getExtension()
+                               : pathinfo($node->getFilename(), PATHINFO_EXTENSION),
                 'size' => $node->getSize(),
             );
         }
