@@ -237,15 +237,15 @@ class Dropbox implements FileSystem {
 
     /**
      * list directory contents
-     * @param string $file
+     * @param string $dir
      * @param bool   $hidden
      * @param null   $rev
      * @param string $type
      * @return bool|mixed
      */
-    public function listDir($file='/', $hidden=false, $rev = NUll, $type = 'sandbox')
+    public function listDir($dir='/', $hidden=false, $rev = NUll, $type = 'sandbox')
     {
-        $result = $this->metadata($file, true, false, $hidden, $rev, $type);
+        $result = $this->metadata($dir, true, false, $hidden, $rev, $type);
         $return = array();
         foreach ($result['contents'] as $item) {
             $exp = explode('/', $item['path']);
@@ -256,7 +256,8 @@ class Dropbox implements FileSystem {
                 'extension' => (count($ext) > 1) ? array_pop($ext) : null,
                 'basename' => implode('.', $ext),
                 'mtime'=>strtotime($item['modified']),
-                'size' => $item['bytes']
+                'size' => $item['bytes'],
+                'type' => $item['is_dir'] ? 'dir' : 'file',
             );
         }
         return $return;
