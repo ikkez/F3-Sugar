@@ -16,7 +16,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.8.1
+        @version 0.9.0
         @date 15.02.2013
  **/
 
@@ -243,10 +243,23 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return bool|mixed
      */
-    public function listDir($file='', $hidden=false, $rev = NUll, $type = 'sandbox')
+    public function listDir($file='/', $hidden=false, $rev = NUll, $type = 'sandbox')
     {
         $result = $this->metadata($file, true, false, $hidden, $rev, $type);
-        return $result['contents'];
+        $return = array();
+        foreach ($result['contents'] as $item) {
+            $exp = explode('/', $item['path']);
+            $ext = explode('.', $name = end($exp));
+            $return[$name] = array(
+                'path' => $item['path'],
+                'filename' => $name,
+                'extension' => (count($ext) > 1) ? array_pop($ext) : null,
+                'basename' => implode('.', $ext),
+                'mtime'=>strtotime($item['modified']),
+                'size' => $item['bytes']
+            );
+        }
+        return $return;
     }
 
     /**
@@ -271,7 +284,7 @@ class Dropbox implements FileSystem {
      * @param string $type          storage type [sandbox|dropbox]
      * @return bool|mixed
      */
-    protected function metadata($file,$list=true,$existCheck=false,
+    public function metadata($file,$list=true,$existCheck=false,
                                 $hidden=false,$rev=NULL, $type='sandbox')
     {
         $url = 'https://api.dropbox.com/1/metadata/';
