@@ -16,7 +16,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.9.0
+        @version 0.9.1
         @date 15.02.2013
  **/
 
@@ -43,7 +43,7 @@ class Dropbox implements FileSystem {
         E_AUTHERROR = 'OAuth failed: %s',
         E_METHODNOTSUPPORTED = 'METHOD %s not supported';
 
-    public function __construct($appKey,$appSecret) {
+    public function __construct($appKey, $appSecret) {
         $this->appKey = $appKey;
         $this->appSecret = $appSecret;
         $this->f3 = \Base::instance();
@@ -79,7 +79,7 @@ class Dropbox implements FileSystem {
      * @param null $callback_url
      * @return array|bool
      */
-    public function login($callback_url = NULL) {
+    public function login($callback_url=NULL) {
         if (!$this->f3->exists('GET.oauth_token')) {
             $tokens = $this->requestToken();
             $this->setAuthToken($tokens['oauth_token'], $tokens['oauth_token_secret']);
@@ -117,7 +117,7 @@ class Dropbox implements FileSystem {
      * AUTH Step 2: reroute to auth page
      * @param null $callback_url
      */
-    public function authorize($callback_url = NULL){
+    public function authorize($callback_url=NULL){
         $url = 'https://www.dropbox.com/1/oauth/authorize';
         $params = array(
             'oauth_token' => $this->authToken,
@@ -230,7 +230,7 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return mixed
      */
-    public function exists($file, $hidden = false, $rev = NULL, $type = 'sandbox')
+    public function exists($file, $hidden=false, $rev=NULL, $type='sandbox')
     {
         return $this->metadata($file, false, true, $hidden, $rev, $type);
     }
@@ -238,13 +238,13 @@ class Dropbox implements FileSystem {
     /**
      * list directory contents
      * @param string $dir
-     * @param null   $filter
+     * @param string $filter
      * @param bool   $hidden
      * @param null   $rev
      * @param string $type
      * @return bool|mixed
      */
-    public function listDir($dir='/', $filter=null, $hidden=false, $rev = NUll, $type = 'sandbox')
+    public function listDir($dir='/', $filter=NULL, $hidden=false, $rev=NUll, $type='sandbox')
     {
         $result = $this->metadata($dir, true, false, $hidden, $rev, $type);
         $return = array();
@@ -272,7 +272,7 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return bool|mixed
      */
-    public function fileInfo($file,$rev = NUll, $type = 'sandbox')
+    public function fileInfo($file, $rev=NUll, $type='sandbox')
     {
         return $this->metadata($file,false,false,true,$rev,$type);
     }
@@ -287,8 +287,8 @@ class Dropbox implements FileSystem {
      * @param string $type          storage type [sandbox|dropbox]
      * @return bool|mixed
      */
-    public function metadata($file,$list=true,$existCheck=false,
-                             $hidden=false,$rev=NULL, $type='sandbox')
+    public function metadata($file, $list=true, $existCheck=false,
+                             $hidden=false, $rev=NULL, $type='sandbox')
     {
         $url = 'https://api.dropbox.com/1/metadata/';
         $params = array();
@@ -337,7 +337,7 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return mixed
      */
-    public function delete($file,$type='sandbox')
+    public function delete($file, $type='sandbox')
     {
         $url = 'https://api.dropbox.com/1/fileops/delete';
         $result = $this->doOAuthCall($url,'POST',array('path' => $file),$type);
@@ -378,7 +378,7 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return mixed
      */
-    public function modified($file, $rev = NULL, $type = 'sandbox')
+    public function modified($file, $rev=NULL, $type='sandbox')
     {
         $result = $this->metadata($file, false, false, true, $rev, $type);
         return strtotime($result['modified']);
@@ -391,7 +391,7 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return mixed
      */
-    public function size($file, $rev = NULL, $type = 'sandbox')
+    public function size($file, $rev=NULL, $type='sandbox')
     {
         $result = $this->metadata($file, false, false, true, $rev, $type);
         return strtotime($result['bytes']);
@@ -404,7 +404,7 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return mixed
      */
-    public function isDir($dir, $rev = NULL, $type = 'sandbox')
+    public function isDir($dir, $rev=NULL, $type='sandbox')
     {
         $result = $this->metadata($dir, false, true, false, $rev, $type);
         return (bool)$result;
@@ -416,7 +416,7 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return mixed
      */
-    public function createDir($dir,$type='sandbox')
+    public function createDir($dir, $type='sandbox')
     {
         $url = 'https://api.dropbox.com/1/fileops/create_folder';
         $result = $this->doOAuthCall($url, 'POST', array('path'=>$dir), $type);
@@ -435,7 +435,7 @@ class Dropbox implements FileSystem {
      * @param string $type
      * @return mixed
      */
-    public function removeDir($dir,$type='sandbox')
+    public function removeDir($dir, $type='sandbox')
     {
         $this->delete($dir,$type);
     }
