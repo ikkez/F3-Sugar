@@ -238,27 +238,29 @@ class Dropbox implements FileSystem {
     /**
      * list directory contents
      * @param string $dir
+     * @param null   $filter
      * @param bool   $hidden
      * @param null   $rev
      * @param string $type
      * @return bool|mixed
      */
-    public function listDir($dir='/', $hidden=false, $rev = NUll, $type = 'sandbox')
+    public function listDir($dir='/', $filter=null, $hidden=false, $rev = NUll, $type = 'sandbox')
     {
         $result = $this->metadata($dir, true, false, $hidden, $rev, $type);
         $return = array();
         foreach ($result['contents'] as $item) {
             $exp = explode('/', $item['path']);
             $ext = explode('.', $name = end($exp));
-            $return[$name] = array(
-                'path' => $item['path'],
-                'filename' => $name,
-                'extension' => (count($ext) > 1) ? array_pop($ext) : null,
-                'basename' => implode('.', $ext),
-                'mtime'=>strtotime($item['modified']),
-                'size' => $item['bytes'],
-                'type' => $item['is_dir'] ? 'dir' : 'file',
-            );
+            if (!$filter || preg_match($filter, $name))
+                $return[$name] = array(
+                    'path' => $item['path'],
+                    'filename' => $name,
+                    'extension' => (count($ext) > 1) ? array_pop($ext) : null,
+                    'basename' => implode('.', $ext),
+                    'mtime'=>strtotime($item['modified']),
+                    'size' => $item['bytes'],
+                    'type' => $item['is_dir'] ? 'dir' : 'file',
+                );
         }
         return $return;
     }
@@ -277,7 +279,7 @@ class Dropbox implements FileSystem {
 
     /**
      * perform meta request
-     * @param        $file          full file pathname
+     * @param string $file          full file pathname
      * @param bool   $list          include file list, if $file is a dir
      * @param bool   $existCheck    return bool instead of json or error
      * @param bool   $hidden        include deleted files
@@ -286,7 +288,7 @@ class Dropbox implements FileSystem {
      * @return bool|mixed
      */
     public function metadata($file,$list=true,$existCheck=false,
-                                $hidden=false,$rev=NULL, $type='sandbox')
+                             $hidden=false,$rev=NULL, $type='sandbox')
     {
         $url = 'https://api.dropbox.com/1/metadata/';
         $params = array();
