@@ -68,6 +68,10 @@ If the login was successful, `$authTokens` will contain an array of `oauth_token
 -   **$myFS->modified( $file );** returns timestamp of file's last modified time.
 -   **$myFS->size( $file );** returns filesize in bytes
 -   **$myFS->isDir( $path );**
+-   **$myFS->listDir( $path, $filter );**
+	
+	Get all files and folders within $path. You can use a regex pattern i.e. like `/\.php/i` to filter the result array. Some filesystems also have a $recursive option.
+
 -   **$myFS->createDir( $path );**
 -   **$myFS->removeDir( $path );**
 
@@ -139,6 +143,5 @@ $xml = simplexml_load_file($xmlFile);
 -   **get(); set(); clear(); exists();** for handling meta key fields
 
 ### Roadmap
--   complete a unified listDir() method
 -   create a DB meta storage handler, to get rid of meta files
 -   add filesystem adapter for Google Drive and Amazon S3
