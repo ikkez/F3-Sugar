@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.7.2
+        @version 0.7.3
         @date 17.01.2013
  **/
 
@@ -81,7 +81,7 @@ class Cortex extends \DB\Cursor {
      * @param array $config
      */
     function setFieldConfiguration(array $config) {
-        self::$fieldConf = $config;
+        static::$fieldConf = $config;
         $this->reset();
     }
 
@@ -96,8 +96,8 @@ class Cortex extends \DB\Cursor {
     static public function setup($db, $table, $fields=null)
     {
         if(is_null($fields))
-            if(!empty(self::$fieldConf))
-                    $fields = self::$fieldConf;
+            if(!empty(static::$fieldConf))
+                    $fields = static::$fieldConf;
             else {
                 trigger_error('no field setup defined');
                 return false;
@@ -106,10 +106,10 @@ class Cortex extends \DB\Cursor {
         $dbsType = get_class($db);
         if ($dbsType == 'DB\SQL') {
             $schema = new \DB\SQL\Schema($db);
+            // prepare field configuration
             foreach($fields as &$field) {
-                if(in_array($field['type'],
-                    array(\DB\Cortex::DT_TEXT_JSON, \DB\Cortex::DT_TEXT_SERIALIZED)))
-                    $field['type']=\DB\SQL\Schema::DT_TEXT32;
+                if(in_array($field['type'], array(self::DT_TEXT_JSON, self::DT_TEXT_SERIALIZED)))
+                    $field['type']=$schema::DT_TEXT32;
                 if(!array_key_exists('nullable', $field)) $field['nullable'] = true;
                 if(!array_key_exists('default', $field)) $field['default'] = false;
             }
@@ -120,16 +120,16 @@ class Cortex extends \DB\Cursor {
                        $field_conf['nullable'], $field_conf['default']);
                 }
             } else {
-                $existingCols = $schema->getCols();
+                $existingCols = $schema->alterTable($table)->getCols();
                 // add missing fields
                 foreach ($fields as $field_key => $field_conf)
                     if (!in_array($field_key, $existingCols))
                         $schema->addColumn($field_key, $field_conf['type'],
                             $field_conf['nullable'], $field_conf['default']);
                 // remove unused fields
-                foreach ($existingCols as $col)
-                    if (!in_array($col, array_keys($fields)))
-                        $schema->dropColumn($col);
+//                foreach ($existingCols as $col)
+//                    if (!in_array($col, array_keys($fields)) && $col!='id')
+//                        $schema->dropColumn($col);
             }
         }
         return true;
@@ -383,13 +383,14 @@ class Cortex extends \DB\Cursor {
      * Return an array of objects matching criteria
      * @param array|null $filter
      * @param array|null $options
+     * @param int        $ttl
      * @return array
      */
-    public function find($filter = NULL, array $options = NULL)
+    public function find($filter = NULL, array $options = NULL, $ttl = 0)
     {
         $filter = $this->prepareFilter($filter);
         $options = $this->prepareOptions($options);
-        $result = $this->mapper->find($filter, $options);
+        $result = $this->mapper->find($filter, $options, $ttl);
         foreach($result as &$mapper)
             $mapper = $this->factory($mapper);
         return $result;
@@ -434,22 +435,22 @@ class Cortex extends \DB\Cursor {
      */
     function set($key, $val)
     {
-        if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty(self::$fieldConf)) {
-            if(self::$fieldConf[$key]['type']== \DB\Cortex::DT_TEXT_SERIALIZED)
+        $fields = static::$fieldConf;
+        if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields)) {
+            if($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
                 $val = serialize($val);
-            elseif(self::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_JSON)
+            elseif($fields[$key]['type'] == self::DT_TEXT_JSON)
                 $val = json_encode($val);
             else
                 trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
         }
         if ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo') {
-            if (!empty(self::$fieldConf) && array_key_exists('nullable', self::$fieldConf[$key]))
-                    if(self::$fieldConf[$key]['nullable'] === false && $val === false)
+            if (!empty($fields) && array_key_exists('nullable', $fields[$key]))
+                    if($fields[$key]['nullable'] === false && $val === false)
                         trigger_error('unable to set a not nullable field to null');
             if ($this->dbsType == 'DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
                 $val = new \MongoId($val);
         }
-
         return $this->mapper->{$key} = $val;
     }
 
@@ -460,10 +461,10 @@ class Cortex extends \DB\Cursor {
      */
     function get($key)
     {
-        if ($this->dbsType == 'DB\SQL' && !empty(self::$fieldConf)) {
-            if (self::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_SERIALIZED)
+        if ($this->dbsType == 'DB\SQL' && !empty(static::$fieldConf)) {
+            if (static::$fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
                 return unserialize($this->mapper->{$key});
-            elseif (self::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_JSON)
+            elseif (static::$fieldConf[$key]['type'] == self::DT_TEXT_JSON)
                 return json_decode($this->mapper->{$key},true);
         }
         return $this->mapper->{$key};
@@ -477,12 +478,12 @@ class Cortex extends \DB\Cursor {
     function cast($obj = NULL)
     {
         $fields = $this->mapper->cast($obj);
-        if ($this->dbsType == 'DB\SQL' && !empty(self::$fieldConf))
+        if ($this->dbsType == 'DB\SQL' && !empty(static::$fieldConf))
             foreach ($fields as $key => &$val)
-                if(array_key_exists($key, self::$fieldConf))
-                    if (self::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_SERIALIZED)
+                if(array_key_exists($key, static::$fieldConf))
+                    if (static::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_SERIALIZED)
                         $val=unserialize($this->mapper->{$key});
-                    elseif (self::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_JSON)
+                    elseif (static::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_JSON)
                         $val=json_decode($this->mapper->{$key}, true);
         return $fields;
     }
@@ -528,8 +529,8 @@ class Cortex extends \DB\Cursor {
         $this->mapper->reset();
         // set default values
         if($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo') {
-            if(!empty(self::$fieldConf))
-                foreach(self::$fieldConf as $field_key => $field_conf) {
+            if(!empty(static::$fieldConf))
+                foreach(static::$fieldConf as $field_key => $field_conf) {
                     if(array_key_exists('default',$field_conf))
                         $this->{$field_key} = $field_conf['default'];
                 }
