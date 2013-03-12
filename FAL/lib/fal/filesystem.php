@@ -63,6 +63,14 @@ interface FileSystem
     public function isDir($dir);
 
     /**
+     * list content of given path, can be filtered by regex
+     * @param $dir
+     * @param $filter
+     * @return array
+     */
+    public function listDir($dir=null, $filter=null);
+
+    /**
      * create new directory
      * @param $dir
      * @return mixed
