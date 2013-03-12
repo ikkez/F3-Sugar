@@ -147,7 +147,7 @@ class FTP implements FileSystem
         return true;
     }
     
-    public function listDir($dir=null, $pattern=null, $recursive=false)
+    public function listDir($dir=null, $filter=null, $recursive=false)
     {
         if (is_null($dir) || $dir == '/') $dir = $this->path;
         if (!$this->isDir($dir))
@@ -169,7 +169,7 @@ class FTP implements FileSystem
                 array_splice($chunks, 0, 8);
                 $name = implode(" ", $chunks);
                 if($name != '.' && $name != '..') {
-                    if($pattern && !preg_match($pattern,$name)) continue;
+                    if($filter && !preg_match($filter,$name)) continue;
                     $item['filename'] = $name;
                     $ext = explode('.',$name);
                     $item['extension'] = (count($ext)>1) ? array_pop($ext) : null;
