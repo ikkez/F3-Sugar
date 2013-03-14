@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.2.1
+        @version 1.2.2
  **/
 
 
@@ -530,8 +530,9 @@ class Schema {
                 // static default
                 $pdo_type = preg_match('/int|bool/i', $type_val, $parts) ?
                     constant('\PDO::PARAM_'.strtoupper($parts[0])) : \PDO::PARAM_STR;
-                $def_cmd .= $this->db->quote(htmlspecialchars($default, ENT_QUOTES,
-                    $this->fw->get('ENCODING')), $pdo_type);
+                $def_cmd .= ($default === NULL) ? 'NULL' :
+                            $this->db->quote(htmlspecialchars($default, ENT_QUOTES,
+                                 $this->fw->get('ENCODING')), $pdo_type);
             }
         } else
             $def_cmd = '';
