@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.7.3
+        @version 0.8.0
         @date 17.01.2013
  **/
 
@@ -67,6 +67,8 @@ class Cortex extends \DB\Cursor {
                 trigger_error('Unknown DB system not supported: '.$this->dbsType);
         }
         $this->reset();
+        foreach(static::$fieldConf as $key=>&$conf)
+            $conf=self::resolveRelations($conf);
     }
 
     /**
@@ -74,8 +76,8 @@ class Cortex extends \DB\Cursor {
      *
      * field example:
      *  array('title' => array(
-     *      'type' => \DT::TEXT16,
-     *      'default' => 'new record title'
+     *          'type' => \DT::TEXT16,
+     *          'default' => 'new record title'
      *  ))
      *
      * @param array $config
@@ -108,10 +110,14 @@ class Cortex extends \DB\Cursor {
             $schema = new \DB\SQL\Schema($db);
             // prepare field configuration
             foreach($fields as &$field) {
+                // relation field types
+                $field = self::resolveRelations($field);
+                // transform array fields
                 if(in_array($field['type'], array(self::DT_TEXT_JSON, self::DT_TEXT_SERIALIZED)))
                     $field['type']=$schema::DT_TEXT32;
+                // defaults values
                 if(!array_key_exists('nullable', $field)) $field['nullable'] = true;
-                if(!array_key_exists('default', $field)) $field['default'] = false;
+                if(!array_key_exists('default', $field)) $field['default'] = NULL;
             }
             if (!in_array($table, $schema->getTables())) {
                 $schema->createTable($table);
@@ -160,6 +166,23 @@ class Cortex extends \DB\Cursor {
                 $db->{$table}->drop();
                 break;
         }
+    }
+
+    protected static function resolveRelations($field) {
+        // relation field types
+        if (array_key_exists('has-one', $field)) {
+            if (!is_array($hasOne = $field['has-one']))
+                $hasOne = array($hasOne, 'id');
+            if ($hasOne[1] == 'id') $field['type'] = \DB\SQL\Schema::DT_INT8;
+            else {
+                $refl = new \ReflectionClass($hasOne[0]);
+                $fc = $refl->getDefaultProperties();
+                $field['type'] = $fc['fieldConf'][$hasOne[1]];
+            }
+            $field['nullable'] = true;
+            $field['default'] = null;
+        }
+        return $field;
     }
 
     /**
@@ -421,6 +444,15 @@ class Cortex extends \DB\Cursor {
         $this->mapper->erase($filter);
     }
 
+    /**
+     * Save mapped record
+     * @return mixed
+     **/
+    function save()
+    {
+        return $this->dry() ? $this->insert() : $this->update();
+    }
+
     public function count($filter = NULL)
     {
         $filter = $this->prepareFilter($filter);
@@ -436,6 +468,20 @@ class Cortex extends \DB\Cursor {
     function set($key, $val)
     {
         $fields = static::$fieldConf;
+        if(!in_array($key,array_keys($fields)))
+            trigger_error(sprintf('Field %s does not exist in %s.',$key,get_class($this)));
+        // handle relations
+        if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
+            // fetch index value
+            if (!$val instanceof self) trigger_error('You can only save hydrated mapper objects');
+            if(!$val->dry()) {
+                $hasOne = $fields[$key]['has-one'];
+                $rel_field = (is_array($hasOne) ? $hasOne[1] : '_id');
+                $val = $val->get($rel_field);
+            } else
+                trigger_error('You can only save hydrated mapper objects');
+        }
+        // convert array content
         if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields)) {
             if($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
                 $val = serialize($val);
@@ -444,6 +490,7 @@ class Cortex extends \DB\Cursor {
             else
                 trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
         }
+        // add workarounds
         if ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo') {
             if (!empty($fields) && array_key_exists('nullable', $fields[$key]))
                     if($fields[$key]['nullable'] === false && $val === false)
@@ -461,11 +508,25 @@ class Cortex extends \DB\Cursor {
      */
     function get($key)
     {
-        if ($this->dbsType == 'DB\SQL' && !empty(static::$fieldConf)) {
-            if (static::$fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
-                return unserialize($this->mapper->{$key});
-            elseif (static::$fieldConf[$key]['type'] == self::DT_TEXT_JSON)
-                return json_decode($this->mapper->{$key},true);
+        $fields = static::$fieldConf;
+        if(!empty($fields) && array_key_exists($key, $fields)) {
+            // load relations
+            if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
+                $class = (is_array($hasOne = $fields[$key]['has-one'])) ? $hasOne[0] : $hasOne;
+                $rel = new $class;
+                if (!$rel instanceof self) trigger_error('Relations only works with Cortex');
+                $rel_field = (is_array($hasOne) ? $hasOne[1] :
+                    (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
+                $rel->load(array($rel_field.' = ?', $this->mapper->{$key}));
+                return (!$rel->dry()) ? $rel : null;
+            }
+            // resolve array fields
+            if ($this->dbsType == 'DB\SQL' && array_key_exists('type', $fields[$key])) {
+                if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
+                    return unserialize($this->mapper->{$key});
+                elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
+                    return json_decode($this->mapper->{$key},true);
+            }
         }
         return $this->mapper->{$key};
     }
@@ -473,18 +534,24 @@ class Cortex extends \DB\Cursor {
     /**
      * Return fields of mapper object as an associative array
      * @return array
-     * @param $obj object
+     * @param      $obj object
+     * @param bool $relations resolve relations
      */
-    function cast($obj = NULL)
+    function cast($obj = NULL, $relations = TRUE)
     {
-        $fields = $this->mapper->cast($obj);
+        $fields = $this->mapper->cast( ($obj) ? $obj->mapper : null );
         if ($this->dbsType == 'DB\SQL' && !empty(static::$fieldConf))
             foreach ($fields as $key => &$val)
-                if(array_key_exists($key, static::$fieldConf))
-                    if (static::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_SERIALIZED)
-                        $val=unserialize($this->mapper->{$key});
-                    elseif (static::$fieldConf[$key]['type'] == \DB\Cortex::DT_TEXT_JSON)
-                        $val=json_decode($this->mapper->{$key}, true);
+                if(array_key_exists($key, static::$fieldConf)) {
+                    if($relations && array_key_exists('has-one', static::$fieldConf[$key])) {
+                        $val = ( !is_null( $obj = $this->get($key) )) ? $obj->cast() : null;
+                    }
+                    elseif(array_key_exists('type', static::$fieldConf[$key]))
+                        if (static::$fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
+                            $val=unserialize($this->mapper->{$key});
+                        elseif (static::$fieldConf[$key]['type'] == self::DT_TEXT_JSON)
+                            $val=json_decode($this->mapper->{$key}, true);
+                }
         return $fields;
     }
 
