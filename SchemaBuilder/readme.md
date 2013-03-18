@@ -27,10 +27,18 @@ The class prodives you the following simple methods for:
 
 #### managing tables
 
+-   **$builder->getDatabases();**
+	
+	Returns a list of all databases available (except SQLite). Can be useful for installation purpose, when you want the user to select a database to work on. Therefor just create your DB connection without selecting a database like: 
+	```
+	$db = new \DB\SQL('mysql:host=localhost;port=3306;dbname=', $user, $password);
+	```
+	Some DB engine default setups also grants simple read operations, without setting a user / password.
+	
 -   **$builder->getTables();**
 	
 	This will return a list of all tables available within the given dbname.
-	
+
 - 	**$builder->createTable( $tableName );**
 	
 	Creates a new table, containing an auto-incremented, primary-key field named 'id', which is required for further SQL\Mapper usage. The SchemaBuilder selects and reminds that table name for more altering operations.
@@ -212,7 +220,7 @@ The class prodives you the following simple methods for:
 
 	usage:
 	``` php
-	$columns = $builder->table('news')->getCols();
+	$columns = $builder->alterTable('news')->getCols();
 	```	
 	
 -	**$builder->dropColumn( $columnName );**
