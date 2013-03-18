@@ -25,7 +25,7 @@ $builder = new \DB\SQL\Schema( $db );
 
 The class prodives you the following simple methods for:
 
-#### managing tables
+#### managing databases
 
 -   **$builder->getDatabases();**
 	
@@ -34,6 +34,9 @@ The class prodives you the following simple methods for:
 	$db = new \DB\SQL('mysql:host=localhost;port=3306;dbname=', $user, $password);
 	```
 	Some DB engine default setups also grants simple read operations, without setting a user / password.
+
+
+#### managing tables
 	
 -   **$builder->getTables();**
 	
@@ -185,30 +188,34 @@ The class prodives you the following simple methods for:
 	usage:
 	``` php    
     $builder->alterTable('news');
-    $builder->addColumn('author',\DB\SQL\Schema::DT_TEXT8);
-    $builder->addColumn('bodytext',\DB\SQL\Schema::DT_TEXT16);
+    $builder->addColumn('author', \DB\SQL\Schema::DT_TEXT8);
+    $builder->addColumn('bodytext', \DB\SQL\Schema::DT_TEXT16);
 
     // or even chained for one field
-    $builder->alterTable('news')->addCol('author',\DB\SQL\Schema::DT_TEXT8);	
-	```	
+    $builder->alterTable('news')->addCol('author', \DB\SQL\Schema::DT_TEXT8);
+     
+    $builder->addColumn('image', \DB\SQL\Schema::DT_TEXT8, true, NULL); // use NULL as a default value 	
+    ```	
 	
 	If `$nullable` is false, the field is added as NOT NULL field, so it cannot contain a null value and therefore needs a default.
     
     example:
     ``` php    
     $builder->alterTable('news');
-    $builder->addColumn('version',\DB\SQL\Schema::DT_INT,false,1);
-    $builder->addColumn('title',\DB\SQL\Schema::DT_TEXT16,false,'new untitled news item');
+    $builder->addColumn('version', \DB\SQL\Schema::DT_INT, false, 1);
+    $builder->addColumn('title', \DB\SQL\Schema::DT_TEXT16, false, 'new untitled news item');
 	```	
     
     But you can set defaults to nullable fields as well.
     
     **CURRENT_TIMESTAMP as dynamic default value**
+    
     If you like to add a timestamp of the current time to new inserted records, you can add a TIMESTAMP field with a special default value to achieve this.
     
     example:
     ``` php    
-    $builder->alterTable('news')->addColumn('creation_date',\DB\SQL\Schema::DT_TIMESTAMP,false,\DB\SQL\Schema::DF_CURRENT_TIMESTAMP);
+    $builder->alterTable('news');
+    $builder->addColumn('creation_date',\DB\SQL\Schema::DT_TIMESTAMP,false,\DB\SQL\Schema::DF_CURRENT_TIMESTAMP);
 	```	
 	
 	Notice: constants with DF_ prefix are default values, DT_ is for DataTypes.
