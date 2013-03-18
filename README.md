@@ -2,6 +2,13 @@
 some custom helpers and plugins for the PHP Fat-Free Framework
 
 
+### FAL
+
+A File Abstraction Layer across multiple filesystem adapters, with meta data support and F3 Caching features.
+
+***
+
+
 ### FileUnit
 
 A Plugin which offers some more file system functionality.
