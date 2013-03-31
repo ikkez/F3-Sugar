@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.8.0
+        @version 0.8.1
         @date 17.01.2013
  **/
 
@@ -67,8 +67,9 @@ class Cortex extends \DB\Cursor {
                 trigger_error('Unknown DB system not supported: '.$this->dbsType);
         }
         $this->reset();
-        foreach(static::$fieldConf as $key=>&$conf)
-            $conf=self::resolveRelations($conf);
+        if(!empty(static::$fieldConf))
+            foreach(static::$fieldConf as $key=>&$conf)
+                $conf=self::resolveRelations($conf);
     }
 
     /**
@@ -173,7 +174,7 @@ class Cortex extends \DB\Cursor {
         if (array_key_exists('has-one', $field)) {
             if (!is_array($hasOne = $field['has-one']))
                 $hasOne = array($hasOne, 'id');
-            if ($hasOne[1] == 'id') $field['type'] = \DB\SQL\Schema::DT_INT8;
+            if ($hasOne[1] == 'id') $field['type'] = \DB\SQL\Schema::DT_INT16;
             else {
                 $refl = new \ReflectionClass($hasOne[0]);
                 $fc = $refl->getDefaultProperties();
@@ -468,7 +469,7 @@ class Cortex extends \DB\Cursor {
     function set($key, $val)
     {
         $fields = static::$fieldConf;
-        if(!in_array($key,array_keys($fields)))
+        if(!empty($fields) && !in_array($key,array_keys($fields)))
             trigger_error(sprintf('Field %s does not exist in %s.',$key,get_class($this)));
         // handle relations
         if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
