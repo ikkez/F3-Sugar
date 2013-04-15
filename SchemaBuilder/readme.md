@@ -1,7 +1,7 @@
 ## SQL Schema Builder
-#### An F3 extension for managing database structures.
+#### An extension for managing database structures.
 
-This F3-Plugin provides you a SQL table schema builder for the PHP Fat-Free Framework. It might be useful for installation scripts and dynamic applications, you might need have in cms enviroments.
+This Plugin provides you a SQL table schema builder for the **PHP Fat-Free Framework**. It might be useful for installation scripts and dynamic applications, like a CMS enviroment.
 
 Currently MySQL, SQLite & PostgreSQL are supported and fully tested. Further support for SQL Server, MSSQL/Sybase, Access and DB2 are already included. Handle with care and test your application. No warranty at all.
 
@@ -10,7 +10,7 @@ This Plugin is made for F3 version 3.x
 ***
 ### Installation
 
-Just copy schema.php into F3's lib/db/sql Folder. Done.
+Just copy schema.php into F3's `lib/db/sql` Folder. Done.
 
 ### Usage
 
