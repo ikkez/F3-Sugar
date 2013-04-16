@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.2.2
+        @version 1.2.3
  **/
 
 
@@ -430,22 +430,22 @@ class Schema {
             return array_keys($schema);
         else
             foreach ($schema as $name => &$cols) {
-                    $default = $cols['default'];
-                    if(!is_null($default) && (
-                        is_int(strpos($this->findQuery($this->defaultTypes['CUR_STAMP']),$default))
-                        || $default == "('now'::text)::timestamp(0) without time zone")){
-                        $default = 'CUR_STAMP';
-                    } else {
-                        // remove single-qoutes in sqlite
-                        if (preg_match('/sqlite2?/', $this->db->driver()))
-                            $default = substr($default, 1, -1);
-                        // extract value from character_data in postgre
-                        if (preg_match('/pgsql/', $this->db->driver()) && !is_null($default))
-                            if (is_int(strpos($default, 'nextval')))
-                                $default = null; // drop autoincrement default
-                            elseif (preg_match("/\'(.*)\'/", $default, $match))
-                                $default = $match[1];
-                    }
+                $default = ($cols['default'] === '') ? null : $cols['default'];
+                if(!is_null($default) && (
+                    is_int(strpos($this->findQuery($this->defaultTypes['CUR_STAMP']),$default))
+                    || $default == "('now'::text)::timestamp(0) without time zone")){
+                    $default = 'CUR_STAMP';
+                } else {
+                    // remove single-qoutes in sqlite
+                    if (preg_match('/sqlite2?/', $this->db->driver()))
+                        $default = substr($default, 1, -1);
+                    // extract value from character_data in postgre
+                    if (preg_match('/pgsql/', $this->db->driver()) && !is_null($default))
+                        if (is_int(strpos($default, 'nextval')))
+                            $default = null; // drop autoincrement default
+                        elseif (preg_match("/\'(.*)\'/", $default, $match))
+                            $default = $match[1];
+                }
                 $cols['default'] = $default;
             }
         return $schema;
