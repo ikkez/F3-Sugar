@@ -2,6 +2,10 @@
 some custom helpers and plugins for the PHP Fat-Free Framework
 
 
+## Currency
+
+It's a currency rate plugin, that offers a conversion tool and some more stuff.
+
 ### FAL
 
 A File Abstraction Layer across multiple filesystem adapters, with meta data support and F3 Caching features.
