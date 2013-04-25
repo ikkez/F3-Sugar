@@ -67,7 +67,7 @@ class LocalFS implements FileSystem
     }
 
     public function listDir($dir=null, $filter=null, $recursive=false) {
-        if(is_null($dir) || $dir = '/') $dir = '';
+        if(is_null($dir) || $dir == '/') $dir = '';
         if (!$this->isDir($dir))
             trigger_error('Scan path is not a valid directory');
 
