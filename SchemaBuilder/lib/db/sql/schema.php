@@ -318,7 +318,7 @@ class Schema {
             $this->renameTable($this->name.'_temp');
             // find dynamic defaults
             foreach($newCols as $name=>$col)
-                if($col['default'] == \DF::CURRENT_TIMESTAMP) $dyndef[$name] = $col;
+                if($col['default'] == self::DF_CURRENT_TIMESTAMP) $dyndef[$name] = $col;
             $dynfields = '';
             if(!empty($dyndef))
                 foreach($dyndef as $n=>$col) {
