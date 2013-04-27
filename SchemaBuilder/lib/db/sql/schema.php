@@ -370,6 +370,30 @@ class Schema {
     }
 
     /**
+     * create index
+     * @param $columns Column(s) to be indexed
+     * @param $unique Unique index
+     * @return bool
+     */
+    public function createIndex($columns,$unique=FALSE) {
+        if (!is_array($columns))
+            $columns = array($columns);
+        $cols = implode(',',$columns);
+        $name = implode('_',$columns);
+        $index = $unique?'UNIQUE INDEX':'INDEX';
+        $cmd = array(
+            'pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => array(
+                "CREATE $index $name ON $this->name ($cols);"
+            ),
+            'mysql' => array(//ALTER TABLE is used because of MySQL bug #48875
+                "ALTER TABLE `$this->name` ADD $index `$name` ($cols);"
+            ),
+        );
+        $query = $this->findQuery($cmd);
+        return $this->execQuerys($query);
+    }
+
+    /**
      * rename a table
      * @param $new_name
      * @return bool
