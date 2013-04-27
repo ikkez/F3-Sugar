@@ -480,7 +480,7 @@ class Schema {
             'ibm' => 'WITH DEFAULT',
         );
         // not nullable fields should have a default value [SQlite]
-        if ($default === false && $nullable === false) {
+        if ($default === false && $nullable === false && preg_match('/sqlite2?/', $this->db->driver())) {
             trigger_error(sprintf(self::TEXT_NotNullFieldNeedsDefault, $name));
             return false;
         }
