@@ -53,7 +53,7 @@ class Schema extends Controller
 
 			// adding some testing data
 			$ax = new \DB\SQL\Mapper($db, $tname);
-			$ax->column_6 = 'hello world';
+			$ax->column_7 = 'hello world';
 			$ax->save();
 			$ax->reset();
 			$result = $ax->find();
@@ -61,12 +61,12 @@ class Schema extends Controller
 				$r = $r->cast();
 			}
 			$test->expect(array_key_exists(0, $result) &&
-				$result[0]['column_6'] == 'hello world',
+				$result[0]['column_7'] == 'hello world',
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
 			// default value text, not nullable
-			$r1 = $builder->addColumn('text_default_not_null', \DB\SQL\Schema::DT_TEXT8, false,
+			$r1 = $builder->addColumn('text_default_not_null', \DB\SQL\Schema::DT_VARCHAR128, false,
                 'foo bar');
 			$r2 = $builder->getCols(true);
 			$test->expect(
@@ -74,11 +74,11 @@ class Schema extends Controller
 					in_array('text_default_not_null', array_keys($r2)) &&
 					$r2['text_default_not_null']['default'] == 'foo bar' &&
 					$r2['text_default_not_null']['nullable'] == false,
-				$this->getTime().' '.$type.'adding column [TEXT8], not nullable with default value'
+				$this->getTime().' '.$type.'adding column [VARCHAR128], not nullable with default value'
 			);
 			unset($ax);
 			$ax = new \DB\SQL\Mapper($db, $tname);
-			$ax->column_6 = 'tanduay';
+			$ax->column_7 = 'tanduay';
 			$ax->save();
 			$ax->reset();
 			$result = $ax->find();
@@ -86,24 +86,24 @@ class Schema extends Controller
 				$r = $r->cast();
 			}
 			$test->expect(array_key_exists(1, $result) &&
-					$result[1]['column_6'] == 'tanduay' &&
+					$result[1]['column_7'] == 'tanduay' &&
 					$result[1]['text_default_not_null'] == 'foo bar',
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
 			// default value numeric, not nullable
-			$r1 = $builder->addColumn('int_default_not_null', \DB\SQL\Schema::DT_INT8, false, 123);
+			$r1 = $builder->addColumn('int_default_not_null', \DB\SQL\Schema::DT_INT4, false, 123);
 			$r2 = $builder->getCols(true);
 			$test->expect(
 					$r1 == true &&
 					in_array('int_default_not_null', array_keys($r2)) &&
 					$r2['int_default_not_null']['default'] == 123 &&
 					$r2['int_default_not_null']['nullable'] == false,
-				$this->getTime().' '.$type.'adding column [INT8], not nullable with default value'
+				$this->getTime().' '.$type.'adding column [INT4], not nullable with default value'
 			);
 			unset($ax);
 			$ax = new \DB\SQL\Mapper($db, $tname);
-			$ax->column_6 = 'test3';
+			$ax->column_7 = 'test3';
 			$ax->save();
 			$ax->reset();
 			$result = $ax->find();
@@ -112,26 +112,26 @@ class Schema extends Controller
 			}
 			$test->expect(
 					array_key_exists(2, $result) &&
-					$result[2]['column_6'] == 'test3' &&
+					$result[2]['column_7'] == 'test3' &&
 					$result[2]['int_default_not_null'] === 123,
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
 			// default value text, nullable
-			$r1 = $builder->addColumn('text_default_nullable', \DB\SQL\Schema::DT_TEXT8, true, 'foo bar');
+			$r1 = $builder->addColumn('text_default_nullable', \DB\SQL\Schema::DT_VARCHAR128, true, 'foo bar');
 			$r2 = $builder->getCols(true);
 			$test->expect(
 					$r1 == true &&
 					in_array('text_default_nullable', array_keys($r2)) &&
 					$r2['text_default_nullable']['default'] == 'foo bar',
-				$this->getTime().' '.$type.'adding column [TEXT8], nullable with default value'
+				$this->getTime().' '.$type.'adding column [VARCHAR128], nullable with default value'
 			);
 			unset($ax);
 			$ax = new \DB\SQL\Mapper($db, $tname);
-			$ax->column_6 = 'test4';
+			$ax->column_7 = 'test4';
 			$ax->save();
 			$ax->reset();
-			$ax->column_6 = 'test5';
+			$ax->column_7 = 'test5';
 			$ax->text_default_nullable = null;
 			$ax->save();
 			$ax->reset();
@@ -141,24 +141,24 @@ class Schema extends Controller
 			}
 			$test->expect(
 					array_key_exists(3, $result) && array_key_exists(4, $result) &&
-					$result[3]['column_6'] == 'test4' && $result[3]['text_default_nullable'] == 'foo bar' &&
-					$result[4]['column_6'] == 'test5' && $result[4]['text_default_nullable'] === null,
+					$result[3]['column_7'] == 'test4' && $result[3]['text_default_nullable'] == 'foo bar' &&
+					$result[4]['column_7'] == 'test5' && $result[4]['text_default_nullable'] === null,
 				$this->getTime().' '.$type.'mapping dummy data'
 			);
 
 			// default value numeric, nullable
-			$r1 = $builder->addColumn('int_default_nullable', \DB\SQL\Schema::DT_INT8, true, 123);
+			$r1 = $builder->addColumn('int_default_nullable', \DB\SQL\Schema::DT_INT4, true, 123);
 			$r2 = $builder->getCols(true);
 			$test->expect(
 				$r1 == true && in_array('int_default_nullable', array_keys($r2)) == true && $r2['int_default_nullable']['default'] == 123,
-				$this->getTime().' '.$type.'adding column [INT8], nullable with default value'
+				$this->getTime().' '.$type.'adding column [INT4], nullable with default value'
 			);
 			unset($ax);
 			$ax = new \DB\SQL\Mapper($db, $tname);
-			$ax->column_6 = 'test6';
+			$ax->column_7 = 'test6';
 			$ax->save();
 			$ax->reset();
-			$ax->column_6 = 'test7';
+			$ax->column_7 = 'test7';
 			$ax->int_default_nullable = null;
 			$ax->save();
 			$ax->reset();
@@ -168,8 +168,8 @@ class Schema extends Controller
 				$r = $r->cast();
 			}
 			$test->expect(array_key_exists(5, $result) && array_key_exists(6, $result) &&
-					$result[5]['column_6'] == 'test6' && $result[5]['int_default_nullable'] === 123 &&
-					$result[6]['column_6'] == 'test7' && $result[6]['int_default_nullable'] === null,
+					$result[5]['column_7'] == 'test6' && $result[5]['int_default_nullable'] === 123 &&
+					$result[6]['column_7'] == 'test7' && $result[6]['int_default_nullable'] === null,
 				$this->getTime() . ' ' . $type . 'mapping dummy data'
 			);
 
@@ -236,7 +236,7 @@ class Schema extends Controller
 
 			// adding composite primary keys
 			$builder->createTable($tname);
-			$builder->addColumn('version', \DB\SQL\Schema::DT_INT8, false, 1);
+			$builder->addColumn('version', \DB\SQL\Schema::DT_INT4, false, 1);
 			$builder->setPKs(array('id', 'version'));
 			$r1 = $builder->getCols(true);
 
@@ -250,9 +250,9 @@ class Schema extends Controller
 			);
 
 			// more fields to composite primary key table
-			$builder->addColumn('title', \DB\SQL\Schema::DT_TEXT8);
-			$builder->addColumn('title2', \DB\SQL\Schema::DT_TEXT8);
-			$builder->addColumn('title_notnull', \DB\SQL\Schema::DT_TEXT8, false, "foo");
+			$builder->addColumn('title', \DB\SQL\Schema::DT_VARCHAR256);
+			$builder->addColumn('title2', \DB\SQL\Schema::DT_TEXT);
+			$builder->addColumn('title_notnull', \DB\SQL\Schema::DT_VARCHAR128, false, "foo");
 			$r1 = $builder->getCols(true);
 			$test->expect(
 				array_key_exists('title', $r1) &&
