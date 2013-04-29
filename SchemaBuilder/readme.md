@@ -49,8 +49,8 @@ The class prodives you the following simple methods for:
 	example:	
 	``` php
 	$builder->createTable('products');
-    $builder->addColumn('title',\DB\SQL\Schema::DT_TEXT8);
-    $builder->addColumn('description',\DB\SQL\Schema::DT_TEXT16);
+    $builder->addColumn('title',\DB\SQL\Schema::DT_VARCHAR128);
+    $builder->addColumn('description',\DB\SQL\Schema::DT_TEXT);
 	```
 
 - 	**$builder->alterTable( $tableName );**
@@ -101,9 +101,9 @@ The class prodives you the following simple methods for:
 	<table>
 		<tr>
 			<th>Type</th>
-			<th></th>
-			<th>size</th>
-			<th>bound</th>
+			<th>Description</th>
+			<th>Storage size</th>
+			<th>Save Range</th>
 		</tr>
 		<tr>
 			<td>DT_BOOL<br/>DT_BOOLEAN</td>
@@ -112,19 +112,25 @@ The class prodives you the following simple methods for:
 			<td>0,1</td>
 		</tr>
 		<tr>
-			<td>DT_TINYINT<br/>DT_INT8</td>
+			<td>DT_INT1<br/>DT_TINYINT</td>
 			<td>exact integer</td>
 			<td>at least 1 byte</td>
 			<td>lower: 0, upper; 255</td>
 		</tr>
 		<tr>
-			<td>DT_INT<br/>DT_INT16</td>
+			<td>DT_INT2<br/>DT_SMALLINT</td>
 			<td>exact integer</td>
-			<td>at least 4 bytes</td>
+			<td>at least 2 bytes</td>
+			<td>±32,768</td>
+		</tr>
+		<tr>
+			<td>DT_INT4<br/>DT_INT</td>
+			<td>exact integer</td>
+			<td>4 bytes</td>
 			<td>±2,147,483,648</td>
 		</tr>
 		<tr>
-			<td>DT_BIGINT<br/>DT_INT32</td>
+			<td>DT_INT8<br/>DT_BIGINT</td>
 			<td>exact integer</td>
 			<td>at most 8 bytes</td>
 			<td>±2^63</td>
@@ -142,21 +148,33 @@ The class prodives you the following simple methods for:
 			<td>±10^38+1</td>
 		</tr>
 		<tr>
-			<td>DT_TEXT8<br/>DT_VARCHAR</td>
+			<td>DT_VARCHAR128</td>
 			<td>character string</td>
-			<td>1 byte</td>
-			<td>max length 255</td>
+			<td>128 bytes</td>
+			<td>128 chars</td>
 		</tr>
 		<tr>
-			<td>DT_TEXT<br/>DT_TEXT16</td>
+			<td>DT_VARCHAR256</td>
 			<td>character string</td>
-			<td>2 bytes</td>
+			<td>256 bytes</td>
+			<td>256 chars</td>
+		</tr>
+		<tr>
+			<td>DT_VARCHAR512</td>
+			<td>character string</td>
+			<td>512 bytes</td>
+			<td>512 chars</td>
+		</tr>
+		<tr>
+			<td>DT_TEXT</td>
+			<td>character string</td>
+			<td></td>
 			<td>max length 2,147,483,647</td>
 		</tr>
 		<tr>
-			<td>DT_TEXT32</td>
+			<td>DT_LONGTEXT</td>
 			<td>character string</td>
-			<td>4 bytes</td>
+			<td></td>
 			<td>max length 4,294,967,295</td>
 		</tr>
 		<tr>
@@ -188,13 +206,13 @@ The class prodives you the following simple methods for:
 	usage:
 	``` php    
     $builder->alterTable('news');
-    $builder->addColumn('author', \DB\SQL\Schema::DT_TEXT8);
-    $builder->addColumn('bodytext', \DB\SQL\Schema::DT_TEXT16);
+    $builder->addColumn('author', \DB\SQL\Schema::DT_VARCHAR128);
+    $builder->addColumn('bodytext', \DB\SQL\Schema::DT_TEXT);
 
     // or even chained for one field
-    $builder->alterTable('news')->addCol('author', \DB\SQL\Schema::DT_TEXT8);
+    $builder->alterTable('news')->addCol('author', \DB\SQL\Schema::DT_VARCHAR128);
      
-    $builder->addColumn('image', \DB\SQL\Schema::DT_TEXT8, true, NULL); // use NULL as a default value 	
+    $builder->addColumn('image', \DB\SQL\Schema::DT_VARCHAR128, true, NULL); // use NULL as a default value 	
     ```	
 	
 	If `$nullable` is false, the field is added as NOT NULL field, so it cannot contain a null value and therefore needs a default.
@@ -203,7 +221,7 @@ The class prodives you the following simple methods for:
     ``` php    
     $builder->alterTable('news');
     $builder->addColumn('version', \DB\SQL\Schema::DT_INT, false, 1);
-    $builder->addColumn('title', \DB\SQL\Schema::DT_TEXT16, false, 'new untitled news item');
+    $builder->addColumn('title', \DB\SQL\Schema::DT_TEXT, false, 'new untitled news item');
 	```	
     
     But you can set defaults to nullable fields as well.
@@ -255,8 +273,8 @@ The class prodives you the following simple methods for:
 	usage:
 	``` php
 	$builder->createTable('news');
-	$builder->addColumn('title', \DB\SQL\Schema::DT_TEXT8);
-	$builder->addColumn('bodytext', \DB\SQL\Schema::DT_TEXT16);
+	$builder->addColumn('title', \DB\SQL\Schema::DT_VARCHAR128);
+	$builder->addColumn('bodytext', \DB\SQL\Schema::DT_TEXT);
 	$builder->addColumn('version', \DB\SQL\Schema::DT_INT8, false, 1);
 	$builder->setPKs(array('id', 'version'));
 	```
