@@ -1,9 +1,0 @@
-<div class="pagebrowser">
-	<F3:check if="{{@pg.firstPage}}"><a href="{{@BASE, @pg.route, @pg.firstPage}}">&lt;&lt;</a></F3:check>
-	<F3:check if="{{@pg.prevPage}}"><a href="{{@BASE, @pg.route, @pg.prevPage}}">&lt;</a></F3:check>
-	<F3:repeat group="{{@pg.rangePages}}" value="{{@page}}">
-		<a {{@page == @pg.currentPage ? 'class="active"':'' }} href="{{@BASE, @pg.route, @page}}">{{@page}}</a>
-	</F3:repeat>
-	<F3:check if="{{@pg.nextPage}}"><a href="{{@BASE, @pg.route, @pg.nextPage}}">&gt;</a></F3:check>
-	<F3:check if="{{@pg.lastPage}}"><a href="{{@BASE, @pg.route, @pg.lastPage}}">&gt;&gt;</a></F3:check>
-</div>
