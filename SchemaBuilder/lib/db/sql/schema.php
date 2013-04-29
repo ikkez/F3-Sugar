@@ -235,25 +235,45 @@ class Schema {
     /**
      * create a basic table, containing required ID serial field
      * @param $name
+     * @param $columns
      * @return bool|SchemaBuilder
      */
-    public function createTable($name)
+    public function createTable($name,$columns=NULL)
     {
         if (!$this->valid($name)) return false;
         if (in_array($name, $this->getTables())) return false;
+        $cols='';
+        if ($columns)
+            foreach($columns as $cname=>$column) {
+                list($type,$nullable,$default,$passThrough)=$column+array(NULL,TRUE,FALSE,FALSE);
+                if ($type && $this->valid($cname) &&
+                    ($passThrough || array_key_exists(strtoupper($type),$this->dataTypes)) &&
+                        $type_val=$this->findQuery($this->dataTypes[strtoupper($type)])) {
+                    $def_cmds = array(
+                        'sqlite2?|mysql|pgsql|mssql|sybase|dblib|odbc' => 'DEFAULT ',
+                        'ibm' => 'WITH DEFAULT ',
+                    );
+                    $pdo_type = preg_match('/int|bool/i', $type_val, $parts) ?
+                        constant('\PDO::PARAM_'.strtoupper($parts[0])) : \PDO::PARAM_STR;                    
+                    $def_cmd = $this->findQuery($def_cmds) . ($default === NULL ? 'NULL' :
+                            $this->db->quote(htmlspecialchars($default, ENT_QUOTES,
+                                 $this->fw->get('ENCODING')), $pdo_type));
+                    $cols.=",$cname $type_val".($nullable?' NULL ':' NOT NULL ').$def_cmd;
+                }
+            }
         $cmd = array(
             'sqlite2?|sybase|dblib|odbc' => array(
-                "CREATE TABLE $name (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT )"),
+                "CREATE TABLE $name (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT $cols)"),
             'mysql' => array(
-                "CREATE TABLE `$name` (id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT)
+                "CREATE TABLE `$name` (id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT $cols)
                 DEFAULT CHARSET=utf8"),
             'pgsql' => array(
-                "CREATE TABLE $name (id SERIAL PRIMARY KEY)"),
+                "CREATE TABLE $name (id SERIAL PRIMARY KEY $cols)"),
             'mssql' => array(
-                "CREATE TABLE $name (id INT PRIMARY KEY);"
+                "CREATE TABLE $name (id INT PRIMARY KEY $cols);"
             ),
             'ibm' => array(
-                "CREATE TABLE $name (id INTEGER AS IDENTITY NOT NULL, PRIMARY KEY(id));"
+                "CREATE TABLE $name (id INTEGER AS IDENTITY NOT NULL $cols, PRIMARY KEY(id));"
             ),
         );
         $query = $this->findQuery($cmd);
