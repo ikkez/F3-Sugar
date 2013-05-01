@@ -11,7 +11,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.6.1
+        @version 0.7.1
         @date 10.04.2013
  **/
 
@@ -31,7 +31,8 @@ class Currency extends Prefab {
      * @param int $ttl caching time in seconds
      * @return array
      */
-    public function getRates($base='USD', $ttl=86400) {
+    public function getRates($base='USD', $ttl=86400)
+    {
         if ($this->f3->exists('RATES.'.$base))
             return $this->f3->get('RATES.'.$base);
         $feed_url = 'http://themoneyconverter.com/rss-feed/'.$base.'/rss.xml';
@@ -57,19 +58,53 @@ class Currency extends Prefab {
     }
 
     /**
+     * fetch Bitcoin Rate from MtGox
+     * @param string $base
+     * @param int    $ttl
+     * @return bool
+     */
+    public function getBitcoinRate($base = 'USD', $ttl = 3600)
+    {
+        if ($this->f3->exists('RATES.BTC.'.$base))
+            return $this->f3->get('RATES.BTC.'.$base);
+        $feed_url = 'http://data.mtgox.com/api/1/BTC'.strtoupper($base).'/ticker';
+        $response = \Web::instance()->request($feed_url);
+        $json = json_decode($response['body'], true);
+        if (is_array($json) && $json['result'] == 'success') {
+            return $this->f3->set('RATES.BTC.'.$base,array(
+                'min' => $json['return']['low']['value'],
+                'max' => $json['return']['high']['value'],
+                'avg' => $json['return']['avg']['value']
+            ),$ttl);
+        } else {
+            return false;
+        }
+    }
+
+    /**
      * @param int|float $amount
      * @param string    $from    currency ISO code
      * @param string    $to      currency ISO code
      * @param int|bool  $decimal precision
      * @return float|bool
      */
-    public function convert($amount, $from, $to, $decimal = 2) {
-        $rates = $this->getRates($from);
-        if (!is_float($amount) && !is_numeric($amount)) {
+    public function convert($amount, $from, $to, $decimal = 2)
+    {
+         if (!is_float($amount) && !is_numeric($amount)) {
             trigger_error(self::TEXT_AmountMustBeNumeric);
             return false;
         }
-        $result = $rates[$to]['value'] * $amount;
+        if($from == $to) return $amount;
+        if($to == 'BTC') {
+            $rates = $this->getBitcoinRate($from);
+            $result = $amount / $rates['avg'];
+        } elseif($from == 'BTC'){
+            $rates = $this->getBitcoinRate($to);
+            $result = $amount * $rates['avg'];
+        } else {
+            $rates = $this->getRates($from);
+            $result = $rates[$to]['value'] * $amount;
+        }
         return $decimal ? round($result,$decimal) : $result;
     }
 
@@ -79,7 +114,8 @@ class Currency extends Prefab {
      * @param null $locale
      * @return array|bool
      */
-    public function getLocaleCurrency($locale = null) {
+    public function getLocaleCurrency($locale = null)
+    {
         $current_lang = $this->f3->split($this->f3->get('LANGUAGE'));
         if ($locale) {
             if (is_array($locales = $this->getInstalledLocales()) 
@@ -105,7 +141,8 @@ class Currency extends Prefab {
      * does not work on Windows, or with activated SAFE mode
      * @return array|bool
      */
-    public function getInstalledLocales() {
+    public function getInstalledLocales()
+    {
         if (function_exists('shell_exec') && !stristr(PHP_OS, 'WIN'))
             return explode("\n",trim(shell_exec('locale -a')));
         else return false;

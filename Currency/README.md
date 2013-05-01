@@ -1,9 +1,12 @@
 ## F3 Currency Rate Plugin
 
-Use this Plugin to get fetch currency rates (+90 major, minor and exotic currenies), convert money values from one currency to another, determine the currency of a selected locale/language and gather some system information about available locales.
+Use this Plugin to get fetch currency rates (+90 major, minor, exotic currenies and Bitcoin), convert money values from one currency to another, determine the currency of a selected locale/language and gather some system information about available locales.
 
 
-some examples:
+### some examples
+
+
+#### get rates, based on a specified currency
 
 ``` php
 $cur = Currency::instance();
@@ -23,12 +26,36 @@ Array
 )
 */
 
+// for Bitcoin rates:
 
+print_r($cur->getBitcoinRate('USD')); // cached for 1 hour by default
 
+/*
+Array
+(
+    [min] => 127.19900
+    [max] => 146.50000
+    [avg] => 135.36211
+)
+*/
+```
+
+#### convert a currency
+
+``` php
 echo $cur->convert(10.50,'EUR','USD'); // 13.64
+```
+
+You can also convert to an average Bitcoin rate.
+
+``` php
+echo $cur->convert(50,'EUR','BTC'); // 0.48
+```
 
 
+#### get currency of a locale
 
+``` php
 print_r( $cur->getLocaleCurrency('en_US') );
 /*
 Array
@@ -37,8 +64,14 @@ Array
     [symbol] => $
 )
 */
+```
 
 
+#### get a list of installed locales on the server
+
+Notice: currently this does not work on Windows systems.
+
+``` php
 print_r( $cur->getInstalledLocales() );
 /*
 Array
