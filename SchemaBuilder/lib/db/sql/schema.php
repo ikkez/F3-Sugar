@@ -359,7 +359,7 @@ class TableAlterer extends TableBuilder {
         if (empty($this->columns))
             return false;
 
-        $querys = array();
+        $queries = array();
         foreach ($this->columns as $cname => $column) {
             // not nullable fields should have a default value, when altering a table
             if ($column->default === false && $column->nullable === false) {
@@ -379,22 +379,27 @@ class TableAlterer extends TableBuilder {
                         if ($key == 'id') unset($colTypes[$key]);
                     }
                 // add new field
-                $colTypes[$cname] = $column->getColumnArray();
                 $oname = $this->name;
-                $querys[] = $this->rename($oname.'_temp_stamp',false);
-                $new = $this->schema->createTable($oname);
-                foreach ($colTypes as $name => $col)
-                    $new->addColumnRaw(array('name'=>$name,'passThrough'=>true)+$col);
-                $querys[] = $new->build(false);
+                $queries[] = $this->rename($oname.'_temp_stamp',false);
+                $newColConf = array('passThrough' => true) + $column->getColumnArray();
+                $newTable = $this->schema->createTable($oname);
+                foreach ($colTypes as $name => $col) {
+                    $newTable->addColumnRaw(array('name'=>$name,'passThrough'=>true)+$col);
+                    if ($column->after == $name)
+                        $newTable->addColumnRaw($newColConf);
+                }
+                if($column->after == false)
+                    $newTable->addColumnRaw($newColConf);
+                $queries[] = $newTable->build(false);
                 // copy data
                 $fields = empty($colTypes) ? ''
                     :implode(', ', array_map(array($this->db,'quotekey'),array_keys($colTypes)));
                 // TODO: setPK
 //                $new->setPKs($pkeys);
                 if (!empty($fields))
-                    $querys[] = 'INSERT INTO '.$this->db->quotekey($new->name).' ('.$fields.') '.
+                    $queries[] = 'INSERT INTO '.$this->db->quotekey($newTable->name).' ('.$fields.') '.
                                 'SELECT '.$fields.' FROM '.$this->db->quotekey($this->name).';';
-                $querys[] = $this->drop(false);
+                $queries[] = $this->drop(false);
                 $this->name = $oname;
             } else {
                 $table = $this->db->quotekey($this->name);
@@ -405,10 +410,10 @@ class TableAlterer extends TableBuilder {
                     'ibm' =>
                         "ALTER TABLE $table ADD COLUMN ".$col_query,
                 );
-                $querys[] = $this->findQuery($cmd);
+                $queries[] = $this->findQuery($cmd);
             }
         }
-        return ($exec) ? $this->execQuerys($querys) : $querys;
+        return ($exec) ? $this->execQuerys($queries) : $queries;
     }
 
 
