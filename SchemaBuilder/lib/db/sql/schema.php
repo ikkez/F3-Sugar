@@ -250,15 +250,20 @@ class Schema extends DB_Utils {
 
 abstract class TableBuilder extends DB_Utils {
 
-    protected   $columns;
+    protected   $columns, $pkeys;
     public      $name, $schema;
 
+    /**
+     * @param string $name
+     * @param Schema $schema
+     */
     public function __construct($name, Schema $schema)
     {
         if (!$this->valid($name)) return false;
         $this->name = $name;
         $this->schema = $schema;
         $this->columns = array();
+        $this->pkeys = array('id');
         parent::__construct($schema->db);
     }
 
@@ -270,33 +275,26 @@ abstract class TableBuilder extends DB_Utils {
 
     /**
      * add a new column to this table
-     * @param string $name
-     * @return Column|false
+     * @param string|Column $key column name or object
+     * @param null|array $args optional config array
+     * @return \DB\SQL\Column
      */
-    public function addColumn($name)
+    public function addColumn($key,$args = null)
     {
-        if (array_key_exists($name,$this->columns))
-            trigger_error(sprintf("column '%s' already exists",$name));
-        $column = new Column($name, $this);
-        return $this->columns[$name] =& $column;
-    }
-
-    /**
-     * add a new column to this table, using a config array
-     * @param array $args
-     * @return Column|false
-     */
-    public function addColumnRaw($args)
-    {
-        if (array_key_exists('name',$args) && array_key_exists('type',$args)) {
-            $args += array('default'=>false,'index'=>false,'unique'=>false,'after'=>false,
-                           'nullable'=>true,'pkey'=>false,'passThrough' => false);
-            $col = $this->addColumn($args['name']);
-            foreach($args as $arg=>$val)
-                $col->{$arg} = $val;
-            return $col;
+        if($key instanceof Column) {
+            $args = $key->getColumnArray();
+            $key = $key->name;
         }
-        trigger_error('arguments incomplete');
+        if (array_key_exists($key,$this->columns))
+            trigger_error(sprintf("column '%s' already exists",$key));
+        $column = new Column($key, $this);
+        if($args)
+            foreach ($args as $arg => $val)
+                $column->{$arg} = $val;
+        // TODO: improve that, skip default pkey fields
+        if (count($this->pkeys) == 1 && in_array($key,$this->pkeys))
+            return $column;
+        return $this->columns[$key] =& $column;
     }
 
 }
@@ -366,6 +364,8 @@ class TableAlterer extends TableBuilder {
                 trigger_error(sprintf(self::TEXT_NotNullFieldNeedsDefault, $column->name));
                 return false;
             }
+            if ($column->pkey && !in_array($cname, $this->pkeys))
+                $this->pkeys[] = $cname;
             if (
                 $column->default === Schema::DF_CURRENT_TIMESTAMP &&
                 preg_match('/sqlite2?/', $this->db->driver()))
@@ -376,20 +376,19 @@ class TableAlterer extends TableBuilder {
                 foreach ($colTypes as $key => $col)
                     if ($col['pkey']) {
                         $pkeys[] = $key;
-                        if ($key == 'id') unset($colTypes[$key]);
+//                        if ($key == 'id') unset($colTypes[$key]);
                     }
                 // add new field
                 $oname = $this->name;
                 $queries[] = $this->rename($oname.'_temp_stamp',false);
-                $newColConf = array('passThrough' => true) + $column->getColumnArray();
                 $newTable = $this->schema->createTable($oname);
                 foreach ($colTypes as $name => $col) {
-                    $newTable->addColumnRaw(array('name'=>$name,'passThrough'=>true)+$col);
+                    $newTable->addColumn($name,$col)->passThrough();
                     if ($column->after == $name)
-                        $newTable->addColumnRaw($newColConf);
+                        $newTable->addColumn($column)->passThrough();
                 }
-                if($column->after == false)
-                    $newTable->addColumnRaw($newColConf);
+                if(!$column->after)
+                    $newTable->addColumn($column)->passThrough();
                 $queries[] = $newTable->build(false);
                 // copy data
                 $fields = empty($colTypes) ? ''
@@ -398,7 +397,7 @@ class TableAlterer extends TableBuilder {
 //                $new->setPKs($pkeys);
                 if (!empty($fields))
                     $queries[] = 'INSERT INTO '.$this->db->quotekey($newTable->name).' ('.$fields.') '.
-                                'SELECT '.$fields.' FROM '.$this->db->quotekey($this->name).';';
+                                 'SELECT '.$fields.' FROM '.$this->db->quotekey($this->name).';';
                 $queries[] = $this->drop(false);
                 $this->name = $oname;
             } else {
@@ -492,11 +491,12 @@ class TableAlterer extends TableBuilder {
             $this->alterTable($tname);
             return true;
         } else {
+            $quotedTable = $this->db->quotekey($this->name);
             $cmd = array(
                 'mysql|mssql|sybase|dblib' => array(
-                    "ALTER TABLE $this->name DROP $column"),
+                    "ALTER TABLE $quotedTable DROP $column"),
                 'pgsql|odbc|ibm' => array(
-                    "ALTER TABLE $this->name DROP COLUMN $column"),
+                    "ALTER TABLE $quotedTable DROP COLUMN $column"),
             );
             $query = $this->findQuery($cmd);
             return $this->execQuerys($query);
@@ -512,10 +512,14 @@ class TableAlterer extends TableBuilder {
     public function renameColumn($column, $column_new)
     {
         // TODO: fix that
-        if (!$this->valid($column_new)) return false;
+        //if (!$this->valid($column_new)) return false;
         $colTypes = $cur_fields = $this->getCols(true);
         // check if column is already existing
-        if (!in_array($column, array_keys($colTypes))) return false;
+        if (!in_array($column, array_keys($colTypes)))
+            trigger_error('cannot rename column. it does not exist.');
+        if (in_array($column_new, array_keys($colTypes)))
+            trigger_error('cannot rename column. new column already exist.');
+        
         if (preg_match('/sqlite2?/', $this->db->driver())) {
             // SQlite does not support drop or rename column directly
             // remind primary-key fields
@@ -526,7 +530,8 @@ class TableAlterer extends TableBuilder {
                 }
             $oname = $this->name;
             $this->renameTable($oname.'_temp_rename');
-            $new = new self($this->db, $this->schema);
+            $new = $this->schema->createTable($oname);
+            //$new = new self($this->db, $this->schema);
             if (!$new->db->inTransaction())
                 $new->db->begin();
             $new->createTable($oname);
@@ -556,13 +561,16 @@ class TableAlterer extends TableBuilder {
             return true;
         } else {
             $colTypes = $this->getCols(true);
+            $quotedTable = $this->db->quotekey($this->name);
+            $quotedColumn = $this->db->quotekey($column);
+            $quotedColumnNew = $this->db->quotekey($column_new);
             $cmd = array(
                 'mysql' => array(
-                    "ALTER TABLE `$this->name` CHANGE `$column` `$column_new` ".$colTypes[$column]['type']),
+                    "ALTER TABLE $quotedTable CHANGE $quotedColumn $quotedColumnNew ".$colTypes[$column]['type']),
                 'pgsql|ibm' => array(
-                    "ALTER TABLE $this->name RENAME COLUMN $column TO $column_new"),
+                    "ALTER TABLE $quotedTable RENAME COLUMN $quotedColumn TO $quotedColumnNew"),
                 'mssql|sybase|dblib' => array(
-                    "sp_rename $this->name.$column, $column_new"),
+                    "sp_rename $quotedTable.$quotedColumn, $quotedColumnNew"),
             );
             $query = $this->findQuery($cmd);
             return $this->execQuerys($query);
@@ -735,6 +743,10 @@ class Column extends DB_Utils {
     const
         TEXT_CurrentStampDataType = 'Current timestamp as column default is only possible for TIMESTAMP datatype';
 
+    /**
+     * @param string $name
+     * @param TableBuilder $table
+     */
     public function __construct($name, TableBuilder $table) {
         $this->name = $name;
         $this->nullable = true;
@@ -758,6 +770,11 @@ class Column extends DB_Utils {
     public function type($datatype, $passThrough = FALSE) {
         $this->type = $datatype;
         $this->passThrough = $passThrough;
+        return $this;
+    }
+
+    public function passThrough($state = TRUE) {
+        $this->passThrough = $state;
         return $this;
     }
 
@@ -808,8 +825,8 @@ class Column extends DB_Utils {
      */
     public function getColumnQuery()
     {
-        if (!$this->type || !$this->valid($this->name))
-            return false;
+        if (!$this->type)
+            trigger_error(sprintf('Cannot build a column query for `%s`: no column type set',$this->name));
         // prepare column types
         if ($this->passThrough)
             $type_val = $this->type;
