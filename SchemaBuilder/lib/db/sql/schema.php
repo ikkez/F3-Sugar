@@ -250,7 +250,7 @@ class Schema extends DB_Utils {
 
 abstract class TableBuilder extends DB_Utils {
 
-    protected   $columns, $pkeys;
+    protected   $columns, $pkeys, $queries;
     public      $name, $schema;
 
     /**
@@ -263,6 +263,7 @@ abstract class TableBuilder extends DB_Utils {
         $this->name = $name;
         $this->schema = $schema;
         $this->columns = array();
+        $this->queries = array();
         $this->pkeys = array('id');
         parent::__construct($schema->db);
     }
@@ -314,8 +315,14 @@ class TableCreator extends TableBuilder {
             trigger_error(sprintf("table '%s' already exists. cannot create it.",$this->name));
         $cols = '';
         if (!empty($this->columns))
-            foreach ($this->columns as $cname => $column)
+            foreach ($this->columns as $cname => $column) {
+                // no defaults for TEXT type
+                if($column->default !== false && is_int(strpos(strtoupper($column->type),'TEXT'))) {
+                    trigger_error(sprintf("column `%s` of type text can't have a default value", $column->name));
+                    return false;
+                }
                 $cols .= ', '.$column->getColumnQuery();
+            }
         $table = $this->db->quotekey($this->name);
         $cmd = array(
             'sqlite2?|sybase|dblib|odbc' =>
@@ -325,11 +332,9 @@ class TableCreator extends TableBuilder {
             'pgsql' =>
                 "CREATE TABLE $table (id SERIAL PRIMARY KEY".$cols.")",
             'mssql' =>
-                "CREATE TABLE $table (id INT PRIMARY KEY".$cols.");"
-            ,
-            'ibm' => array(
-                "CREATE TABLE $table (id INTEGER AS IDENTITY NOT NULL $cols, PRIMARY KEY(id));"
-            ),
+                "CREATE TABLE $table (id INT PRIMARY KEY".$cols.");",
+            'ibm' =>
+                "CREATE TABLE $table (id INTEGER AS IDENTITY NOT NULL $cols, PRIMARY KEY(id));",
         );
         $query = $this->findQuery($cmd);
         if (!$exec)
@@ -353,15 +358,15 @@ class TableAlterer extends TableBuilder {
         // check if table exists
         if (!in_array($this->name, $this->schema->getTables()))
             trigger_error(sprintf("Unable to alter table '%s'. It does not exist.", $this->name));
-        $cols = '';
-        if (empty($this->columns))
-            return false;
-
-        $queries = array();
         foreach ($this->columns as $cname => $column) {
             // not nullable fields should have a default value, when altering a table
             if ($column->default === false && $column->nullable === false) {
                 trigger_error(sprintf(self::TEXT_NotNullFieldNeedsDefault, $column->name));
+                return false;
+            }
+            // no defaults for TEXT type
+            if($column->default !== false && is_int(strpos(strtoupper($column->type),'TEXT'))) {
+                trigger_error(sprintf("column `%s` of type text can't have a default value", $column->name));
                 return false;
             }
             if ($column->pkey && !in_array($cname, $this->pkeys))
@@ -380,7 +385,7 @@ class TableAlterer extends TableBuilder {
                     }
                 // add new field
                 $oname = $this->name;
-                $queries[] = $this->rename($oname.'_temp_stamp',false);
+                $this->queries[] = $this->rename($oname.'_temp_stamp',false);
                 $newTable = $this->schema->createTable($oname);
                 foreach ($colTypes as $name => $col) {
                     $newTable->addColumn($name,$col)->passThrough();
@@ -389,16 +394,16 @@ class TableAlterer extends TableBuilder {
                 }
                 if(!$column->after)
                     $newTable->addColumn($column)->passThrough();
-                $queries[] = $newTable->build(false);
+                $this->queries[] = $newTable->build(false);
                 // copy data
                 $fields = empty($colTypes) ? ''
                     :implode(', ', array_map(array($this->db,'quotekey'),array_keys($colTypes)));
                 // TODO: setPK
 //                $new->setPKs($pkeys);
                 if (!empty($fields))
-                    $queries[] = 'INSERT INTO '.$this->db->quotekey($newTable->name).' ('.$fields.') '.
+                    $this->queries[] = 'INSERT INTO '.$this->db->quotekey($newTable->name).' ('.$fields.') '.
                                  'SELECT '.$fields.' FROM '.$this->db->quotekey($this->name).';';
-                $queries[] = $this->drop(false);
+                $this->queries[] = $this->drop(false);
                 $this->name = $oname;
             } else {
                 $table = $this->db->quotekey($this->name);
@@ -409,10 +414,15 @@ class TableAlterer extends TableBuilder {
                     'ibm' =>
                         "ALTER TABLE $table ADD COLUMN ".$col_query,
                 );
-                $queries[] = $this->findQuery($cmd);
+                $this->queries[] = $this->findQuery($cmd);
             }
         }
-        return ($exec) ? $this->execQuerys($queries) : $queries;
+        if (empty($this->queries))
+            return false;
+        $result = ($exec) ? $this->execQuerys($this->queries) : $this->queries;
+        $this->columns = array();
+        $this->queries = array();
+        return $result;
     }
 
 
@@ -565,15 +575,15 @@ class TableAlterer extends TableBuilder {
             $quotedColumn = $this->db->quotekey($column);
             $quotedColumnNew = $this->db->quotekey($column_new);
             $cmd = array(
-                'mysql' => array(
-                    "ALTER TABLE $quotedTable CHANGE $quotedColumn $quotedColumnNew ".$colTypes[$column]['type']),
-                'pgsql|ibm' => array(
-                    "ALTER TABLE $quotedTable RENAME COLUMN $quotedColumn TO $quotedColumnNew"),
-                'mssql|sybase|dblib' => array(
-                    "sp_rename $quotedTable.$quotedColumn, $quotedColumnNew"),
+                'mysql' =>
+                    "ALTER TABLE $quotedTable CHANGE $quotedColumn $quotedColumnNew ".$colTypes[$column]['type'],
+                'pgsql|ibm' =>
+                    "ALTER TABLE $quotedTable RENAME COLUMN $quotedColumn TO $quotedColumnNew",
+                'mssql|sybase|dblib' =>
+                    "sp_rename $quotedTable.$quotedColumn, $quotedColumnNew",
             );
-            $query = $this->findQuery($cmd);
-            return $this->execQuerys($query);
+            $this->queries[] = $this->findQuery($cmd);
+            return true;
         }
     }
 
