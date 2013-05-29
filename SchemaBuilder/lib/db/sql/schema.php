@@ -423,6 +423,11 @@ class TableAlterer extends TableBuilder {
         // find rename commands
         $rename = (!empty($this->rebuild_cmd) && array_key_exists('rename',$this->rebuild_cmd))
                   ? $this->rebuild_cmd['rename'] : array();
+        // drop fields
+        if (!empty($this->rebuild_cmd) && array_key_exists('drop', $this->rebuild_cmd))
+            foreach($this->rebuild_cmd['drop'] as $name)
+                if(array_key_exists($name,$existing_columns))
+                    unset($existing_columns[$name]);
         // remember primary-key fields
         foreach ($existing_columns as $key => $col)
             if ($col['pkey'])
@@ -496,55 +501,29 @@ class TableAlterer extends TableBuilder {
         return $schema;
     }
 
-
     /**
      * removes a column from a table
-     * @param $column
+     * @param string $name
      * @return bool
      */
-    public function dropColumn($column)
+    public function dropColumn($name)
     {
-        // TODO: fix that
         $colTypes = $this->getCols(true);
         // check if column exists
-        if (!in_array($column, array_keys($colTypes))) return true;
+        if (!in_array($name, array_keys($colTypes))) return true;
         if (preg_match('/sqlite2?/', $this->db->driver())) {
             // SQlite does not support drop column directly
-            // unset dropped field
-            unset($colTypes[$column]);
-            // remember primary-key fields
-            foreach ($colTypes as $key => $col)
-                if ($col['pkey']) {
-                    $pkeys[] = $key;
-                    if ($key == 'id') unset($colTypes[$key]);
-                }
-            $new = new self($this->db, $this->schema);
-            if (!$new->db->inTransaction())
-                $new->db->begin();
-            $new->createTable($this->name.'_temp_drop');
-            foreach ($colTypes as $name => $col)
-                $new->addColumn($name, $col['type'], $col['nullable'], $col['default'], true);
-            $fields = !empty($colTypes) ? ', '.implode(', ', array_keys($colTypes)) : '';
-            $new->setPKs($pkeys);
-            $new->db->exec('INSERT INTO `'.$new->name.'` '.
-                'SELECT id'.$fields.' FROM '.$this->name);
-            $tname = $this->name;
-            $this->dropTable();
-            $new->renameTable($tname);
-            if ($new->db->inTransaction())
-                $new->db->commit();
-            $this->alterTable($tname);
-            return true;
+            $this->rebuild_cmd['drop'][] = $name;
         } else {
             $quotedTable = $this->db->quotekey($this->name);
+            $quotedColumn = $this->db->quotekey($name);
             $cmd = array(
-                'mysql|mssql|sybase|dblib' => array(
-                    "ALTER TABLE $quotedTable DROP $column;"),
-                'pgsql|odbc|ibm' => array(
-                    "ALTER TABLE $quotedTable DROP COLUMN $column;"),
+                'mysql|mssql|sybase|dblib' =>
+                    "ALTER TABLE $quotedTable DROP $quotedColumn;",
+                'pgsql|odbc|ibm' =>
+                    "ALTER TABLE $quotedTable DROP COLUMN $quotedColumn;",
             );
-            $query = $this->findQuery($cmd);
-            return $this->execQuerys($query);
+            $this->queries[] = $this->findQuery($cmd);
         }
     }
 
