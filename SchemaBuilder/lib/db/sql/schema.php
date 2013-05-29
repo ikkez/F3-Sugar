@@ -347,7 +347,7 @@ class TableCreator extends TableBuilder {
 class TableAlterer extends TableBuilder {
 
     protected
-        $colTypes;
+        $colTypes, $rebuild_cmd;
 
     /**
      * generate SQL querys for altering the table and execute it if $exec is true,
@@ -358,6 +358,12 @@ class TableAlterer extends TableBuilder {
         // check if table exists
         if (!in_array($this->name, $this->schema->getTables()))
             trigger_error(sprintf("Unable to alter table '%s'. It does not exist.", $this->name));
+
+        if ($sqlite = preg_match('/sqlite2?/', $this->db->driver())) {
+            $sqlite_queries = array();
+        }
+        $rebuild = false;
+        // add new columns
         foreach ($this->columns as $cname => $column) {
             // not nullable fields should have a default value, when altering a table
             if ($column->default === false && $column->nullable === false) {
@@ -371,60 +377,89 @@ class TableAlterer extends TableBuilder {
             }
             if ($column->pkey && !in_array($cname, $this->pkeys))
                 $this->pkeys[] = $cname;
-            if (
-                $column->default === Schema::DF_CURRENT_TIMESTAMP &&
-                preg_match('/sqlite2?/', $this->db->driver()))
-            {
+
+            $table = $this->db->quotekey($this->name);
+            $col_query = $column->getColumnQuery();
+            if ($sqlite) {
                 // sqlite: dynamic column default only works when rebuilding the table
-                $colTypes = $this->getCols(true);
-                // remember primary-key fields
-                foreach ($colTypes as $key => $col)
-                    if ($col['pkey']) {
-                        $pkeys[] = $key;
-//                        if ($key == 'id') unset($colTypes[$key]);
-                    }
-                // add new field
-                $oname = $this->name;
-                $this->queries[] = $this->rename($oname.'_temp_stamp',false);
-                $newTable = $this->schema->createTable($oname);
-                foreach ($colTypes as $name => $col) {
-                    $newTable->addColumn($name,$col)->passThrough();
-                    if ($column->after == $name)
-                        $newTable->addColumn($column)->passThrough();
-                }
-                if(!$column->after)
-                    $newTable->addColumn($column)->passThrough();
-                $this->queries[] = $newTable->build(false);
-                // copy data
-                $fields = empty($colTypes) ? ''
-                    :implode(', ', array_map(array($this->db,'quotekey'),array_keys($colTypes)));
-                // TODO: setPK
-//                $new->setPKs($pkeys);
-                if (!empty($fields))
-                    $this->queries[] = 'INSERT INTO '.$this->db->quotekey($newTable->name).' ('.$fields.') '.
-                                 'SELECT '.$fields.' FROM '.$this->db->quotekey($this->name).';';
-                $this->queries[] = $this->drop(false);
-                $this->name = $oname;
+                if($column->default === Schema::DF_CURRENT_TIMESTAMP) {
+                    $rebuild = true;
+                    break;
+                } else
+                    $sqlite_queries[] = "ALTER TABLE $table ADD $col_query;";
             } else {
-                $table = $this->db->quotekey($this->name);
-                $col_query = $column->getColumnQuery();
                 $cmd = array(
-                    'mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc' =>
-                        "ALTER TABLE $table ADD ".$col_query,
+                    'mysql|pgsql|mssql|sybase|dblib|odbc' =>
+                        "ALTER TABLE $table ADD $col_query;",
                     'ibm' =>
-                        "ALTER TABLE $table ADD COLUMN ".$col_query,
+                        "ALTER TABLE $table ADD COLUMN $col_query;",
                 );
                 $this->queries[] = $this->findQuery($cmd);
             }
         }
+        if ($sqlite)
+            if ($rebuild || !empty($this->rebuild_cmd)) $this->_sqlite_rebuild();
+            else $this->queries += $sqlite_queries;
         if (empty($this->queries))
             return false;
         $result = ($exec) ? $this->execQuerys($this->queries) : $this->queries;
-        $this->columns = array();
-        $this->queries = array();
+        $this->queries = $this->columns = $this->rebuild_cmd = array();
+        $rebuild = false;
         return $result;
     }
 
+    /**
+     * rebuild a sqlite table with additional schema changes
+     */
+    protected function _sqlite_rebuild()
+    {
+        $new_columns = $this->columns;
+        $existing_columns = $this->getCols(true);
+        // find after sorts
+        $after = array();
+        foreach ($new_columns as $cname => $column)
+            if(!empty($column->after))
+                $after[$column->after][] = $cname;
+        // find rename commands
+        $rename = (!empty($this->rebuild_cmd) && array_key_exists('rename',$this->rebuild_cmd))
+                  ? $this->rebuild_cmd['rename'] : array();
+        // remember primary-key fields
+        foreach ($existing_columns as $key => $col)
+            if ($col['pkey'])
+                $pkeys[] = array_key_exists($key,$rename) ? $rename[$key] : $key;
+        // create new table
+        $oname = $this->name;
+        $this->queries[] = $this->rename($oname.'_temp', false);
+        $newTable = $this->schema->createTable($oname);
+        // add existing fields
+        foreach ($existing_columns as $name => $col) {
+            $colName = array_key_exists($name, $rename) ? $rename[$name] : $name;
+            $newTable->addColumn($colName, $col)->passThrough();
+            // add new fields with after flag
+            if (array_key_exists($name,$after))
+                foreach(array_reverse($after[$name]) as $acol) {
+                    $newTable->addColumn($new_columns[$acol]);
+                    unset($new_columns[$acol]);
+                }
+        }
+        // add remaining new fields
+        foreach($new_columns as $ncol)
+            $newTable->addColumn($column)->passThrough();
+        $this->queries[] = $newTable->build(false);
+        // copy data
+        if(!empty($existing_columns)) {
+            foreach(array_keys($existing_columns) as $name) {
+                $fields_from[] = $this->db->quotekey($name);
+                $toName = array_key_exists($name, $rename) ? $rename[$name] : $name;
+                $fields_to[] = $this->db->quotekey($toName);
+            }
+            $this->queries[] =
+                'INSERT INTO '.$this->db->quotekey($newTable->name).' ('.implode(', ', $fields_to).') '.
+                'SELECT '.implode(', ', $fields_from).' FROM '.$this->db->quotekey($this->name).';';
+        }
+        $this->queries[] = $this->drop(false);
+        $this->name = $oname;
+    }
 
     /**
      * get columns of a table
@@ -504,9 +539,9 @@ class TableAlterer extends TableBuilder {
             $quotedTable = $this->db->quotekey($this->name);
             $cmd = array(
                 'mysql|mssql|sybase|dblib' => array(
-                    "ALTER TABLE $quotedTable DROP $column"),
+                    "ALTER TABLE $quotedTable DROP $column;"),
                 'pgsql|odbc|ibm' => array(
-                    "ALTER TABLE $quotedTable DROP COLUMN $column"),
+                    "ALTER TABLE $quotedTable DROP COLUMN $column;"),
             );
             $query = $this->findQuery($cmd);
             return $this->execQuerys($query);
@@ -515,75 +550,41 @@ class TableAlterer extends TableBuilder {
 
     /**
      * rename a column
-     * @param $column
-     * @param $column_new
-     * @return bool
+     * @param $name
+     * @param $new_name
+     * @return void
      */
-    public function renameColumn($column, $column_new)
+    public function renameColumn($name, $new_name)
     {
-        // TODO: fix that
-        //if (!$this->valid($column_new)) return false;
-        $colTypes = $cur_fields = $this->getCols(true);
+        $existing_columns = $this->getCols(true);
         // check if column is already existing
-        if (!in_array($column, array_keys($colTypes)))
+        if (!in_array($name, array_keys($existing_columns)))
             trigger_error('cannot rename column. it does not exist.');
-        if (in_array($column_new, array_keys($colTypes)))
+        if (in_array($new_name, array_keys($existing_columns)))
             trigger_error('cannot rename column. new column already exist.');
         
-        if (preg_match('/sqlite2?/', $this->db->driver())) {
+        if (preg_match('/sqlite2?/', $this->db->driver()))
             // SQlite does not support drop or rename column directly
-            // remind primary-key fields
-            foreach ($colTypes as $key => $col)
-                if ($col['pkey'] == true) {
-                    $pkeys[] = (($key == $column) ? $column_new : $key);
-                    if ($key == 'id') unset($colTypes[$key]);
-                }
-            $oname = $this->name;
-            $this->renameTable($oname.'_temp_rename');
-            $new = $this->schema->createTable($oname);
-            //$new = new self($this->db, $this->schema);
-            if (!$new->db->inTransaction())
-                $new->db->begin();
-            $new->createTable($oname);
-            foreach ($colTypes as $name => $col)
-                $new->addColumn((($name == $column) ? $column_new : $name),
-                    $col['type'], $col['nullable'], $col['default'], true);
-            foreach (array_keys($colTypes) as $type)
-                $new_fields[] = ', '.(($type == $column) ? $column_new : $type);
-            $new->setPKs($pkeys);
-            $new->db->exec('INSERT INTO `'.$new->name.'` ("id"'.implode($new_fields).') '.
-                'SELECT "'.implode('", "', array_keys($cur_fields)).'" FROM `'.$this->name.'`;');
-            $new->dropTable($this->name);
-            if ($new->db->inTransaction())
-                $new->db->commit();
-            $this->alterTable($oname);
-            return true;
-        } elseif (preg_match('/odbc/', $this->db->driver())) {
+            $this->rebuild_cmd['rename'][$name] = $new_name;
+        elseif (preg_match('/odbc/', $this->db->driver())) {
             // no rename column for odbc, create temp column
-            if (!$this->db->inTransaction())
-                $this->db->begin();
-            $this->addColumn($column_new, $colTypes[$column]['type'],
-                $colTypes[$column]['nullable'], $colTypes[$column]['default'], true);
-            $this->db->exec("UPDATE $this->name SET $column_new = $column");
-            $this->dropColumn($column);
-            if ($this->db->inTransaction())
-                $this->db->commit();
-            return true;
+            $this->addColumn($new_name, $existing_columns[$name])->passThrough();
+            $this->queries[] = "UPDATE $this->name SET $new_name = $name";
+            $this->dropColumn($name);
         } else {
-            $colTypes = $this->getCols(true);
+            $existing_columns = $this->getCols(true);
             $quotedTable = $this->db->quotekey($this->name);
-            $quotedColumn = $this->db->quotekey($column);
-            $quotedColumnNew = $this->db->quotekey($column_new);
+            $quotedColumn = $this->db->quotekey($name);
+            $quotedColumnNew = $this->db->quotekey($new_name);
             $cmd = array(
                 'mysql' =>
-                    "ALTER TABLE $quotedTable CHANGE $quotedColumn $quotedColumnNew ".$colTypes[$column]['type'],
+                    "ALTER TABLE $quotedTable CHANGE $quotedColumn $quotedColumnNew ".$existing_columns[$name]['type'].";",
                 'pgsql|ibm' =>
-                    "ALTER TABLE $quotedTable RENAME COLUMN $quotedColumn TO $quotedColumnNew",
+                    "ALTER TABLE $quotedTable RENAME COLUMN $quotedColumn TO $quotedColumnNew;",
                 'mssql|sybase|dblib' =>
-                    "sp_rename $quotedTable.$quotedColumn, $quotedColumnNew",
+                    "sp_rename $quotedTable.$quotedColumn, $quotedColumnNew;",
             );
             $this->queries[] = $this->findQuery($cmd);
-            return true;
         }
     }
 
@@ -877,9 +878,15 @@ class Column extends DB_Utils {
             }
             $query .= ' '.$def_cmd;
         }
+        if (!empty($this->after)) {
+            // `after` feature only works for mysql
+            if (preg_match('/mysql/', $this->db->driver())) {
+                $after_cmd = 'AFTER '.$this->db->quotekey($this->after);
+                $query .= ' '.$after_cmd;
+            }
+        }
         return $query;
     }
-    
 }
 
 
