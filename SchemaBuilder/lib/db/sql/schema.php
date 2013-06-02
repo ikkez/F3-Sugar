@@ -102,7 +102,7 @@ class Schema extends DB_Utils {
     protected $fw;
 
     const
-        // DataTypes
+        // DataTypes and Aliases
         DT_BOOL = 'BOOLEAN',
         DT_BOOLEAN = 'BOOLEAN',
         DT_INT1 = 'INT1',
@@ -195,11 +195,11 @@ class Schema extends DB_Utils {
     /**
      * returns a table object for altering operations
      * @param $name
-     * @return bool|TableAlterer
+     * @return bool|TableModifier
      */
     public function alterTable($name)
     {
-        return new TableAlterer($name,$this);
+        return new TableModifier($name,$this);
     }
 
     /**
@@ -256,6 +256,7 @@ abstract class TableBuilder extends DB_Utils {
     /**
      * @param string $name
      * @param Schema $schema
+     * @return \DB\SQL\TableBuilder
      */
     public function __construct($name, Schema $schema)
     {
@@ -298,6 +299,32 @@ abstract class TableBuilder extends DB_Utils {
         return $this->columns[$key] =& $column;
     }
 
+    /**
+     * create index on one or more columns
+     * @param string|array $columns Column(s) to be indexed
+     * @param bool         $unique  Unique index
+     * @return bool
+     */
+    public function addIndex($columns, $unique = FALSE)
+    {
+        if (!is_array($columns))
+            $columns = array($columns);
+        $columns = array_map(array($this->db, 'quotekey'), $columns);
+        $cols = implode(',', $columns);
+        $name = implode('_', $columns);
+        $index = $unique ? 'UNIQUE INDEX' : 'INDEX';
+        $cmd = array(
+            'pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => array(
+                "CREATE $index $name ON ".$this->db->quotekey($this->name)." ($cols);"
+            ),
+            'mysql' => array( //ALTER TABLE is used because of MySQL bug #48875
+                "ALTER TABLE `$this->name` ADD $index `$name` ($cols);"
+            ),
+        );
+        $query = $this->findQuery($cmd);
+        return $this->execQuerys($query);
+    }
+
 }
 
 class TableCreator extends TableBuilder {
@@ -306,13 +333,15 @@ class TableCreator extends TableBuilder {
      * generate SQL query for creating a basic table, containing an ID serial field
      * and execute it if $exec is true, otherwise just return the generated query string
      * @param bool $exec
-     * @return bool|TableAlterer|string
+     * @return bool|TableModifier|string
      */
     public function build($exec = TRUE)
     {
         // check if already existing
-        if ($exec && in_array($this->name, $this->schema->getTables()))
+        if ($exec && in_array($this->name, $this->schema->getTables())) {
             trigger_error(sprintf("table '%s' already exists. cannot create it.",$this->name));
+            return false;
+        }
         $cols = '';
         if (!empty($this->columns))
             foreach ($this->columns as $cname => $column) {
@@ -340,17 +369,17 @@ class TableCreator extends TableBuilder {
         if (!$exec)
             return $query;
         $this->execQuerys($query);
-        return new TableAlterer($this->name,$this->schema);
+        return new TableModifier($this->name,$this->schema);
     }
 }
 
-class TableAlterer extends TableBuilder {
+class TableModifier extends TableBuilder {
 
     protected
         $colTypes, $rebuild_cmd;
 
     /**
-     * generate SQL querys for altering the table and execute it if $exec is true,
+     * generate SQL queries for altering the table and execute it if $exec is true,
      * otherwise return the generated query string
      */
     public function build($exec = TRUE)
@@ -589,32 +618,6 @@ class TableAlterer extends TableBuilder {
     }
 
     /**
-     * create index on one or more columns
-     * @param string|array $columns Column(s) to be indexed
-     * @param bool $unique Unique index
-     * @return bool
-     */
-    public function addIndex($columns, $unique = FALSE)
-    {
-        if (!is_array($columns))
-            $columns = array($columns);
-        $columns = array_map(array($this->db, 'quotekey'), $columns);
-        $cols = implode(',', $columns);
-        $name = implode('_', $columns);
-        $index = $unique ? 'UNIQUE INDEX' : 'INDEX';
-        $cmd = array(
-            'pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => array(
-                "CREATE $index $name ON ".$this->db->quotekey($this->name)." ($cols);"
-            ),
-            'mysql' => array( //ALTER TABLE is used because of MySQL bug #48875
-                "ALTER TABLE `$this->name` ADD $index `$name` ($cols);"
-            ),
-        );
-        $query = $this->findQuery($cmd);
-        return $this->execQuerys($query);
-    }
-
-    /**
      * set primary keys
      * @param $pks array
      * @return bool
@@ -754,12 +757,12 @@ class Column extends DB_Utils {
 
     /**
      * @param string $datatype
-     * @param bool $passThrough don't match datatype against DT array
+     * @param bool $force don't match datatype against DT array
      * @return $this
      */
-    public function type($datatype, $passThrough = FALSE) {
+    public function type($datatype, $force = FALSE) {
         $this->type = $datatype;
-        $this->passThrough = $passThrough;
+        $this->passThrough = $force;
         return $this;
     }
 
