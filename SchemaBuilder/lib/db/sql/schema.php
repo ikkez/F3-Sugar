@@ -148,11 +148,13 @@ class Schema extends DB_Utils {
         $cmd = array(
             'mysql' => 'SHOW DATABASES',
             'pgsql' => 'SELECT datname FROM pg_catalog.pg_database',
-            'mssql|sybase|dblib|sqlsrv' => 'EXEC SP_HELPDB',
+            'mssql|sybase|dblib|sqlsrv|odbc' => 'EXEC SP_HELPDB',
         );
         $query = $this->findQuery($cmd);
         if (!$query) return false;
         $result = $this->db->exec($query);
+        var_dump($result);
+        if(!is_array($result)) return false;
         foreach($result as &$db)
             if (is_array($db)) $db = array_shift($db);
         return $result;
@@ -169,8 +171,10 @@ class Schema extends DB_Utils {
                 "show tables"),
             'sqlite2?' => array(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name!='sqlite_sequence'"),
-            'mssql|sqlsrv|pgsql|sybase|dblib|odbc' => array(
+            'pgsql|sybase|dblib' => array(
                 "select table_name from information_schema.tables where table_schema = 'public'"),
+            'mssql|sqlsrv|odbc' => array(
+                "select table_name from information_schema.tables"),
             'ibm' => array("select TABLE_NAME from sysibm.tables"),
         );
         $query = $this->findQuery($cmd);
@@ -242,7 +246,13 @@ class Schema extends DB_Utils {
     {
         if (is_object($name) && $name instanceof TableBuilder)
             $name = $name->name;
-        $query = 'DROP TABLE IF EXISTS '.$this->db->quotekey($name).';';
+        $cmd = array(
+            'mysql|ibm|sqlite2?|pgsql|sybase|dblib' =>
+                'DROP TABLE IF EXISTS '.$this->db->quotekey($name).';',
+            'mssql|sqlsrv|odbc' =>
+                "IF OBJECT_ID('[$name]', 'U') IS NOT NULL DROP TABLE [$name];"
+        );
+        $query = $this->findQuery($cmd);
         return ($exec) ? $this->execQuerys($query) : $query;
     }
 
@@ -354,14 +364,14 @@ class TableCreator extends TableBuilder {
             }
         $table = $this->db->quotekey($this->name);
         $cmd = array(
-            'sqlite2?|sybase|dblib|odbc' =>
+            'sqlite2?|sybase|dblib' =>
                 "CREATE TABLE $table (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT".$cols.")",
             'mysql' =>
                 "CREATE TABLE $table (id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT".$cols.") DEFAULT CHARSET=utf8",
             'pgsql' =>
                 "CREATE TABLE $table (id SERIAL PRIMARY KEY".$cols.")",
-            'mssql' =>
-                "CREATE TABLE $table (id INT PRIMARY KEY".$cols.");",
+            'mssql|odbc|sqlsrv' =>
+                "CREATE TABLE $table (id INT IDENTITY PRIMARY KEY".$cols.");",
             'ibm' =>
                 "CREATE TABLE $table (id INTEGER AS IDENTITY NOT NULL $cols, PRIMARY KEY(id));",
         );
