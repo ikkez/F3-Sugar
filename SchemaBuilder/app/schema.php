@@ -174,217 +174,234 @@ class Schema extends Controller
             $result[1]['column_7'] == 'test5' && $result[1]['text_default_nullable'] === null,
             $this->getTestDesc('mapping dummy data')
         );
-        unset($mapper, $r1);
+        unset($mapper, $result);
 
+        // default value numeric, nullable
+        $table->addColumn('int_default_nullable')->type($schema::DT_INT4)->defaults(123);
+        $table->build();
+        $r1 = $table->getCols(true);
+        $this->test->expect(
+            in_array('int_default_nullable', array_keys($r1)) == true &&
+            $r1['int_default_nullable']['default'] == 123,
+            $this->getTestDesc('adding column [INT4], nullable with default value')
+        );
+        unset($r1);
+
+        // adding dummy data
+        $mapper = new \DB\SQL\Mapper($db, $this->tname);
+        $mapper->column_7 = 'test6';
+        $mapper->save();
+        $mapper->reset();
+        $mapper->column_7 = 'test7';
+        $mapper->int_default_nullable = null;
+        $mapper->save();
+        $mapper->reset();
+        $result = $mapper->find(array('column_7 = ? OR column_7 = ?', 'test6', 'test7'));
+        foreach ($result as &$r)
+            $r = $r->cast();
+
+        $this->test->expect(
+            array_key_exists(0, $result) && array_key_exists(1, $result) &&
+            $result[0]['column_7'] == 'test6' && $result[0]['int_default_nullable'] === 123 &&
+            $result[1]['column_7'] == 'test7' && $result[1]['int_default_nullable'] === null,
+            $this->getTestDesc('mapping dummy data')
+        );
+        unset($mapper, $result);
+
+        // current timestamp
+        $table->addColumn('stamp')
+                ->type($schema::DT_TIMESTAMP)
+                ->nullable(false)
+                ->defaults($schema::DF_CURRENT_TIMESTAMP);
+        $table->build();
+        $r1 = $table->getCols(true);
+        $this->test->expect(
+            in_array('stamp', array_keys($r1)) &&
+            $r1['stamp']['default'] == $schema::DF_CURRENT_TIMESTAMP,
+            $this->getTestDesc(
+                'adding column [TIMESTAMP], not nullable with current_timestamp default value')
+        );
+        unset($r1);
+
+        // rename column
+        $table->renameColumn('text_default_not_null', 'title123');
+        $table->build();
+        $r1 = $table->getCols();
+        $this->test->expect(
+            in_array('title123', $r1) && !in_array('text_default_not_null', $r1),
+            $this->getTestDesc('renaming column')
+        );
+        unset($r1);
+
+        // adding dummy data
+        $mapper = new \DB\SQL\Mapper($db, $this->tname);
+        $mapper->title123 = 'test8';
+        $mapper->save();
+        $mapper->reset();
+        $result = $mapper->findone(array('title123 = ?','test8'));
+        $this->test->expect(
+            !$result->dry(),
+            $this->getTestDesc('mapping dummy data')
+        );
+        $table->renameColumn('title123', 'text_default_not_null');
+        $table->build();
+        unset($result,$mapper);
+
+        // remove column
+        $table->dropColumn('column_1');
+        $table->build();
+        $r1 = $table->getCols();
+        $this->test->expect(
+            !in_array('column_1', $r1),
+            $this->getTestDesc('removing column')
+        );
+        unset($r1);
+
+        // rename table
+        $schema->dropTable('test123');
+        $table->rename('test123');
+        $result = $schema->getTables();
+        $this->test->expect(
+            in_array('test123', $result) && !in_array($this->tname, $result),
+            $this->getTestDesc('renaming table')
+        );
+        $table->rename($this->tname);
+        unset($result);
+
+        // check record count
+        $mapper = new \DB\SQL\Mapper($db, $this->tname);
+        $this->test->expect(
+            count($mapper->find()) == 8,
+            $this->getTestDesc('check record count')
+        );
+        unset($mapper);
+
+        // drop table
+        $schema->dropTable($this->tname);
+        $this->test->expect(
+            !in_array($this->tname, $schema->getTables()),
+            $this->getTestDesc('drop table')
+        );
+
+        /*
+        to be continued
+
+        // adding composite primary keys
+        $schema->createTable($this->tname);
+        $schema->addColumn('version', \DB\SQL\Schema::DT_INT4, false, 1);
+        $schema->setPKs(array('id', 'version'));
+        $r1 = $table->getCols(true);
+
+        $this->test->expect(!empty($r1) &&
+            $r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
+            $this->getTestDesc('adding composite primary-keys')
+        );
+        $this->test->expect(!empty($r1) &&
+            $r1['version']['default'] == '1',
+            $this->getTestDesc('default value on composite primary key')
+        );
+
+        // more fields to composite primary key table
+        $schema->addColumn('title', \DB\SQL\Schema::DT_VARCHAR256);
+        $schema->addColumn('title2', \DB\SQL\Schema::DT_TEXT);
+        $schema->addColumn('title_notnull', \DB\SQL\Schema::DT_VARCHAR128, false, "foo");
+        $r1 = $table->getCols(true);
+        $this->test->expect(
+            array_key_exists('title', $r1) &&
+            array_key_exists('title_notnull', $r1) &&
+            $r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
+            $this->getTestDesc('adding more fields to composite pk table')
+        );
+
+        // testing primary keys with inserted data
+        $mapper = new \DB\SQL\Mapper($db, $this->tname);
+        $mapper->title = 'test1';
+        $mapper->save();
+        $mapper->reset();
+
+        $mapper->id = 1;
+        $mapper->title = 'nullable';
+        $mapper->version = 2;
+        $mapper->save();
+        $mapper->reset();
+
+        $mapper->title = 'test3';
+        $mapper->title2 = 'foobar';
+        $mapper->title_notnull = 'bar';
+        $mapper->save();
+
+        $result = $mapper->find();
+        foreach ($result as &$r) {
+            $r = $r->cast();
+        }
+        $cpk_expected = array(
+            0=>array(
+                'id' => 1,
+                'version' => 1,
+                'title' => 'test1',
+                'title2' => NULL,
+                'title_notnull' => 'foo',
+            ),
+            1=>array(
+                'id' => 1,
+                'version' => 2,
+                'title' => 'nullable',
+                'title2' => NULL,
+                'title_notnull' => 'foo',
+            ),
+            2=>array(
+                'id' => 2,
+                'version' => 1,
+                'title' => 'test3',
+                'title2' => 'foobar',
+                'title_notnull' => 'bar',
+            ),
+        );
+        foreach ($result as &$r)
+            ksort($r);
+        foreach ($cpk_expected as &$r)
+            ksort($r);
+        $this->test->expect(
+            json_encode($result) == json_encode($cpk_expected),
+            $this->getTestDesc('adding items with composite primary-keys')
+        );
+
+        $schema->dropTable($this->tname);
+        */
 
 
     }
 
-	function get()
-	{
-		$this->f3 = \Base::instance();
-		$this->test = new \Test;
+    function get()
+    {
+        $this->f3 = \Base::instance();
+        $this->test = new \Test;
 
-		$this->f3->set('QUIET', false);
-		$this->f3->set('CACHE', false);
+        $this->f3->set('QUIET', false);
+        $this->f3->set('CACHE', false);
 
-		$dbs = array(
-			'mysql' => new \DB\SQL(
-				'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
-			),
-			'sqlite' => new \DB\SQL(
-				'sqlite::memory:'
-//				'sqlite:db/sqlite.db'
-			),
-			'pgsql' => new \DB\SQL(
-				'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree'
-			),
-		);
+        $dbs = array(
+            'mysql' => new \DB\SQL(
+                'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
+            ),
+            'sqlite' => new \DB\SQL(
+                'sqlite::memory:'
+                // 'sqlite:db/sqlite.db'
+            ),
+            'pgsql' => new \DB\SQL(
+                'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree'
+            ),
+        );
 
-		$this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
-		$this->tname = 'test_table';
+        $this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
+        $this->tname = 'test_table';
 
-		foreach ($dbs as $type => $db) {
-
+        foreach ($dbs as $type => $db) {
             $this->current_engine = $type;
             $this->runTestSuite($db);
             $this->current_test = 1;
-
-			/*
-
-			// default value numeric, nullable
-			$r1 = $schema->addColumn('int_default_nullable', \DB\SQL\Schema::DT_INT4, true, 123);
-			$r2 = $table->getCols(true);
-			$this->test->expect(
-				$r1 == true && in_array('int_default_nullable', array_keys($r2)) == true && $r2['int_default_nullable']['default'] == 123,
-				$this->getTestDesc('adding column [INT4], nullable with default value')
-			);
-			unset($mapper);
-			$mapper = new \DB\SQL\Mapper($db, $this->tname);
-			$mapper->column_7 = 'test6';
-			$mapper->save();
-			$mapper->reset();
-			$mapper->column_7 = 'test7';
-			$mapper->int_default_nullable = null;
-			$mapper->save();
-			$mapper->reset();
-//			 $db->exec("INSERT INTO $this->tname (column_6, int_default_nullable) VALUES('test7',NULL);");
-			$result = $mapper->find();
-			foreach ($result as &$r) {
-				$r = $r->cast();
-			}
-			$this->test->expect(array_key_exists(5, $result) && array_key_exists(6, $result) &&
-					$result[5]['column_7'] == 'test6' && $result[5]['int_default_nullable'] === 123 &&
-					$result[6]['column_7'] == 'test7' && $result[6]['int_default_nullable'] === null,
-				$this->getTime() . ' ' . $type . 'mapping dummy data'
-			);
-
-			// current timestamp
-			$r1 = $schema->addColumn('stamp', \DB\SQL\Schema::DT_TIMESTAMP, false,
-                \DB\SQL\Schema::DF_CURRENT_TIMESTAMP);
-			$r2 = $table->getCols(true);
-			$this->test->expect(
-				$r1 == true && in_array('stamp',array_keys($r2)) == true &&
-				$r2['stamp']['default'] == \DB\SQL\Schema::DF_CURRENT_TIMESTAMP,
-				$this->getTestDesc(
-					'adding column [TIMESTAMP], not nullable with current_timestamp default value')
-			);
-
-			// rename column
-			$r1 = $schema->renameColumn('text_default_not_null', 'title123');
-			$r2 = $table->getCols();
-			$this->test->expect(
-				$r1 == true &&
-					in_array('title123', $r2) == true &&
-					in_array('text_default_not_null', $r2) == false,
-				$this->getTestDesc('renaming column')
-			);
-			unset($mapper);
-			$mapper = new \DB\SQL\Mapper($db, $this->tname);
-			$mapper->title123 = 'test8';
-			$mapper->save();
-			$mapper->reset();
-			$result = $mapper->find();
-			foreach ($result as &$r) {
-				$r = $r->cast();
-			}
-			$this->test->expect(array_key_exists(7, $result) && $result[7]['title123'] == 'test8',
-				$this->getTestDesc('mapping dummy data')
-			);
-			$schema->alterTable($this->tname, function ($table) {
-				return $table->renameColumn('title123', 'text_default_not_null');
-			});
-
-			// remove column
-			$r1 = $schema->dropColumn('column_1');
-			$r2 = $table->getCols();
-			$this->test->expect(
-				$r1 == true && !empty($r2) && in_array('column_1', $r2) == false,
-				$this->getTestDesc('removng column')
-			);
-
-			// rename table
-			$schema->dropTable('test123');
-			$r1 = $schema->renameTable('test123');
-			$this->test->expect(
-				$r1 == true && in_array('test123', $schema->getTables()) &&
-					in_array($this->tname, $schema->getTables()) == false,
-				$this->getTestDesc('renaming table')
-			);
-			$schema->renameTable($this->tname);
-
-			// drop table
-			$schema->dropTable($this->tname);
-			$this->test->expect(
-				in_array($this->tname, $schema->getTables()) == false,
-				$this->getTestDesc('drop table')
-			);
-
-			// adding composite primary keys
-			$schema->createTable($this->tname);
-			$schema->addColumn('version', \DB\SQL\Schema::DT_INT4, false, 1);
-			$schema->setPKs(array('id', 'version'));
-			$r1 = $table->getCols(true);
-
-			$this->test->expect(!empty($r1) &&
-				$r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
-				$this->getTestDesc('adding composite primary-keys')
-			);
-			$this->test->expect(!empty($r1) &&
-				$r1['version']['default'] == '1',
-				$this->getTestDesc('default value on composite primary key')
-			);
-
-			// more fields to composite primary key table
-			$schema->addColumn('title', \DB\SQL\Schema::DT_VARCHAR256);
-			$schema->addColumn('title2', \DB\SQL\Schema::DT_TEXT);
-			$schema->addColumn('title_notnull', \DB\SQL\Schema::DT_VARCHAR128, false, "foo");
-			$r1 = $table->getCols(true);
-			$this->test->expect(
-				array_key_exists('title', $r1) &&
-				array_key_exists('title_notnull', $r1) &&
-				$r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
-				$this->getTestDesc('adding more fields to composite pk table')
-			);
-
-			// testing primary keys with inserted data
-			$mapper = new \DB\SQL\Mapper($db, $this->tname);
-			$mapper->title = 'test1';
-			$mapper->save();
-			$mapper->reset();
-
-			$mapper->id = 1;
-			$mapper->title = 'nullable';
-			$mapper->version = 2;
-			$mapper->save();
-			$mapper->reset();
-
-			$mapper->title = 'test3';
-			$mapper->title2 = 'foobar';
-			$mapper->title_notnull = 'bar';
-			$mapper->save();
-
-			$result = $mapper->find();
-			foreach ($result as &$r) {
-				$r = $r->cast();
-			}
-			$cpk_expected = array(
-				0=>array(
-					'id' => 1,
-					'version' => 1,
-					'title' => 'test1',
-					'title2' => NULL,
-					'title_notnull' => 'foo',
-				),
-				1=>array(
-					'id' => 1,
-					'version' => 2,
-					'title' => 'nullable',
-					'title2' => NULL,
-					'title_notnull' => 'foo',
-				),
-				2=>array(
-					'id' => 2,
-					'version' => 1,
-					'title' => 'test3',
-					'title2' => 'foobar',
-					'title_notnull' => 'bar',
-				),
-			);
-			foreach ($result as &$r)
-				ksort($r);
-			foreach ($cpk_expected as &$r)
-				ksort($r);
-			$this->test->expect(
-				json_encode($result) == json_encode($cpk_expected),
-				$this->getTestDesc('adding items with composite primary-keys')
-			);
-
-			$schema->dropTable($this->tname);
-			*/
-
-		}
-		$this->f3->set('results', $this->test->results());
-	}
+        }
+        $this->f3->set('results', $this->test->results());
+    }
 
 }
