@@ -153,8 +153,7 @@ class Schema extends DB_Utils {
         $query = $this->findQuery($cmd);
         if (!$query) return false;
         $result = $this->db->exec($query);
-        var_dump($result);
-        if(!is_array($result)) return false;
+        if (!is_array($result)) return false;
         foreach($result as &$db)
             if (is_array($db)) $db = array_shift($db);
         return $result;
@@ -260,7 +259,7 @@ class Schema extends DB_Utils {
 
 abstract class TableBuilder extends DB_Utils {
 
-    protected   $columns, $pkeys, $queries;
+    protected   $columns, $pkeys, $queries, $increments, $rebuild_cmd;
     public      $name, $schema;
 
     /**
@@ -276,6 +275,7 @@ abstract class TableBuilder extends DB_Utils {
         $this->columns = array();
         $this->queries = array();
         $this->pkeys = array('id');
+        $this->increments = 'id';
         parent::__construct($schema->db);
     }
 
@@ -303,7 +303,7 @@ abstract class TableBuilder extends DB_Utils {
         if($args)
             foreach ($args as $arg => $val)
                 $column->{$arg} = $val;
-        // TODO: improve that, skip default pkey fields
+        // skip default pkey field
         if (count($this->pkeys) == 1 && in_array($key,$this->pkeys))
             return $column;
         return $this->columns[$key] =& $column;
@@ -335,10 +335,57 @@ abstract class TableBuilder extends DB_Utils {
         return $this->execQuerys($query);
     }
 
+    /**
+     * set primary / composite key to table
+     * @param string|array $pkeys
+     * @return bool
+     */
+    public function primary($pkeys) {
+        if(empty($pkeys))
+            return false;
+        if (!is_array($pkeys))
+            $pkeys = array($pkeys);
+        // single pkey
+        $this->increments = $pkeys[0];
+        $this->pkeys = $pkeys;
+        // drop duplicate pkey definition
+        if(array_key_exists($this->increments,$this->columns))
+            unset($this->columns[$this->increments]);
+        // composite key
+        if(count($pkeys) > 1) {
+            $pkeys_quoted = array_map(array($this->db,'quotekey'), $pkeys);
+            $pk_string = implode(', ', $pkeys_quoted);
+            if (preg_match('/sqlite2?/', $this->db->driver())) {
+                // rebuild table with new primary keys
+                $this->rebuild_cmd['pkeys'] = $pkeys;
+                return;
+            } else {
+                $table = $this->db->quotekey($this->name);
+                $table_key = $table.'_pkey';
+                $cmd = array(
+                    'mssql|sybase|dblib|odbc' =>
+                        "CREATE INDEX $table_key ON $table ( $pk_string );",
+                    'mysql' =>
+                        "ALTER TABLE $table DROP PRIMARY KEY, ADD PRIMARY KEY ( $pk_string );",
+                    'pgsql' => array(
+                        "ALTER TABLE $table DROP CONSTRAINT $table_key;",
+                        "ALTER TABLE $table ADD CONSTRAINT $table_key PRIMARY KEY ( $pk_string );",
+                    ),
+                );
+                $query = $this->findQuery($cmd);
+                if (is_array($query))
+                    foreach ($query as $q)
+                        $this->queries[] = $q;
+                else
+                    $this->queries[] = $query;
+            }
+        }
+    }
+
 }
 
 class TableCreator extends TableBuilder {
-    
+
     /**
      * generate SQL query for creating a basic table, containing an ID serial field
      * and execute it if $exec is true, otherwise just return the generated query string
@@ -363,25 +410,37 @@ class TableCreator extends TableBuilder {
                 $cols .= ', '.$column->getColumnQuery();
             }
         $table = $this->db->quotekey($this->name);
+        $id = $this->db->quotekey($this->increments);
         $cmd = array(
             'sqlite2?|sybase|dblib' =>
-                "CREATE TABLE $table (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT".$cols.")",
+                "CREATE TABLE $table ($id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT".$cols.")",
             'mysql' =>
-                "CREATE TABLE $table (id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT".$cols.") DEFAULT CHARSET=utf8",
+                "CREATE TABLE $table ($id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT".$cols.") DEFAULT CHARSET=utf8",
             'pgsql' =>
-                "CREATE TABLE $table (id SERIAL PRIMARY KEY".$cols.")",
+                "CREATE TABLE $table ($id SERIAL PRIMARY KEY".$cols.")",
             'mssql|odbc|sqlsrv' =>
-                "CREATE TABLE $table (id INT IDENTITY PRIMARY KEY".$cols.");",
+                "CREATE TABLE $table ($id INT IDENTITY PRIMARY KEY".$cols.");",
             'ibm' =>
-                "CREATE TABLE $table (id INTEGER AS IDENTITY NOT NULL $cols, PRIMARY KEY(id));",
+                "CREATE TABLE $table ($id INTEGER AS IDENTITY NOT NULL $cols, PRIMARY KEY($id));",
         );
         $query = $this->findQuery($cmd);
+        // composite key for sqlite
+        if (count($this->pkeys) > 1 && preg_match('/sqlite2?/', $this->db->driver())) {
+            $pk_string = implode(', ', $this->pkeys);
+            $query = "CREATE TABLE $table ($id INTEGER NULL".$cols.", PRIMARY KEY ($pk_string) );";
+            $newTable = new TableModifier($this->name, $this->schema);
+            // auto-incrementation in composite primary keys
+            $pk_queries = $newTable->_sqlite_increment_trigger($this->increments);
+            $this->queries = array_merge($this->queries, $pk_queries);
+        }
+        array_unshift($this->queries, $query);
         if (!$exec)
-            return $query;
-        $this->execQuerys($query);
-        return new TableModifier($this->name,$this->schema);
+            return $this->queries;
+        $this->execQuerys($this->queries);
+        return isset($newTable) ? $newTable : new TableModifier($this->name,$this->schema);
     }
 }
+
 
 class TableModifier extends TableBuilder {
 
@@ -462,15 +521,24 @@ class TableModifier extends TableBuilder {
         // find rename commands
         $rename = (!empty($this->rebuild_cmd) && array_key_exists('rename',$this->rebuild_cmd))
                   ? $this->rebuild_cmd['rename'] : array();
-        // drop fields
-        if (!empty($this->rebuild_cmd) && array_key_exists('drop', $this->rebuild_cmd))
-            foreach($this->rebuild_cmd['drop'] as $name)
-                if(array_key_exists($name,$existing_columns))
-                    unset($existing_columns[$name]);
         // remember primary-key fields
         foreach ($existing_columns as $key => $col)
             if ($col['pkey'])
-                $pkeys[] = array_key_exists($key,$rename) ? $rename[$key] : $key;
+                $pkeys[array_key_exists($key,$rename) ? $rename[$key] : $key] = $col;
+        // drop fields
+        if (!empty($this->rebuild_cmd) && array_key_exists('drop', $this->rebuild_cmd))
+            foreach ($this->rebuild_cmd['drop'] as $name)
+                if (array_key_exists($name, $existing_columns)) {
+                    if (array_key_exists($name, $pkeys)) {
+                        unset($pkeys[$name]);
+                        // drop composite key
+                        if(count($pkeys) == 1) {
+                            $incrementTrigger = $this->db->quotekey($this->name.'_insert');
+                            $this->queries[] = 'DROP TRIGGER IF EXISTS '.$incrementTrigger;
+                        }
+                    }
+                    unset($existing_columns[$name]);
+                }
         // create new table
         $oname = $this->name;
         $this->queries[] = $this->rename($oname.'_temp', false);
@@ -489,7 +557,9 @@ class TableModifier extends TableBuilder {
         // add remaining new fields
         foreach($new_columns as $ncol)
             $newTable->addColumn($column)->passThrough();
-        $this->queries[] = $newTable->build(false);
+        $newTable->primary(array_keys($pkeys));
+        $newTableQueries = $newTable->build(false);
+        $this->queries = array_merge($this->queries,$newTableQueries);
         // copy data
         if(!empty($existing_columns)) {
             foreach(array_keys($existing_columns) as $name) {
@@ -503,6 +573,25 @@ class TableModifier extends TableBuilder {
         }
         $this->queries[] = $this->drop(false);
         $this->name = $oname;
+    }
+
+    /**
+     * create an insert trigger to work-a-round auto-incrementation in composite primary keys
+     * @param $pkey
+     * @return array
+     */
+    public function _sqlite_increment_trigger($pkey) {
+        $table = $this->db->quotekey($this->name);
+        $pkey = $this->db->quotekey($pkey);
+        $triggerName = $this->db->quotekey($this->name.'_insert');
+        $queries[] = "DROP TRIGGER IF EXISTS $triggerName;";
+        $queries[] = 'CREATE TRIGGER '.$triggerName.' AFTER INSERT ON '.$table.
+                     ' WHEN (NEW.'.$pkey.' IS NULL) BEGIN'.
+                     ' UPDATE '.$table.' SET '.$pkey.' = ('.
+                     ' select coalesce( max( '.$pkey.' ), 0 ) + 1 from '.$table.
+                     ') WHERE ROWID = NEW.ROWID;'.
+                     ' END;';
+        return $queries;
     }
 
     /**
@@ -627,110 +716,6 @@ class TableModifier extends TableBuilder {
         return $this->schema->dropTable($this,$exec);
     }
 
-    /**
-     * set primary keys
-     * @param $pks array
-     * @return bool
-     * @deprecated
-     */
-    public function __setPKs($pks)
-    {
-        // TODO: fix that
-        $pk_string = implode(', ', $pks);
-        if (preg_match('/sqlite2?/', $this->db->driver())) {
-            $this->db->exec('DROP TRIGGER IF EXISTS '.$this->name.'_insert');
-            // collect primary key field information
-            $colTypes = $this->getCols(true);
-            $pk_def = array();
-            foreach ($pks as $name) {
-                $dfv = $colTypes[$name]['default'];
-                $df_def = ($dfv !== false) ? " DEFAULT '".$dfv."'" : '';
-                $pk_def[] = $name.' '.$colTypes[$name]['type'].$df_def;
-            }
-            $currentPKs = array();
-            foreach ($colTypes as $colname => $conf)
-                if ($conf['pkey']) $currentPKs[] = $colname;
-            // from comp to single pkey
-            if (count($pks) <= 1 && count($currentPKs) >= 1) {
-                // already the right pk
-                if ((count($pks) == 1 && count($currentPKs) == 1) && $pks[0] == $currentPKs[0])
-                    return true;
-                // rebuild with single pk
-                $oname = $this->name;
-                $this->renameTable($this->name.'_temp');
-                $this->createTable($oname);
-                foreach ($colTypes as $name => $col)
-                    $this->addColumn($name, $col['type'], $col['nullable'], $col['default'], true);
-                $fields = implode(', ', array_keys($colTypes));
-                $this->db->exec('INSERT INTO '.$this->name.'('.$fields.') '.
-                'SELECT '.$fields.' FROM '.$this->name.'_temp');
-                // drop old table
-                $this->dropTable($this->name.'_temp');
-                return true;
-            }
-            $pk_def = implode(', ', $pk_def);
-            // fetch all new non primary key fields
-            $newCols = array();
-            foreach ($colTypes as $colname => $conf)
-                if (!in_array($colname, $pks)) $newCols[$colname] = $conf;
-            if (!$this->db->inTransaction())
-                $this->db->begin();
-            $oname = $this->name;
-            // rename to temp
-            $this->renameTable($this->name.'_temp');
-            // find dynamic defaults
-            foreach ($newCols as $name => $col)
-                if ($col['default'] == self::DF_CURRENT_TIMESTAMP) $dyndef[$name] = $col;
-            $dynfields = '';
-            if (!empty($dyndef))
-                foreach ($dyndef as $n => $col) {
-                    $dynfields .= $n.' '.$col['type'].' '.(($col['nullable']) ? 'NULL' : 'NOT NULL').
-                        ' DEFAULT '.$this->findQuery($this->defaultTypes[$col['default']]).',';
-                    unset($newCols[$n]);
-                }
-            // create new origin table, with new private keys and their fields
-            $this->db->exec("CREATE TABLE $oname ( $pk_def, $dynfields PRIMARY KEY ($pk_string) );");
-            // add non-pk fields
-            $this->alterTable($oname);
-            foreach ($newCols as $name => $col)
-                $this->addColumn($name, $col['type'], $col['nullable'], $col['default'], true);
-            // create insert trigger to work-a-round autoincrement in multiple primary keys
-            // is set on first PK if it's an int field
-            if (strstr(strtolower($colTypes[$pks[0]]['type']), 'int'))
-                $this->db->exec('CREATE TRIGGER '.$oname.'_insert AFTER INSERT ON '.$oname.
-                ' WHEN (NEW.'.$pks[0].' IS NULL) BEGIN'.
-                ' UPDATE '.$oname.' SET '.$pks[0].' = ('.
-                ' select coalesce( max( '.$pks[0].' ), 0 ) + 1 from '.$oname.
-                ') WHERE ROWID = NEW.ROWID;'.
-                ' END;');
-            // import all data
-            $cols = $this->getCols();
-            $fields = implode(', ', $cols);
-            $this->db->exec('INSERT INTO '.$oname.'('.$fields.') '.
-            'SELECT '.$fields.' FROM '.$oname.'_temp');
-            // drop old table
-            $this->dropTable($oname.'_temp');
-            if (!$this->db->inTransaction())
-                $this->db->commit();
-            return true;
-
-        } else {
-            $cmd = array(
-                'mssql|sybase|dblib|odbc' => array(
-                    "CREATE INDEX ".$this->name."_pkey ON ".$this->name." ( $pk_string );"
-                ),
-                'mysql' => array(
-                    "ALTER TABLE $this->name DROP PRIMARY KEY, ADD PRIMARY KEY ( $pk_string );"),
-                'pgsql' => array(
-                    "ALTER TABLE $this->name DROP CONSTRAINT ".$this->name.'_pkey;',
-                    "ALTER TABLE $this->name ADD CONSTRAINT ".$this->name."_pkey PRIMARY KEY ( $pk_string );",
-                ),
-            );
-            $query = $this->findQuery($cmd);
-            return $this->execQuerys($query);
-        }
-    }
-
 }
 
 /**
@@ -799,11 +784,6 @@ class Column extends DB_Utils {
     public function index($unique = FALSE) {
         $this->index = true;
         $this->unique = $unique;
-        return $this;
-    }
-
-    public function primary() {
-        $this->pkey = true;
         return $this;
     }
 
