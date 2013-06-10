@@ -276,6 +276,25 @@ class Schema extends Controller
         );
         unset($mapper);
 
+        // adding composite primary keys
+        $table->addColumn('version')->type($schema::DT_INT4)->nullable(false)->defaults(1);
+        $table->primary(array('id', 'version'));
+        $table->build();
+        $r1 = $table->getCols(true);
+        $this->test->expect(!empty($r1) && isset($r1['version']) &&
+            $r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
+            $this->getTestDesc('adding composite primary-keys')
+        );
+        unset($r1);
+
+        // check record count
+        $mapper = new \DB\SQL\Mapper($db, $this->tname);
+        $this->test->expect(
+            count($mapper->find()) == 8,
+            $this->getTestDesc('check record count')
+        );
+        unset($mapper);
+
         // drop table
         $schema->dropTable($this->tname);
         $this->test->expect(
@@ -283,28 +302,29 @@ class Schema extends Controller
             $this->getTestDesc('drop table')
         );
 
-        /*
-        to be continued
-
         // adding composite primary keys
-        $schema->createTable($this->tname);
-        $schema->addColumn('version', \DB\SQL\Schema::DT_INT4, false, 1);
-        $schema->setPKs(array('id', 'version'));
+        $table = $schema->createTable($this->tname);
+        $table->addColumn('version')->type($schema::DT_INT4)->defaults(1);
+        $table->primary(array('id', 'version'));
+        $table = $table->build();
         $r1 = $table->getCols(true);
 
         $this->test->expect(!empty($r1) &&
             $r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
-            $this->getTestDesc('adding composite primary-keys')
+            $this->getTestDesc('creating new table with composite key')
         );
         $this->test->expect(!empty($r1) &&
             $r1['version']['default'] == '1',
             $this->getTestDesc('default value on composite primary key')
         );
+        unset($r1);
 
         // more fields to composite primary key table
-        $schema->addColumn('title', \DB\SQL\Schema::DT_VARCHAR256);
-        $schema->addColumn('title2', \DB\SQL\Schema::DT_TEXT);
-        $schema->addColumn('title_notnull', \DB\SQL\Schema::DT_VARCHAR128, false, "foo");
+        $table->addColumn('title')->type($schema::DT_VARCHAR256);
+        $table->addColumn('title2')->type($schema::DT_TEXT);
+        $table->addColumn('title_notnull')
+              ->type($schema::DT_VARCHAR128)->nullable(false)->defaults("foo");
+        $table->build();
         $r1 = $table->getCols(true);
         $this->test->expect(
             array_key_exists('title', $r1) &&
@@ -312,6 +332,7 @@ class Schema extends Controller
             $r1['id']['pkey'] == true && $r1['version']['pkey'] == true,
             $this->getTestDesc('adding more fields to composite pk table')
         );
+        unset($r1);
 
         // testing primary keys with inserted data
         $mapper = new \DB\SQL\Mapper($db, $this->tname);
@@ -330,10 +351,8 @@ class Schema extends Controller
         $mapper->title_notnull = 'bar';
         $mapper->save();
 
-        $result = $mapper->find();
-        foreach ($result as &$r) {
-            $r = $r->cast();
-        }
+        $result = array_map(array($mapper,'cast'),$mapper->find());
+
         $cpk_expected = array(
             0=>array(
                 'id' => 1,
@@ -367,8 +386,6 @@ class Schema extends Controller
         );
 
         $schema->dropTable($this->tname);
-        */
-
 
     }
 
