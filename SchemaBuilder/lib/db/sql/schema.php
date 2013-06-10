@@ -341,7 +341,7 @@ abstract class TableBuilder extends DB_Utils {
      * @return bool
      */
     public function primary($pkeys) {
-        if(empty($pkeys))
+        if (empty($pkeys))
             return false;
         if (!is_array($pkeys))
             $pkeys = array($pkeys);
@@ -349,10 +349,14 @@ abstract class TableBuilder extends DB_Utils {
         $this->increments = $pkeys[0];
         $this->pkeys = $pkeys;
         // drop duplicate pkey definition
-        if(array_key_exists($this->increments,$this->columns))
+        if (array_key_exists($this->increments,$this->columns))
             unset($this->columns[$this->increments]);
+        // set flag on new fields
+        foreach ($pkeys as $name)
+            if(array_key_exists($name,$this->columns))
+                $this->columns[$name]->pkey = true;
         // composite key
-        if(count($pkeys) > 1) {
+        if (count($pkeys) > 1) {
             $pkeys_quoted = array_map(array($this->db,'quotekey'), $pkeys);
             $pk_string = implode(', ', $pkeys_quoted);
             if (preg_match('/sqlite2?/', $this->db->driver())) {
@@ -361,7 +365,7 @@ abstract class TableBuilder extends DB_Utils {
                 return;
             } else {
                 $table = $this->db->quotekey($this->name);
-                $table_key = $table.'_pkey';
+                $table_key = $this->db->quotekey($this->name.'_pkey');
                 $cmd = array(
                     'mssql|sybase|dblib|odbc' =>
                         "CREATE INDEX $table_key ON $table ( $pk_string );",
@@ -373,11 +377,10 @@ abstract class TableBuilder extends DB_Utils {
                     ),
                 );
                 $query = $this->findQuery($cmd);
-                if (is_array($query))
-                    foreach ($query as $q)
-                        $this->queries[] = $q;
-                else
-                    $this->queries[] = $query;
+                if (!is_array($query))
+                    $query = array($query);
+                foreach ($query as $q)
+                    $this->queries[] = $q;
             }
         }
     }
@@ -461,6 +464,8 @@ class TableModifier extends TableBuilder {
             $sqlite_queries = array();
         }
         $rebuild = false;
+        $additional_queries = $this->queries;
+        $this->queries = array();
         // add new columns
         foreach ($this->columns as $cname => $column) {
             // not nullable fields should have a default value, when altering a table
@@ -498,6 +503,7 @@ class TableModifier extends TableBuilder {
         if ($sqlite)
             if ($rebuild || !empty($this->rebuild_cmd)) $this->_sqlite_rebuild();
             else $this->queries += $sqlite_queries;
+        $this->queries = array_merge($this->queries,$additional_queries);
         if (empty($this->queries))
             return false;
         $result = ($exec) ? $this->execQuerys($this->queries) : $this->queries;
@@ -521,10 +527,13 @@ class TableModifier extends TableBuilder {
         // find rename commands
         $rename = (!empty($this->rebuild_cmd) && array_key_exists('rename',$this->rebuild_cmd))
                   ? $this->rebuild_cmd['rename'] : array();
-        // remember primary-key fields
+        // get primary-key fields
         foreach ($existing_columns as $key => $col)
             if ($col['pkey'])
                 $pkeys[array_key_exists($key,$rename) ? $rename[$key] : $key] = $col;
+        foreach ($new_columns as $key => $col)
+            if ($col->pkey)
+                $pkeys[$key] = $col;
         // drop fields
         if (!empty($this->rebuild_cmd) && array_key_exists('drop', $this->rebuild_cmd))
             foreach ($this->rebuild_cmd['drop'] as $name)
@@ -549,20 +558,20 @@ class TableModifier extends TableBuilder {
             $newTable->addColumn($colName, $col)->passThrough();
             // add new fields with after flag
             if (array_key_exists($name,$after))
-                foreach(array_reverse($after[$name]) as $acol) {
+                foreach (array_reverse($after[$name]) as $acol) {
                     $newTable->addColumn($new_columns[$acol]);
                     unset($new_columns[$acol]);
                 }
         }
         // add remaining new fields
-        foreach($new_columns as $ncol)
-            $newTable->addColumn($column)->passThrough();
+        foreach ($new_columns as $ncol)
+            $newTable->addColumn($ncol);
         $newTable->primary(array_keys($pkeys));
         $newTableQueries = $newTable->build(false);
         $this->queries = array_merge($this->queries,$newTableQueries);
         // copy data
-        if(!empty($existing_columns)) {
-            foreach(array_keys($existing_columns) as $name) {
+        if (!empty($existing_columns)) {
+            foreach (array_keys($existing_columns) as $name) {
                 $fields_from[] = $this->db->quotekey($name);
                 $toName = array_key_exists($name, $rename) ? $rename[$name] : $name;
                 $fields_to[] = $this->db->quotekey($toName);
