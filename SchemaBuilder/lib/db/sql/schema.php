@@ -326,7 +326,7 @@ abstract class TableBuilder extends DB_Utils {
                 if(strtoupper($search_cols[$index_cols[$i]]['type']) == 'TEXT')
                     $col.='('.$length.')';
         $cols = implode(',', $quotedCols);
-        $name = $this->db->quotekey(implode('_', $index_cols));
+        $name = $this->db->quotekey(implode('__', $index_cols));
         $table = $this->db->quotekey($this->name);
         $index = $unique ? 'UNIQUE INDEX' : 'INDEX';
         $cmd = array(
@@ -503,9 +503,6 @@ class TableModifier extends TableBuilder {
                 trigger_error(sprintf("column `%s` of type text can't have a default value", $column->name));
                 return false;
             }
-            if ($column->pkey && !in_array($cname, $this->pkeys))
-                $this->pkeys[] = $cname;
-
             $table = $this->db->quotekey($this->name);
             $col_query = $column->getColumnQuery();
             if ($sqlite) {
@@ -526,10 +523,10 @@ class TableModifier extends TableBuilder {
             }
         }
         if ($sqlite)
-            if ($rebuild || !empty($this->rebuild_cmd)) $this->_sqlite_rebuild();
+            if ($rebuild || !empty($this->rebuild_cmd)) $this->_sqlite_rebuild($exec);
             else $this->queries += $sqlite_queries;
         $this->queries = array_merge($this->queries,$additional_queries);
-        // indexes
+        // add new indexes
         foreach ($this->columns as $cname => $column)
             if ($column->index)
                 $this->addIndex($cname, $column->unique);
@@ -544,7 +541,7 @@ class TableModifier extends TableBuilder {
     /**
      * rebuild a sqlite table with additional schema changes
      */
-    protected function _sqlite_rebuild()
+    protected function _sqlite_rebuild($exec=true)
     {
         $new_columns = $this->columns;
         $existing_columns = $this->getCols(true);
@@ -563,6 +560,8 @@ class TableModifier extends TableBuilder {
         foreach ($new_columns as $key => $col)
             if ($col->pkey)
                 $pkeys[$key] = $col;
+        // indexes
+        $indexes = $this->listIndex();    
         // drop fields
         if (!empty($this->rebuild_cmd) && array_key_exists('drop', $this->rebuild_cmd))
             foreach ($this->rebuild_cmd['drop'] as $name)
@@ -576,7 +575,17 @@ class TableModifier extends TableBuilder {
                         }
                     }
                     unset($existing_columns[$name]);
-                }
+                    // drop index
+                    foreach (array_keys($indexes) as $col) {
+                        if ($col == $name)
+                            unset($indexes[$name]);
+                        if (is_int(strpos($col, '__'))) {
+                            $ci = explode('__', $col);
+                            if (in_array($name, $ci))
+                                unset($indexes[$col]);
+                        }
+                    }
+                }       
         // create new table
         $oname = $this->name;
         $this->queries[] = $this->rename($oname.'_temp', false);
@@ -596,6 +605,18 @@ class TableModifier extends TableBuilder {
         foreach ($new_columns as $ncol)
             $newTable->addColumn($ncol);
         $newTable->primary(array_keys($pkeys));
+        // add existing indexes
+        foreach (array_reverse($indexes) as $name=>$conf) {
+            if (is_int(strpos($name, '__')))
+                $name = explode('__', $name); 
+            if ($exec) {
+                $t = $this->schema->alterTable($oname);
+                $t->dropIndex($name);
+                $t->build();
+            }
+            $newTable->addIndex($name,$conf['unique']);
+        }
+        // build new table
         $newTableQueries = $newTable->build(false);
         $this->queries = array_merge($this->queries,$newTableQueries);
         // copy data
@@ -748,6 +769,58 @@ class TableModifier extends TableBuilder {
             $col = $col->getColumnArray();
         $allCols = array_merge($this->getCols(true), $existingCol);
         parent::_addIndex($columns, $allCols, $unique, $length);
+    }
+
+    /**
+     * drop a column index
+     * @param string|array $name
+     */
+    public function dropIndex($name)
+    {
+        if (is_array($name))
+            $name = implode('__', $name);
+        $name = $this->db->quotekey($name);
+        $cmd = array(
+            'mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' =>
+                "DROP INDEX $name;",
+        );
+        $query = $this->findQuery($cmd);
+        $this->queries[] = $query;
+    }
+
+    /**
+     * returns table indexes as assoc array
+     * @return array
+     */
+    public function listIndex()
+    {
+        $table = $this->db->quotekey($this->name);
+        $cmd = array(
+            'sqlite2?' =>
+                "PRAGMA index_list($table);",
+            'mysql' =>
+                "SHOW INDEX FROM $table;",
+            'mssql|sybase|dblib' =>
+                "select * from sys.indexes ".
+                "where object_id = (select object_id from sys.objects where name = '$this->name')",
+            'pgsql' =>
+                "select i.relname as name, ix.indisunique as unique ".
+                "from pg_class t, pg_class i, pg_index ix ".
+                "where t.oid = ix.indrelid and i.oid = ix.indexrelid ".
+                "and t.relkind = 'r' and t.relname = '$this->name'".
+                "group by t.relname, i.relname, ix.indisunique;",
+        );
+        $result = $this->db->exec($this->findQuery($cmd));
+        $indexes = array();
+        if (preg_match('/pgsql|sqlite2?/', $this->db->driver())) {
+            foreach($result as $row)
+                $indexes[$row['name']] = array('unique' => $row['unique']);
+        } elseif (preg_match('/mysql/', $this->db->driver())) {
+            foreach($result as $row)
+                $indexes[$row['Key_name']] = array('unique' => !(bool)$row['Non_unique']);
+        } else
+            trigger_error(sprintf(self::TEXT_ENGINE_NOT_SUPPORTED, $this->db->driver()));
+        return $indexes;
     }
 
     /**
