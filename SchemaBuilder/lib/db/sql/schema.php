@@ -311,28 +311,32 @@ abstract class TableBuilder extends DB_Utils {
 
     /**
      * create index on one or more columns
-     * @param string|array $columns Column(s) to be indexed
-     * @param bool         $unique  Unique index
-     * @return bool
+     * @param string|array $index_cols Column(s) to be indexed
+     * @param              $search_cols
+     * @param bool         $unique     Unique index
+     * @param int          $length     index length for text fields in mysql
      */
-    public function addIndex($columns, $unique = FALSE)
+    protected function _addIndex($index_cols, $search_cols, $unique, $length)
     {
-        if (!is_array($columns))
-            $columns = array($columns);
-        $columns = array_map(array($this->db, 'quotekey'), $columns);
-        $cols = implode(',', $columns);
-        $name = implode('_', $columns);
+        if (!is_array($index_cols))
+            $index_cols = array($index_cols);
+        $quotedCols = array_map(array($this->db, 'quotekey'), $index_cols);
+        if (preg_match('/mysql/', $this->db->driver()))
+            foreach($quotedCols as $i=>&$col)
+                if(strtoupper($search_cols[$index_cols[$i]]['type']) == 'TEXT')
+                    $col.='('.$length.')';
+        $cols = implode(',', $quotedCols);
+        $name = $this->db->quotekey(implode('_', $index_cols));
+        $table = $this->db->quotekey($this->name);
         $index = $unique ? 'UNIQUE INDEX' : 'INDEX';
         $cmd = array(
-            'pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => array(
-                "CREATE $index $name ON ".$this->db->quotekey($this->name)." ($cols);"
-            ),
-            'mysql' => array( //ALTER TABLE is used because of MySQL bug #48875
-                "ALTER TABLE `$this->name` ADD $index `$name` ($cols);"
-            ),
+            'pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' =>
+                "CREATE $index $name ON $table ($cols);",
+            'mysql' => //ALTER TABLE is used because of MySQL bug #48875
+                "ALTER TABLE $table ADD $index $name ($cols);",
         );
         $query = $this->findQuery($cmd);
-        return $this->execQuerys($query);
+        $this->queries[] = $query;
     }
 
     /**
@@ -437,11 +441,32 @@ class TableCreator extends TableBuilder {
             $this->queries = array_merge($this->queries, $pk_queries);
         }
         array_unshift($this->queries, $query);
+        // indexes
+        foreach ($this->columns as $cname => $column)
+            if ($column->index)
+                $this->addIndex($cname, $column->unique);
         if (!$exec)
             return $this->queries;
         $this->execQuerys($this->queries);
         return isset($newTable) ? $newTable : new TableModifier($this->name,$this->schema);
     }
+
+    /**
+     * create index on one or more columns
+     * @param string|array $columns Column(s) to be indexed
+     * @param bool         $unique  Unique index
+     * @param int          $length  index length for text fields in mysql
+     */
+    public function addIndex($columns, $unique = FALSE, $length = 20)
+    {
+        if (!is_array($columns))
+            $columns = array($columns);
+        $cols = $this->columns;
+        foreach ($cols as &$col)
+            $col = $col->getColumnArray();
+        parent::_addIndex($columns,$cols,$unique,$length);
+    }
+
 }
 
 
@@ -504,6 +529,10 @@ class TableModifier extends TableBuilder {
             if ($rebuild || !empty($this->rebuild_cmd)) $this->_sqlite_rebuild();
             else $this->queries += $sqlite_queries;
         $this->queries = array_merge($this->queries,$additional_queries);
+        // indexes
+        foreach ($this->columns as $cname => $column)
+            if ($column->index)
+                $this->addIndex($cname, $column->unique);
         if (empty($this->queries))
             return false;
         $result = ($exec) ? $this->execQuerys($this->queries) : $this->queries;
@@ -702,6 +731,23 @@ class TableModifier extends TableBuilder {
             );
             $this->queries[] = $this->findQuery($cmd);
         }
+    }
+
+    /**
+     * create index on one or more columns
+     * @param string|array $columns Column(s) to be indexed
+     * @param bool         $unique  Unique index
+     * @param int          $length  index length for text fields in mysql
+     */
+    public function addIndex($columns, $unique = FALSE, $length = 20)
+    {
+        if (!is_array($columns))
+            $columns = array($columns);
+        $existingCol = $this->columns;
+        foreach ($existingCol as &$col)
+            $col = $col->getColumnArray();
+        $allCols = array_merge($this->getCols(true), $existingCol);
+        parent::_addIndex($columns, $allCols, $unique, $length);
     }
 
     /**
