@@ -1,9 +1,9 @@
-## SQL Schema Builder
-#### An extension for managing database structures.
+# SQL Schema Builder
+### An extension for creating and managing SQL database tables.
 
-This Plugin provides you a SQL table schema builder for the **PHP Fat-Free Framework**. It might be useful for installation scripts and dynamic applications, like a CMS enviroment.
+This Plugin provides a SQL table schema builder for the **PHP Fat-Free Framework**. It might be useful for installation scripts, dynamic applications or CMS enviroments.
 
-Currently MySQL, SQLite & PostgreSQL are supported and fully tested. Further support for SQL Server, MSSQL/Sybase, Access and DB2 are already included. Handle with care and test your application. No warranty at all.
+Currently MySQL, SQLite & PostgreSQL are supported and fully tested. Further support for SQL Server, MSSQL/Sybase, Access and DB2 are already included, but experimental. Handle with care and test your application. No warranty at all.
 
 This Plugin is made for F3 version 3.x
 
@@ -121,31 +121,31 @@ The class prodives you the following simple methods for:
 			<td>DT_INT2<br/>DT_SMALLINT</td>
 			<td>exact integer</td>
 			<td>at least 2 bytes</td>
-			<td>±32,768</td>
+			<td>ï¿½32,768</td>
 		</tr>
 		<tr>
 			<td>DT_INT4<br/>DT_INT</td>
 			<td>exact integer</td>
 			<td>4 bytes</td>
-			<td>±2,147,483,648</td>
+			<td>ï¿½2,147,483,648</td>
 		</tr>
 		<tr>
 			<td>DT_INT8<br/>DT_BIGINT</td>
 			<td>exact integer</td>
 			<td>at most 8 bytes</td>
-			<td>±2^63</td>
+			<td>ï¿½2^63</td>
 		</tr>
 		<tr>
 			<td>DT_FLOAT</td>
 			<td>approximate numeric</td>
 			<td>4 bytes</td>
-			<td>±1.79E + 308</td>
+			<td>ï¿½1.79E + 308</td>
 		</tr>
 		<tr>
 			<td>DT_DECIMAL<br/>DT_DOUBLE</td>
 			<td>exact numeric</td>
 			<td>at least 5 bytes</td>
-			<td>±10^38+1</td>
+			<td>ï¿½10^38+1</td>
 		</tr>
 		<tr>
 			<td>DT_VARCHAR128</td>
