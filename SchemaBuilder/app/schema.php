@@ -15,14 +15,46 @@ class Schema extends Controller
 
     private function getTime()
     {
-        $time = microtime(TRUE) - \Base::instance()->get('timer') - $this->roundTime;
-        $this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
+        $time = microtime(TRUE) - $this->f3->get('timer') - $this->roundTime;
+        $this->roundTime = microtime(TRUE) - $this->f3->get('timer');
         return ' [ '.sprintf('%.3f', $time).'s ]';
     }
 
     private function getTestDesc($text)
     {
         return $this->getTime().' '.$this->current_engine.': #'.$this->current_test++.' - '.$text;
+    }
+
+    function get()
+    {
+        $this->f3 = \Base::instance();
+        $this->test = new \Test;
+
+        $this->f3->set('QUIET', false);
+        $this->f3->set('CACHE', false);
+
+        $dbs = array(
+            'mysql' => new \DB\SQL(
+                'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
+            ),
+//            'sqlite' => new \DB\SQL(
+//                'sqlite::memory:'
+            // 'sqlite:db/sqlite.db'
+//            ),
+//            'pgsql' => new \DB\SQL(
+//                'pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'
+//            ),
+        );
+
+        $this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
+        $this->tname = 'test_table';
+
+        foreach ($dbs as $type => $db) {
+            $this->current_engine = $type;
+            $this->runTestSuite($db);
+            $this->current_test = 1;
+        }
+        $this->f3->set('results', $this->test->results());
     }
 
     private function runTestSuite($db)
@@ -40,6 +72,11 @@ class Schema extends Controller
             $this->getTestDesc('create default table')
         );
         unset($result);
+
+        $this->test->expect(
+            $table instanceof \DB\SQL\TableModifier,
+            $this->getTestDesc('$table->build() returns TableModifier')
+        );
 
         // drop table
         $table->drop();
@@ -387,38 +424,57 @@ class Schema extends Controller
 
         $schema->dropTable($this->tname);
 
-    }
-
-    function get()
-    {
-        $this->f3 = \Base::instance();
-        $this->test = new \Test;
-
-        $this->f3->set('QUIET', false);
-        $this->f3->set('CACHE', false);
-
-        $dbs = array(
-            'mysql' => new \DB\SQL(
-                'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
-            ),
-            'sqlite' => new \DB\SQL(
-                'sqlite::memory:'
-                // 'sqlite:db/sqlite.db'
-            ),
-            'pgsql' => new \DB\SQL(
-                'pgsql:host=localhost;dbname=fatfree','fatfree','fatfree'
-            ),
+        // indexes
+        $table = $schema->createTable($this->tname);
+        $table->addColumn('rawtest', array('type' => $schema::DT_VARCHAR256, 'default' => 'foo'));
+        $table->addColumn('text')->type($schema::DT_TEXT);
+        $table->addColumn('foo')->type($schema::DT_VARCHAR128)->index();
+        $table = $table->build();
+        $r1 = $table->getCols(true);
+        $this->test->expect(
+            isset($r1['rawtest']) && $r1['rawtest']['default'] = 'foo',
+            $this->getTestDesc('adding column with options array')
+        );
+        $indexes = $table->listIndex();
+        $this->test->expect(
+            isset($indexes['foo']),
+            $this->getTestDesc('column index on table creation')
+        );
+        $table->addColumn('bar')->type($schema::DT_VARCHAR128)->index(true);
+        $table->addColumn('baz')->type($schema::DT_VARCHAR128);
+        $table->addIndex(array('text', 'baz'));
+        $table->build();
+        $indexes = $table->listIndex();
+        $this->test->expect(
+            isset($indexes['bar']),
+            $this->getTestDesc('column index on table alteration')
+        );
+        $this->test->expect(
+            isset($indexes['bar']) && $indexes['bar']['unique'] == true,
+            $this->getTestDesc('unique index')
+        );
+        $this->test->expect(
+            isset($indexes['text__baz']),
+            $this->getTestDesc('index on combined columns')
         );
 
-        $this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
-        $this->tname = 'test_table';
-
-        foreach ($dbs as $type => $db) {
-            $this->current_engine = $type;
-            $this->runTestSuite($db);
-            $this->current_test = 1;
+        if($this->current_engine == 'sqlite') {
+            $table->dropColumn('rawtest');
+            $table->build();
+            $indexes = $table->listIndex();
+            $this->test->expect(
+                isset($indexes['text__baz']) && isset($indexes['bar']) && $indexes['bar']['unique'],
+                $this->getTestDesc('preserve indexes after table rebuild')
+            );
         }
-        $this->f3->set('results', $this->test->results());
+
+        $table->dropIndex('bar');
+        $table->build();
+        $indexes = $table->listIndex();
+        $this->test->expect(
+            !array_key_exists('bar',$indexes),
+            $this->getTestDesc('drop index')
+        );
     }
 
 }
