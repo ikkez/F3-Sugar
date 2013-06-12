@@ -892,6 +892,79 @@ class Column extends DB_Utils {
         return $this;
     }
 
+    public function type_tinyint() {
+        $this->type = Schema::DT_INT1;
+        return $this;
+    }
+
+    public function type_smallint() {
+        $this->type = Schema::DT_INT2;
+        return $this;
+    }
+
+    public function type_int() {
+        $this->type = Schema::DT_INT4;
+        return $this;
+    }
+
+    public function type_bigint() {
+        $this->type = Schema::DT_INT8;
+        return $this;
+    }
+
+    public function type_float() {
+        $this->type = Schema::DT_FLOAT;
+        return $this;
+    }
+
+    public function type_decimal() {
+        $this->type = Schema::DT_DOUBLE;
+        return $this;
+    }
+
+    public function type_text() {
+        $this->type = Schema::DT_TEXT;
+        return $this;
+    }
+
+    public function type_long() {
+        $this->type = Schema::DT_LONGTEXT;
+        return $this;
+    }
+
+    public function type_varchar($length = 255) {
+        $this->type = "varchar($length)";
+        $this->passThrough = true;
+        return $this;
+    }
+
+    public function type_date() {
+        $this->type = Schema::DT_DATE;
+        return $this;
+    }
+
+    public function type_datetime() {
+        $this->type = Schema::DT_DATETIME;
+        return $this;
+    }
+
+    public function type_timestamp($asDefault=false) {
+        $this->type = Schema::DT_TIMESTAMP;
+        if ($asDefault)
+            $this->default = Schema::DF_CURRENT_TIMESTAMP;
+        return $this;
+    }
+
+    public function type_blob() {
+        $this->type = Schema::DT_BLOB;
+        return $this;
+    }
+
+    public function type_bool() {
+        $this->type = Schema::DT_BOOLEAN;
+        return $this;
+    }
+
     public function passThrough($state = TRUE) {
         $this->passThrough = $state;
         return $this;
