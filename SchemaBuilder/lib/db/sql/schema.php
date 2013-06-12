@@ -780,9 +780,12 @@ class TableModifier extends TableBuilder {
         if (is_array($name))
             $name = implode('__', $name);
         $name = $this->db->quotekey($name);
+        $table = $this->db->quotekey($this->name);
         $cmd = array(
-            'mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' =>
+            'pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' =>
                 "DROP INDEX $name;",
+            'mysql'=>
+                "ALTER TABLE $table DROP INDEX $name;",
         );
         $query = $this->findQuery($cmd);
         $this->queries[] = $query;
