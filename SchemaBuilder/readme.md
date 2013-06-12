@@ -20,14 +20,14 @@ $db = new \DB\SQL('mysql:host=localhost;port=3306;dbname='.$DBname, $user, $pass
 ```
 Now create a Schema object to work on. Inject the DB object into its constructor:
 ``` php
-$builder = new \DB\SQL\Schema( $db );
+$schema = new \DB\SQL\Schema( $db );
 ```
 
-The class prodives you the following simple methods for:
+The Schema class prodives you the following simple methods for:
 
 #### managing databases
 
--   **$builder->getDatabases();**
+-   **$schema->getDatabases();**
 	
 	Returns a list of all databases available (except SQLite). Can be useful for installation purpose, when you want the user to select a database to work on. Therefor just create your DB connection without selecting a database like: 
 	```
@@ -38,33 +38,35 @@ The class prodives you the following simple methods for:
 
 #### managing tables
 	
--   **$builder->getTables();**
+-   **$schema->getTables();**
 	
-	This will return a list of all tables available within the given dbname.
+	This will return a list of all tables available within the current database.
 
-- 	**$builder->createTable( $tableName );**
+- 	**$schema->createTable( $tableName );**
 	
-	Creates a new table, containing an auto-incremented, primary-key field named 'id', which is required for further SQL\Mapper usage. The SchemaBuilder selects and reminds that table name for more altering operations.
+	Returns a new table object for creation purpose. New tables will always contain an auto-incremented, primary-key field named 'id', which is required for further SQL\Mapper usage. You can add columns, indexes and change the primary key on this object.
 		
 	example:	
 	``` php
-	$builder->createTable('products');
-    $builder->addColumn('title',\DB\SQL\Schema::DT_VARCHAR128);
-    $builder->addColumn('description',\DB\SQL\Schema::DT_TEXT);
+	$table = $schema->createTable('products');
+    $table->addColumn('title')->type($schema::DT_VARCHAR128);
+    $table->addColumn('description')->type($schema::DT_TEXT);
+    $table->build();
 	```
 
-- 	**$builder->alterTable( $tableName );**
+- 	**$schema->alterTable( $tableName );**
 
-	Just selects a table for altering operations on already existing tables. 
+	Returns a table object for altering operations on already existing tables. 
     
     example:	
 	``` php
-	$builder->alterTable('products');
-    $builder->addColumn('prize',\DB\SQL\Schema::DT_DECIMAL);
-    $builder->addColumn('stock',\DB\SQL\Schema::DT_INT);
+	$table = $schema->alterTable('products');
+    $table->addColumn('prize')->type($schema::DT_DECIMAL);
+    $table->addColumn('stock')->type($schema::DT_INT);
+    $table->build();
 	```
 
--   **$builder->renameTable( $newTableName );**
+-   **$schema->renameTable( $currentTableName, $newTableName );**
 	
 	Renames a table.
 	
