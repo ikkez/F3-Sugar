@@ -23,7 +23,7 @@ Now create a Schema object to work on. Inject the DB object into its constructor
 $schema = new \DB\SQL\Schema( $db );
 ```
 
-### Creating tables
+### Create tables
 
 Creating new tables is super easy. Let's have a look at this example:
 ``` php
@@ -33,13 +33,63 @@ $table->addColumn('description')->type($schema::DT_TEXT);
 $table->build();
 ```
 
-The `createTable()` method returns a new table object (*instance of TableCreator*) for creation purpose. You may add new columns, indexes and change the primary key with it. New tables will always contain an auto-incremented, primary-key field named `id`, which is required for further SQL\Mapper usage. All actions on a table object that affects its schema, are collected first and needs an additional `build()` command to be executed to really take effect on the database.
+The `createTable()` method returns a new table object (*instance of TableCreator*) for creation purpose. You may add new columns, indexes and change the primary key with it. New tables will always contain an auto-incremented, primary-key field named `id`, which is required for further SQL\Mapper usage. All actions on a table object that affects its schema, are collected first and needs an additional `build()` command to be executed to really take effect on the database. If you're unsure of the result, you can run a simulation of that build method and have a look at the generated queries, the Schema Builder would have executed, with the following call:
+``` php
+$generated_queries = $table->build(false);
+print_r($generated_queries);
+```
 
 #### Add new columns
 
-Using the `addColumn` method on a table object will create a new Column object and adds it to the table object. The  This way we can enable fluent calls for adding new columns and 
+Using the `$table->addColumn()` method will create a new Column object and adds it to the table object. We can use fluent calls for configuring these columns. 
+``` php
+$table->addColumn('deleted')->type($schema::DT_BOOL)->nullable(false)->defaults(0)->after('id');
+```
+Here is a list of possible configuration methods:
+
+* **->type( string $datatype, [ bool $force = false] )**
+
+  Set datatype of this column. Usually a constant of type \DB\SQL\Schema::DT_{datatype}. The `$force` argument will disable the datatype check with the included mappings and uses your raw string as type definition.
+
+* **->nullable( bool $state )**	
+  
+  Makes this column as nullable or not. Default is true.
+  
+* **->defaults( mixed $value )**
+
+  Adds a default value for records. 
+
+* **->after( string $name )**
+
+  Trys to place the new column behind an existing one. *(only SQLite and MySQL)*
+  
+* **->index([ bool $unique = false ])**
+
+  Add an index for that field. `$unique` makes it a UNIQUE INDEX.
 
 
+### Alter tables
+
+Altering existing tables is quite similar to creating them, but offers a bunch more possibilities. A basic example:
+``` php
+$table = $schema->alterTable('products');
+$table->addColumn('prize')->type($schema::DT_DECIMAL);
+$table->addColumn('stock')->type($schema::DT_INT);
+$table->removeColumn('foo_bar');
+$table->renameColumn('title','name');
+$table->build();
+```
+
+As you can see, `alterTable()` returns a new table object (*instance of TableModifier*) for altering purpose, which provides some more actions like removing or renaming columns.
+
+
+---
+
+---
+
+to be continued
+
+---
 
 The Schema class prodives you the following simple methods for:
 
