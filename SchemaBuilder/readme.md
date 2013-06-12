@@ -8,11 +8,11 @@ Currently MySQL, SQLite & PostgreSQL are supported and fully tested. Further sup
 This Plugin is made for F3 version 3.x
 
 ***
-### Installation
+## Installation
 
 Just copy schema.php into F3's `lib/db/sql` Folder. Done.
 
-### Usage
+## Quick Start
 
 To work with the Schema builder, you need an active SQL Connection. Create one like this:
 ``` php
@@ -22,6 +22,24 @@ Now create a Schema object to work on. Inject the DB object into its constructor
 ``` php
 $schema = new \DB\SQL\Schema( $db );
 ```
+
+### Creating tables
+
+Creating new tables is super easy. Let's have a look at this example:
+``` php
+$table = $schema->createTable('products');
+$table->addColumn('title')->type($schema::DT_VARCHAR128);
+$table->addColumn('description')->type($schema::DT_TEXT);
+$table->build();
+```
+
+The `createTable()` method returns a new table object (*instance of TableCreator*) for creation purpose. You may add new columns, indexes and change the primary key with it. New tables will always contain an auto-incremented, primary-key field named `id`, which is required for further SQL\Mapper usage. All actions on a table object that affects its schema, are collected first and needs an additional `build()` command to be executed to really take effect on the database.
+
+#### Add new columns
+
+Using the `addColumn` method on a table object will create a new Column object and adds it to the table object. The  This way we can enable fluent calls for adding new columns and 
+
+
 
 The Schema class prodives you the following simple methods for:
 
