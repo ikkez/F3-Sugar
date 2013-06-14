@@ -47,21 +47,21 @@ $table->addColumn('deleted')->type($schema::DT_BOOL)->nullable(false)->defaults(
 ```
 Here is a list of possible configuration methods:
 
-* **->type( string $datatype, [ bool $force = false ])**
+* **->type( $datatype)**
 
-  Set datatype of this column. Usually a constant of type \DB\SQL\Schema::DT_{datatype}. The `$force` argument will disable the datatype check with the included mappings and uses your raw string as type definition. Have a look at the Column Class API for more details about datatypes.
+  Set datatype of this column. Usually a constant of type \DB\SQL\Schema::DT_{datatype}. Have a look at the Column Class API for more details about datatypes.
 
-* **->nullable( bool $state )**	
+* **->nullable( $state )**
   
   Set this column as NULL or NOT NULL. Default is true / nullable.
   
-* **->defaults( mixed $value )**
+* **->defaults( $value )**
 
   Adds a default value for records. 
 
-* **->after( string $name )**
+* **->after( $name )**
 
-  Trys to place the new column behind an existing one. (*only SQLite and MySQL*)
+  Trys to place the new column behind an existing one.
   
 * **->index([ bool $unique = false ])**
 
@@ -84,8 +84,8 @@ As you can see, `$schema->alterTable()` returns a new table object (*instance of
 
 -   **renameColumn( string $name, string $new_name );**
 -   **dropColumn( string $name );**
--   **addIndex( string|array $columns, [ bool $unique = false ]);**
--   **dropIndex( string|array $columns );**
+-   **addIndex( string | array $columns, [ bool $unique = false ]);**
+-   **dropIndex( string | array $columns );**
 -   **listIndex();**
 -   **getCols([ bool $types = false ]);**
 
@@ -105,18 +105,18 @@ The Schema class prodives you the following simple methods for:
 
 -   **$schema->getDatabases();**
 	
-	Returns a list of all databases available (except SQLite). Can be useful for installation purpose, when you want the user to select a database to work on. Therefor just create your DB connection without selecting a database like: 
+	Returns an array of all databases available (*except for SQLite*). Can be useful for installation purpose, when you want the user to select a database to work on. Therefor just create your DB connection without selecting a database like:
 	```
 	$db = new \DB\SQL('mysql:host=localhost;port=3306;dbname=', $user, $password);
 	```
 	Some DB engine default setups also grants simple read operations, without setting a user / password.
 
 
-##### managing tables
+#### managing tables
 	
 -   **$schema->getTables();**
 	
-	This will return a list of all tables available within the current database.
+	Returns an array of all tables available within the current database.
 
 - 	**$schema->createTable( $tableName );**
 	
@@ -179,6 +179,18 @@ This class is ment for creating new tables. It can be created by using `$schema-
     ```
     The first element of this pkey array will always be treated as an auto-incremented field.
 
+    example:
+    ``` php
+    $table = $schema->createTable('news');
+    $table->addColumn('title')->type($schema::DT_VARCHAR128);
+    $table->addColumn('bodytext')->type($schema::DT_TEXT);
+    $table->addColumn('version')->type($schema::DT_INT8)->nullable(false)->defaults(1);
+    $table->setPKs(array('id', 'version'));
+    $table->build();
+    ```
+
+    Now your primary key is build upon 2 columns, to use records like `id=1, version=1` and `id=1, version=2`.
+
 -   **$table->build([ bool $exec = true ]);**
 
     This will start the table generation process and executes all queries if `$exec` is `TRUE`, otherwise it will just return all queries as array.
@@ -188,18 +200,54 @@ This class is ment for creating new tables. It can be created by using `$schema-
 This class is ment for creating new tables. It can be created by using `$schema->alterTable($name)`.
 
 -   **$table->addColumn($key,$args = null); Column**
--   **renameColumn( string $name, string $new_name );**
--   **dropColumn( string $name );**
--   **addIndex( string|array $columns, [ bool $unique = false ]);**
--   **dropIndex( string|array $columns );**
--   **listIndex();**
--   **$table->primary($pkeys);**
--   **getCols([ bool $types = false ]);**
+
+    Adds a new column.
+
+-   **$table->renameColumn( string $name, string $new_name );**
+
+    This is used to rename an existing column.
+
+-   **$table->dropColumn( string $name );**
+
+    Trys to removes a column from the table, if it exists.
+
+-   **$table->addIndex( string | array $columns, [ bool $unique = false ]);**
+
+    Creates a index or unique index for one or multiple columns on the table.
+
+-   **$table->dropIndex( string | array $columns );**
+
+    Drops an index.
+
+-   **$table->listIndex();**
+
+    Returns an associative array with index name as key and `array('unique'=>$value)` as value.
+
+-   **$table->primary( string | array $pkeys);**
+
+    Creates a new primary or compositve key on the table.
+
+-   **$table->getCols([ bool $types = false ]);**
+
+    Returns an array of existing table columns. If `$types` is set to `TRUE`, it will return an associative array with column name as key and the schema array as value.
+
 -   **$table->build([ bool $exec = true ]);**
+
+    This generates the queries needed for the table alteration and executes them when `$exec` is true, otherwise it returns them as array.
+
+-   **$table->rename( string $new_name, [ bool $exec = true ]);**
+
+    This will instantly rename the table. Notice: Instead of being executed on calling `build()` the execution is controlled by `$exec`.
+
+-   **$table->drop([ bool $exec = true ]);**
+
+    This will instantly drop the table. Notice: Instead of being executed on calling `build()` the execution is controlled by `$exec`.
+
 
 ### Column Class
 
 The method `$table->addColumn($columnName);` adds a further column field to the selected table and creates and returns a new Column object, that can be configured in different ways, before finally building it.
+
 
 * **->type( string $datatype, [ bool $force = false ])**
 
@@ -317,82 +365,58 @@ The method `$table->addColumn($columnName);` adds a further column field to the 
     // or
     $table->addColumn('bodytext')->type($schema::DT_TEXT);
 
-    // build the new columns
+    // save changes to database
     $table->build();
     ```
 
----
+    there are also a bunch of shorthand method you can use instead of `type()`:
 
----
+    -   **type_tinyint()**
+    -   **type_smallint()**
+    -   **type_int()**
+    -   **type_bigint()**
+    -   **type_float()**
+    -   **type_decimal()**
+    -   **type_text()**
+    -   **type_longtext()**
+    -   **type_varchar([ $length = 255 ])**
+    -   **type_date()**
+    -   **type_datetime()**
+    -   **type_timestamp([ $asDefault = FALSE ])**
+    -   **type_blob()**
+    -   **type_bool()**
 
-to be continued
 
----
+* **->type( string $datatype, [ bool $force = false ])**
 
+  Set datatype of this column. Usually a constant of type \DB\SQL\Schema::DT_{datatype}. The `$force` argument will disable the datatype check with the included mappings and uses your raw string as type definition.
 
-If `$nullable` is false, the field is added as NOT NULL field, so it cannot contain a null value and therefore needs a default.
+* **->nullable( bool $state )**
 
-example:
-``` php
-$builder->alterTable('news');
-$builder->addColumn('version', \DB\SQL\Schema::DT_INT, false, 1);
-$builder->addColumn('title', \DB\SQL\Schema::DT_TEXT, false, 'new untitled news item');
-```
+  Set this column as NULL or NOT NULL. Default is `TRUE` / nullable.
+  You can set defaults to nullable fields as well.
 
-But you can set defaults to nullable fields as well.
+* **->defaults( mixed $value )**
 
-**CURRENT_TIMESTAMP as dynamic default value**
+  Adds a default value for records. Usually a *string* or *integer* value or `NULL`.
 
-If you like to add a timestamp of the current time to new inserted records, you can add a TIMESTAMP field with a special default value to achieve this.
+  **CURRENT_TIMESTAMP as dynamic default value*
 
-example:
-``` php
-$builder->alterTable('news');
-$builder->addColumn('creation_date',\DB\SQL\Schema::DT_TIMESTAMP,false,\DB\SQL\Schema::DF_CURRENT_TIMESTAMP);
-```
+  But if you like to add a timestamp of the current time to new inserted records, you can use a TIMESTAMP field with a special default value to achieve this.
+  ``` php
+  $table->addColumn('creation_date')
+        ->type($schema::DT_TIMESTAMP)
+        ->defaults($schema::DF_CURRENT_TIMESTAMP);
+  ```
+  a shorthand would be:
+  ``` php
+  $table->addColumn('creation_date')->type_timestamp(TRUE);
+  ```
 
-Notice: constants with DF_ prefix are default values, DT_ is for DataTypes.
-	
+* **->after( string $name )**
 
--	**$builder->getCols( $types [false] );**
+  Trys to place the new column behind an existing one. (*only works for SQLite and MySQL*)
 
-	Returns an array of all column fields for a given table. When you set $types to TRUE, it will return an assoc array with fieldnames as keys and its type as value. (It's quiet the same as $db->schema, but includes some workarounds for internal default value handling)
+* **->index([ bool $unique = false ])**
 
-	usage:
-	``` php
-	$columns = $builder->alterTable('news')->getCols();
-	```	
-	
--	**$builder->dropColumn( $columnName );**
-
-	Removes a column from the given table.
-	
-	usage:
-	``` php
-	$builder->alterTable('plugins')->dropColumn('plugin-xy');		
-	```	
-
--	**$builder->renameColumn( $currentColumnName, $newColumnName );**
-
-	Renames a column from the given table.
-	
-	usage:
-	``` php
-	$builder->alterTable('news')->renameColumn('name','title');
-	```
-
--	**$builder->setPKs( $pkeyArray );**
-
-	You can define an Array of existing column names, that are going to be used as a composite primary key. If your table contains an auto incremented field (usually `id`), than it should always be the first element in $pkeyArray.
-	
-	usage:
-	``` php
-	$builder->createTable('news');
-	$builder->addColumn('title', \DB\SQL\Schema::DT_VARCHAR128);
-	$builder->addColumn('bodytext', \DB\SQL\Schema::DT_TEXT);
-	$builder->addColumn('version', \DB\SQL\Schema::DT_INT8, false, 1);
-	$builder->setPKs(array('id', 'version'));
-	```
-	
-	Now your primary key is build upon 2 columns, to use records like `id=1, version=1` and `id=1, version=2`.
-
+  Add an index for that field. `$unique` makes it a UNIQUE INDEX.
