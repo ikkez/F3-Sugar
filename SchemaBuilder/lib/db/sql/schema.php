@@ -927,7 +927,7 @@ class Column extends DB_Utils {
         return $this;
     }
 
-    public function type_long() {
+    public function type_longtext() {
         $this->type = Schema::DT_LONGTEXT;
         return $this;
     }
