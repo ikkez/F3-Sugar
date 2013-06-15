@@ -185,7 +185,7 @@ This class is ment for creating new tables. It can be created by using `$schema-
     $table->addColumn('title')->type($schema::DT_VARCHAR128);
     $table->addColumn('bodytext')->type($schema::DT_TEXT);
     $table->addColumn('version')->type($schema::DT_INT8)->nullable(false)->defaults(1);
-    $table->setPKs(array('id', 'version'));
+    $table->primary(array('id', 'version'));
     $table->build();
     ```
 
@@ -400,16 +400,13 @@ The method `$table->addColumn($columnName);` adds a further column field to the 
 
   Adds a default value for records. Usually a *string* or *integer* value or `NULL`.
 
-  **CURRENT_TIMESTAMP as dynamic default value*
+  **CURRENT_TIMESTAMP as dynamic default value**
 
   But if you like to add a timestamp of the current time to new inserted records, you can use a TIMESTAMP field with a special default value to achieve this.
   ``` php
-  $table->addColumn('creation_date')
-        ->type($schema::DT_TIMESTAMP)
-        ->defaults($schema::DF_CURRENT_TIMESTAMP);
-  ```
-  a shorthand would be:
-  ``` php
+  $table->addColumn('creation_date')->type($schema::DT_TIMESTAMP)->defaults($schema::DF_CURRENT_TIMESTAMP);
+
+  // a shorthand would be:
   $table->addColumn('creation_date')->type_timestamp(TRUE);
   ```
 
@@ -420,3 +417,11 @@ The method `$table->addColumn($columnName);` adds a further column field to the 
 * **->index([ bool $unique = false ])**
 
   Add an index for that field. `$unique` makes it a UNIQUE INDEX.
+
+
+---
+
+Like this Plugin?
+
+[![buy me a beer](https://raw.github.com/ikkez/Beer-Donation-Button/gh-pages/img/beer_donation_button_single.png "donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=44UHPNUCVP7QG
+)
