@@ -17,7 +17,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.7.1
+        @version 0.7.2
         @date 08.02.2013
  **/
 
@@ -107,7 +107,7 @@ class FAL extends Magic
         $this->ttl = $ttl;
         $cacheHash = $this->getCacheHash($file);
         if ($this->f3->get('CACHE') && $ttl && ($cached = $cache->exists(
-            $cacheHash,$content)) && $cached + $ttl > microtime(TRUE)
+            $cacheHash,$content)) && $cached[0] + $ttl > microtime(TRUE)
         ) {
             // load from cache
             $this->content = $content;
