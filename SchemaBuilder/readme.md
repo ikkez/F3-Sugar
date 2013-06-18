@@ -255,8 +255,10 @@ The method `$table->addColumn($columnName);` adds a further column field to the 
 
 
 * **->type( string $datatype, [ bool $force = false ])**
+    
+    Set datatype of this column. The `$force` argument will disable the datatype check with the included mappings and uses your raw string as type definition.
 
-    The Column always needs a specified datatype. You can find these available mapped types as constants in \DB\SQL\Schema so far:
+    You can use these available mapped types as constants in \DB\SQL\Schema:
 
     <table>
         <tr>
@@ -369,12 +371,14 @@ The method `$table->addColumn($columnName);` adds a further column field to the 
     $table->addColumn('author')->type(\DB\SQL\Schema::DT_VARCHAR128);
     // or
     $table->addColumn('bodytext')->type($schema::DT_TEXT);
+    // or the shorthand
+    $table->addColumn('bodytext')->type_text();
 
     // save changes to database
     $table->build();
     ```
 
-    there are also a bunch of shorthand method you can use instead of `type()`:
+    there are also a bunch of shorthand methods available, you can use instead of `type()`:
 
     -   **type_tinyint()**
     -   **type_smallint()**
@@ -392,10 +396,7 @@ The method `$table->addColumn($columnName);` adds a further column field to the 
     -   **type_bool()**
 
 
-* **->type( string $datatype, [ bool $force = false ])**
-
-  Set datatype of this column. Usually a constant of type \DB\SQL\Schema::DT_{datatype}. The `$force` argument will disable the datatype check with the included mappings and uses your raw string as type definition.
-
+  
 * **->nullable( bool $state )**
 
   Set this column as NULL or NOT NULL. Default is `TRUE` / nullable.
