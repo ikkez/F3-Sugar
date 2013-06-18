@@ -12,7 +12,7 @@
         Christian Knuth <ikkez0n3@gmail.com>
         https://github.com/ikkez/F3-Sugar/
 
-        @version 0.9.1
+        @version 0.9.2
         @date 08.02.2013
  **/
  
@@ -67,7 +67,7 @@ class LocalFS implements FileSystem
     }
 
     public function listDir($dir=null, $filter=null, $recursive=false) {
-        if(is_null($dir) || $dir = '/') $dir = '';
+        if(is_null($dir) || $dir == '/') $dir = '';
         if (!$this->isDir($dir))
             trigger_error('Scan path is not a valid directory');
 
@@ -82,6 +82,7 @@ class LocalFS implements FileSystem
                 'basename' => $node->getBasename(),
                 'path' => $node->getPathname(),
                 'type' => $node->getType(),
+                'mtime' => $node->getMTime(),
                 'extension' => (strnatcmp(phpversion(),'5.3.6') >= 0)
                                ? $node->getExtension()
                                : pathinfo($node->getFilename(), PATHINFO_EXTENSION),
