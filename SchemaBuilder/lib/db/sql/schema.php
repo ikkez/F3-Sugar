@@ -593,6 +593,10 @@ class TableModifier extends TableBuilder {
         // add existing fields
         foreach ($existing_columns as $name => $col) {
             $colName = array_key_exists($name, $rename) ? $rename[$name] : $name;
+            // update column datatype
+            if (array_key_exists('update',$this->rebuild_cmd)
+                && in_array($name,array_keys($this->rebuild_cmd['update'])))
+                $col['type']=$this->rebuild_cmd['update'][$name];
             $newTable->addColumn($colName, $col)->passThrough();
             // add new fields with after flag
             if (array_key_exists($name,$after))
@@ -754,6 +758,34 @@ class TableModifier extends TableBuilder {
         }
     }
 
+    /**
+     * modifies column datatype
+     * @param      $name
+     * @param      $datatype
+     * @param bool $force
+     * @return bool
+     */
+    public function updateColumn($name, $datatype, $force = false)
+    {
+        if(!$force)
+            $datatype = $this->findQuery($this->schema->dataTypes[strtoupper($datatype)]);
+        $table = $this->db->quotekey($this->name);
+        $column = $this->db->quotekey($name);
+        if (preg_match('/sqlite2?/', $this->db->driver())){
+            $this->rebuild_cmd['update'][$name] = $datatype;
+        } else {
+            $cmd = array(
+            'mysql' =>
+                "ALTER TABLE $table MODIFY COLUMN $column $datatype;",
+            'pgsql' =>
+                "ALTER TABLE $table ALTER COLUMN $column TYPE $datatype;",
+            'mssql|sybase|dblib|ibm' =>
+                "ALTER TABLE $table ALTER COLUMN $column $datatype;",
+            );
+            $this->queries[] = $this->findQuery($cmd);
+        }
+    }
+    
     /**
      * create index on one or more columns
      * @param string|array $columns Column(s) to be indexed

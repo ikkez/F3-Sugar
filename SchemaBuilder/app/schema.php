@@ -34,16 +34,16 @@ class Schema extends Controller
         $this->f3->set('CACHE', false);
 
         $dbs = array(
-            'mysql' => new \DB\SQL(
+            /*'mysql' => new \DB\SQL(
                 'mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''
-            ),
-//            'sqlite' => new \DB\SQL(
-//                'sqlite::memory:'
+            ),*/
+            'sqlite' => new \DB\SQL(
+                'sqlite::memory:'
             // 'sqlite:db/sqlite.db'
-//            ),
-//            'pgsql' => new \DB\SQL(
-//                'pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'
-//            ),
+            ),
+            /*'pgsql' => new \DB\SQL(
+                'pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'
+            ),*/
         );
 
         $this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
@@ -283,7 +283,7 @@ class Schema extends Controller
         $table->renameColumn('title123', 'text_default_not_null');
         $table->build();
         unset($result,$mapper);
-
+        
         // remove column
         $table->dropColumn('column_1');
         $table->build();
@@ -475,6 +475,30 @@ class Schema extends Controller
             !array_key_exists('bar',$indexes),
             $this->getTestDesc('drop index')
         );
+
+        // update column
+        $table->updateColumn('bar',$schema::DT_TEXT);
+        $table->build();
+        $r1 = $table->getCols(true);
+        $this->test->expect(
+            array_key_exists('bar', $r1) && $r1['bar']['type'] == 'text',
+            $this->getTestDesc('update column')
+        );
+
+        // create table with text not nullable column
+        $table2 = $schema->createTable($this->tname.'_notnulltext');
+        $table2->addColumn('desc')->type($schema::DT_TEXT)->nullable(false);
+        $table2 = $table2->build();
+        $r1 = $schema->getTables();
+        $r2 = $table2->getCols(true);
+        $this->test->expect(
+            in_array($this->tname.'_notnulltext', $r1) && array_key_exists('desc', $r2)
+            && $r2['desc']['nullable']==false,
+            $this->getTestDesc('create new table with not nullable text column')
+        );
+        $table2->drop();
+
+        
     }
 
 }
