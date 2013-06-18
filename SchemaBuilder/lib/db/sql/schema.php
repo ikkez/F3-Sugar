@@ -128,11 +128,8 @@ class Schema extends DB_Utils {
         DT_BINARY = 'BLOB',
 
         // column default values
-        DF_CURRENT_TIMESTAMP = 'CUR_STAMP',
+        DF_CURRENT_TIMESTAMP = 'CUR_STAMP';
 
-        // error messages
-        TEXT_NoDataType = 'The specified datatype %s is not defined in %s driver',
-        TEXT_NotNullFieldNeedsDefault = 'You cannot add the not nullable column `%s´ without specifying a default value';
 
     public function __construct(\DB\SQL $db)
     {
@@ -217,10 +214,10 @@ class Schema extends DB_Utils {
         $name = $this->db->quotekey($name);
         $new_name = $this->db->quotekey($new_name);
         if (preg_match('/odbc/', $this->db->driver())) {
-            $querys = array();
-            $querys[] = "SELECT * INTO $new_name FROM $name;";
-            $querys[] = $this->dropTable($name, false);
-            return ($exec) ? $this->execQuerys($querys) : implode("\n",$querys);
+            $queries = array();
+            $queries[] = "SELECT * INTO $new_name FROM $name;";
+            $queries[] = $this->dropTable($name, false);
+            return ($exec) ? $this->db->exec($queries) : implode("\n",$queries);
         } else {
             $cmd = array(
                 'sqlite2?|pgsql' =>
@@ -231,7 +228,7 @@ class Schema extends DB_Utils {
                     "sp_rename $name, $new_name"
             );
             $query = $this->findQuery($cmd);
-            return ($exec) ? $this->execQuerys($query) : $query;
+            return ($exec) ? $this->db->exec($query) : $query;
         }
     }
 
@@ -252,7 +249,7 @@ class Schema extends DB_Utils {
                 "IF OBJECT_ID('[$name]', 'U') IS NOT NULL DROP TABLE [$name];"
         );
         $query = $this->findQuery($cmd);
-        return ($exec) ? $this->execQuerys($query) : $query;
+        return ($exec) ? $this->db->exec($query) : $query;
     }
 
 }
@@ -262,6 +259,10 @@ abstract class TableBuilder extends DB_Utils {
     protected   $columns, $pkeys, $queries, $increments, $rebuild_cmd;
     public      $name, $schema;
 
+    const
+        TEXT_NoDefaultForTEXT = "Column `%s` of type TEXT can't have a default value.",
+        TEXT_ColumnExists = "Cannot add the column `%s`. It already exists.";
+
     /**
      * @param string $name
      * @param Schema $schema
@@ -269,7 +270,6 @@ abstract class TableBuilder extends DB_Utils {
      */
     public function __construct($name, Schema $schema)
     {
-        if (!$this->valid($name)) return false;
         $this->name = $name;
         $this->schema = $schema;
         $this->columns = array();
@@ -293,14 +293,14 @@ abstract class TableBuilder extends DB_Utils {
      */
     public function addColumn($key,$args = null)
     {
-        if($key instanceof Column) {
+        if ($key instanceof Column) {
             $args = $key->getColumnArray();
             $key = $key->name;
         }
         if (array_key_exists($key,$this->columns))
-            trigger_error(sprintf("column '%s' already exists",$key));
+            trigger_error(sprintf(self::TEXT_ColumnExists,$key));
         $column = new Column($key, $this);
-        if($args)
+        if ($args)
             foreach ($args as $arg => $val)
                 $column->{$arg} = $val;
         // skip default pkey field
@@ -393,6 +393,9 @@ abstract class TableBuilder extends DB_Utils {
 
 class TableCreator extends TableBuilder {
 
+    const
+        TEXT_TableAlreadyExists = "Table `%s` already exists. Cannot create it.";
+
     /**
      * generate SQL query for creating a basic table, containing an ID serial field
      * and execute it if $exec is true, otherwise just return the generated query string
@@ -403,7 +406,7 @@ class TableCreator extends TableBuilder {
     {
         // check if already existing
         if ($exec && in_array($this->name, $this->schema->getTables())) {
-            trigger_error(sprintf("table '%s' already exists. cannot create it.",$this->name));
+            trigger_error(sprintf(self::TEXT_TableAlreadyExists,$this->name));
             return false;
         }
         $cols = '';
@@ -411,7 +414,7 @@ class TableCreator extends TableBuilder {
             foreach ($this->columns as $cname => $column) {
                 // no defaults for TEXT type
                 if($column->default !== false && is_int(strpos(strtoupper($column->type),'TEXT'))) {
-                    trigger_error(sprintf("column `%s` of type text can't have a default value", $column->name));
+                    trigger_error(sprintf(self::TEXT_NoDefaultForTEXT, $column->name));
                     return false;
                 }
                 $cols .= ', '.$column->getColumnQuery();
@@ -447,7 +450,7 @@ class TableCreator extends TableBuilder {
                 $this->addIndex($cname, $column->unique);
         if (!$exec)
             return $this->queries;
-        $this->execQuerys($this->queries);
+        $this->db->exec($this->queries);
         return isset($newTable) ? $newTable : new TableModifier($this->name,$this->schema);
     }
 
@@ -475,6 +478,12 @@ class TableModifier extends TableBuilder {
     protected
         $colTypes, $rebuild_cmd;
 
+    const
+        // error messages
+        TEXT_TableNotExisting = "Unable to alter table `%s`. It does not exist.",
+        TEXT_NotNullFieldNeedsDefault = 'You cannot add the not nullable column `%s` without specifying a default value',
+        TEXT_ENGINE_NOT_SUPPORTED = 'DB Engine `%s` is not supported for this action.';
+
     /**
      * generate SQL queries for altering the table and execute it if $exec is true,
      * otherwise return the generated query string
@@ -483,7 +492,7 @@ class TableModifier extends TableBuilder {
     {
         // check if table exists
         if (!in_array($this->name, $this->schema->getTables()))
-            trigger_error(sprintf("Unable to alter table '%s'. It does not exist.", $this->name));
+            trigger_error(sprintf(self::TEXT_TableNotExisting, $this->name));
 
         if ($sqlite = preg_match('/sqlite2?/', $this->db->driver())) {
             $sqlite_queries = array();
@@ -500,7 +509,7 @@ class TableModifier extends TableBuilder {
             }
             // no defaults for TEXT type
             if($column->default !== false && is_int(strpos(strtoupper($column->type),'TEXT'))) {
-                trigger_error(sprintf("column `%s` of type text can't have a default value", $column->name));
+                trigger_error(sprintf(self::TEXT_NoDefaultForTEXT, $column->name));
                 return false;
             }
             $table = $this->db->quotekey($this->name);
@@ -532,7 +541,7 @@ class TableModifier extends TableBuilder {
                 $this->addIndex($cname, $column->unique);
         if (empty($this->queries))
             return false;
-        $result = ($exec) ? $this->execQuerys($this->queries) : $this->queries;
+        $result = ($exec) ? $this->db->exec($this->queries) : $this->queries;
         $this->queries = $this->columns = $this->rebuild_cmd = array();
         $rebuild = false;
         return $result;
@@ -785,7 +794,7 @@ class TableModifier extends TableBuilder {
             $this->queries[] = $this->findQuery($cmd);
         }
     }
-    
+
     /**
      * create index on one or more columns
      * @param string|array $columns Column(s) to be indexed
@@ -892,6 +901,7 @@ class Column extends DB_Utils {
     protected   $table, $schema;
 
     const
+        TEXT_NoDataType = 'The specified datatype %s is not defined in %s driver',
         TEXT_CurrentStampDataType = 'Current timestamp as column default is only possible for TIMESTAMP datatype';
 
     /**
@@ -1107,14 +1117,14 @@ class DB_Utils {
     protected $f3;
 
     const
-        TEXT_IllegalName = '%s is not a valid table or column name',
-        TEXT_ENGINE_NOT_SUPPORTED = 'DB Engine `%s´ is not supported for this action.';
+        TEXT_ENGINE_NOT_SUPPORTED = 'DB Engine `%s` is not supported for this action.';
 
     /**
      * parse command array and return backend specific query
+     * @param $cmd
      * @param $cmd array
      * @return bool|string
-     **/
+     */
     protected function findQuery($cmd)
     {
         $match = FALSE;
@@ -1128,35 +1138,6 @@ class DB_Utils {
             return FALSE;
         }
         return $val;
-    }
-
-    /**
-     * execute query stack
-     * @param $query
-     * @return bool
-     * @deprecated
-     */
-    protected function execQuerys($query)
-    {
-        // TODO: i guess i do not need this anymore
-        if ($this->db->exec($query) === false) return false;
-        return true;
-    }
-
-    /**
-     * check if valid table / column name
-     * @param string $key
-     * @return bool
-     * @deprecated
-     */
-    protected function valid($key)
-    {
-        // TODO: superfluous, table and columns quotations works now
-        if (preg_match('/^(\D\w+(?:\_\w+)*)$/', $key))
-            return TRUE;
-        // Invalid name
-        trigger_error(sprintf(self::TEXT_IllegalName, var_export($key, TRUE)));
-        return FALSE;
     }
 
     public function __construct(SQL $db) {
