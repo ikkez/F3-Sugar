@@ -83,6 +83,7 @@ $table->build();
 As you can see, `$schema->alterTable()` returns a new table object (*instance of TableModifier*) for altering purpose, which provides all methods of the TableCreator plus some more actions like removing or renaming columns. Here is a list of method you can use:
 
 -   **renameColumn( string $name, string $new_name );**
+-   **updateColumn( string $name, string $datatype );**
 -   **dropColumn( string $name );**
 -   **addIndex( string | array $columns, [ bool $unique = false ]);**
 -   **dropIndex( string | array $columns );**
@@ -206,6 +207,10 @@ This class is ment for creating new tables. It can be created by using `$schema-
 -   **$table->renameColumn( string $name, string $new_name );**
 
     This is used to rename an existing column.
+
+-   **$table->updateColumn( string $name, string datatype, [ bool $force = false ]);**
+
+    This is used to modify / update the column's datatype.
 
 -   **$table->dropColumn( string $name );**
 
