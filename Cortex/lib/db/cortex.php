@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.8.1
+        @version 0.8.2
         @date 17.01.2013
  **/
 
@@ -115,24 +115,24 @@ class Cortex extends \DB\Cursor {
                 $field = self::resolveRelations($field);
                 // transform array fields
                 if(in_array($field['type'], array(self::DT_TEXT_JSON, self::DT_TEXT_SERIALIZED)))
-                    $field['type']=$schema::DT_TEXT32;
+                    $field['type']=$schema::DT_TEXT;
                 // defaults values
                 if(!array_key_exists('nullable', $field)) $field['nullable'] = true;
-                if(!array_key_exists('default', $field)) $field['default'] = NULL;
+               // if(!array_key_exists('default', $field)) $field['default'] = NULL;
             }
             if (!in_array($table, $schema->getTables())) {
-                $schema->createTable($table);
+                $table=$schema->createTable($table);
                 foreach ($fields as $field_key => $field_conf) {
-                    $schema->addColumn($field_key, $field_conf['type'],
-                       $field_conf['nullable'], $field_conf['default']);
+                    $table->addColumn($field_key, $field_conf);
                 }
+                $table->build();
             } else {
-                $existingCols = $schema->alterTable($table)->getCols();
+                $table = $schema->alterTable($table);
+                $existingCols = $table->getCols();
                 // add missing fields
                 foreach ($fields as $field_key => $field_conf)
                     if (!in_array($field_key, $existingCols))
-                        $schema->addColumn($field_key, $field_conf['type'],
-                            $field_conf['nullable'], $field_conf['default']);
+                        $table->addColumn($field_key, $field_conf);
                 // remove unused fields
 //                foreach ($existingCols as $col)
 //                    if (!in_array($col, array_keys($fields)) && $col!='id')
@@ -215,8 +215,10 @@ class Cortex extends \DB\Cursor {
                 $parts = preg_split("/\s*(\)|\(|AND|OR)\s*/i", array_shift($cond), -1,
                     PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
                 foreach ($parts as &$part)
-                    if (preg_match('/'.$op_quote.'/i', $part, $match))
-                        $part = $this->_mongo_parse_relational_op($part, array_shift($cond));
+                    if (preg_match('/'.$op_quote.'/i', $part, $match)) {
+                        $bindValue = is_int(strpos($part,'?')) ? array_shift($cond) : null;
+                        $part = $this->_mongo_parse_relational_op($part, $bindValue);
+                    }
                 $ncond = $this->_mongo_parse_logical_op($parts);
                 return $ncond;
                 break;
@@ -242,7 +244,7 @@ class Cortex extends \DB\Cursor {
             if (in_array(strtoupper($part), array('AND', 'OR')))
                 continue;
             // prefix field names
-            $part = preg_replace('/(\w+)/i', '@$1', $part, -1, $count);
+            $part = preg_replace('/([a-z]+)/i', '@$1', $part, -1, $count);
             // value comparison
             if (is_int(strpos($part, '?'))) {
                 $val = array_shift($cond);
@@ -334,6 +336,12 @@ class Cortex extends \DB\Cursor {
         $op_quote = implode('|', $ops);
         if (preg_match('/'.$op_quote.'/i', $cond, $match)) {
             $exp = explode($match[0], $cond);
+            // unbound value
+            if (is_numeric($exp[1]))
+                $var = $exp[1];
+            // field comparison
+            elseif(!is_int(strpos($exp[1], '?')))
+                return array('$where' => 'this.'.trim($exp[0]).' '.$match[0].' this.'.trim($exp[1]));
             // find like operator
             if (strtoupper($match[0]) == 'LIKE') {
                 // %var% -> /var/
@@ -395,6 +403,11 @@ class Cortex extends \DB\Cursor {
             return $options;
         } else
             return null;
+    }
+
+    public function afind($filter = NULL, array $options = NULL, $ttl = 0)
+    {
+        return array_map(array($this,'cast'),$this->find($filter,$options,$ttl));
     }
 
     /************************\
@@ -474,13 +487,13 @@ class Cortex extends \DB\Cursor {
         // handle relations
         if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
             // fetch index value
-            if (!$val instanceof self) trigger_error('You can only save hydrated mapper objects');
-            if(!$val->dry()) {
+            if (!$val instanceof self || $val->dry())
+                trigger_error('You can only save hydrated mapper objects');
+            else {
                 $hasOne = $fields[$key]['has-one'];
                 $rel_field = (is_array($hasOne) ? $hasOne[1] : '_id');
                 $val = $val->get($rel_field);
-            } else
-                trigger_error('You can only save hydrated mapper objects');
+            }
         }
         // convert array content
         if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields)) {
@@ -491,7 +504,7 @@ class Cortex extends \DB\Cursor {
             else
                 trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
         }
-        // add workarounds
+        // add polyfills
         if ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo') {
             if (!empty($fields) && array_key_exists('nullable', $fields[$key]))
                     if($fields[$key]['nullable'] === false && $val === false)

@@ -24,9 +24,9 @@ class Cortex extends Controller
             \DB\Cortex::setdown($db, $tname);
 
             $fields = array(
-                'title' => array('type' => \DB\SQL\Schema::DT_TEXT8),
-                'num1' => array('type' => \DB\SQL\Schema::DT_INT8),
-                'num2' => array('type' => \DB\SQL\Schema::DT_INT8),
+                'title' => array('type' => \DB\SQL\Schema::DT_TEXT),
+                'num1' => array('type' => \DB\SQL\Schema::DT_INT4),
+                'num2' => array('type' => \DB\SQL\Schema::DT_INT4),
             );
             \DB\Cortex::setup($db, $tname, $fields);
 
@@ -205,7 +205,7 @@ class Cortex extends Controller
                 json_encode($result) == json_encode($expected),
                 $type.': check field comparision'
             );
-            
+
             // lookahead search
             $result = $this->getResult($cx->find(array('title like ?','%o6')));
             $expected = array(
@@ -224,7 +224,7 @@ class Cortex extends Controller
             $result = $this->getResult($cx->find(array('title like ?','bar%')));
             $expected = array(
                 0 => array(
-                    'title' => 'bar1',                                       
+                    'title' => 'bar1',
                 ),
             );
             $test->expect(
