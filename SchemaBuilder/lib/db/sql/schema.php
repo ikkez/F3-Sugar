@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 2.0.0
+        @version 2.0.1
  **/
 
 
@@ -141,7 +141,8 @@ class Schema extends DB_Utils {
      * get a list of all databases
      * @return array|bool
      */
-    public function getDatabases() {
+    public function getDatabases()
+    {
         $cmd = array(
             'mysql' => 'SHOW DATABASES',
             'pgsql' => 'SELECT datname FROM pg_catalog.pg_database',
@@ -413,7 +414,7 @@ class TableCreator extends TableBuilder {
         if (!empty($this->columns))
             foreach ($this->columns as $cname => $column) {
                 // no defaults for TEXT type
-                if($column->default !== false && is_int(strpos(strtoupper($column->type),'TEXT'))) {
+                if ($column->default !== false && is_int(strpos(strtoupper($column->type),'TEXT'))) {
                     trigger_error(sprintf(self::TEXT_NoDefaultForTEXT, $column->name));
                     return false;
                 }
@@ -423,11 +424,11 @@ class TableCreator extends TableBuilder {
         $id = $this->db->quotekey($this->increments);
         $cmd = array(
             'sqlite2?|sybase|dblib' =>
-                "CREATE TABLE $table ($id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT".$cols.")",
+                "CREATE TABLE $table ($id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT".$cols.");",
             'mysql' =>
-                "CREATE TABLE $table ($id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT".$cols.") DEFAULT CHARSET=utf8",
+                "CREATE TABLE $table ($id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT".$cols.") DEFAULT CHARSET=utf8 COLLATE utf8_unicode_ci;",
             'pgsql' =>
-                "CREATE TABLE $table ($id SERIAL PRIMARY KEY".$cols.")",
+                "CREATE TABLE $table ($id SERIAL PRIMARY KEY".$cols.");",
             'mssql|odbc|sqlsrv' =>
                 "CREATE TABLE $table ($id INT IDENTITY PRIMARY KEY".$cols.");",
             'ibm' =>

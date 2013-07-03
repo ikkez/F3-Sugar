@@ -260,6 +260,38 @@ class Schema extends Controller
         );
         unset($r1);
 
+
+        // datetime nullable
+        $table->addColumn('datetime')->type_datetime()->nullable(true);
+        $table->build();
+        $r1 = $table->getCols(true);
+        $this->test->expect(
+            in_array('datetime', array_keys($r1)) &&
+            $r1['datetime']['nullable'] == true,
+            $this->getTestDesc(
+                'adding column [DATETIME], nullable, no default')
+        );
+        unset($r1);
+
+
+        // adding dummy data
+        $mapper = new \DB\SQL\Mapper($db, $this->tname);
+        $mapper->column_7 = 'test_datetime';
+        $mapper->datetime = NULL;
+        $mapper->save();
+        $mapper->reset();
+        $result = $mapper->find(array('column_7 = ?', 'test_datetime'));
+        foreach ($result as &$r)
+            $r = $r->cast();
+
+        $this->test->expect(
+            array_key_exists(0, $result) && $result[0]['column_7'] == 'test_datetime' &&
+            $result[0]['datetime'] === null,
+            $this->getTestDesc('mapping dummy data')
+        );
+        unset($mapper, $result);
+
+
         // rename column
         $table->renameColumn('text_default_not_null', 'title123');
         $table->build();
@@ -308,7 +340,7 @@ class Schema extends Controller
         // check record count
         $mapper = new \DB\SQL\Mapper($db, $this->tname);
         $this->test->expect(
-            count($mapper->find()) == 8,
+            count($mapper->find()) == 9,
             $this->getTestDesc('check record count')
         );
         unset($mapper);
@@ -327,7 +359,7 @@ class Schema extends Controller
         // check record count
         $mapper = new \DB\SQL\Mapper($db, $this->tname);
         $this->test->expect(
-            count($mapper->find()) == 8,
+            count($mapper->find()) == 9,
             $this->getTestDesc('check record count')
         );
         unset($mapper);
