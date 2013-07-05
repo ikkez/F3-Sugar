@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.8.2
+        @version 0.8.3
         @date 17.01.2013
  **/
 
@@ -202,6 +202,9 @@ class Cortex extends \DB\Cursor {
     private function prepareFilter($cond = NULL)
     {
         if (is_null($cond)) return $cond;
+        if (is_string($cond))
+            $cond = array($cond);
+        $cond = $this->convertNamedParams($cond);
         $ops = array('<=', '>=', '<>', '<', '>', '!=', '==', '=', 'like');
         foreach ($ops as &$op) $op = preg_quote($op);
         $op_quote = implode('|', $ops);
@@ -228,6 +231,30 @@ class Cortex extends \DB\Cursor {
                 return $cond;
                 break;
         }
+    }
+
+    /**
+     * converts named parameter filter to positional
+     * @param $cond
+     * @return array
+     */
+    function convertNamedParams($cond)
+    {
+        if (count($cond)<=1) return $cond;
+        if (is_int(strpos($cond[0],':'))) {
+            // named param found
+            $where = explode(' ',array_shift($cond));
+            $params = array(0);
+            $pos = 0;
+            foreach ($where as $val)
+                if (is_int(strpos($val,':')) && in_array($val,array_keys($cond))) {
+                    $where = str_replace($val, '?', $where);
+                    $params[] = $cond[$val];
+                } elseif($val == '?')
+                    $params[] = $cond[$pos++];
+            $cond = array(implode(' ',$where)) + $params;
+        }
+        return $cond;
     }
 
     /**
