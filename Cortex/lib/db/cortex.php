@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.8.3
+        @version 0.8.4
         @date 17.01.2013
  **/
 
@@ -174,7 +174,7 @@ class Cortex extends \DB\Cursor {
         if (array_key_exists('has-one', $field)) {
             if (!is_array($hasOne = $field['has-one']))
                 $hasOne = array($hasOne, 'id');
-            if ($hasOne[1] == 'id') $field['type'] = \DB\SQL\Schema::DT_INT16;
+            if ($hasOne[1] == 'id') $field['type'] = \DB\SQL\Schema::DT_INT8;
             else {
                 $refl = new \ReflectionClass($hasOne[0]);
                 $fc = $refl->getDefaultProperties();
@@ -512,7 +512,7 @@ class Cortex extends \DB\Cursor {
         if(!empty($fields) && !in_array($key,array_keys($fields)))
             trigger_error(sprintf('Field %s does not exist in %s.',$key,get_class($this)));
         // handle relations
-        if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
+        if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key]))
             // fetch index value
             if (!$val instanceof self || $val->dry())
                 trigger_error('You can only save hydrated mapper objects');
@@ -521,24 +521,25 @@ class Cortex extends \DB\Cursor {
                 $rel_field = (is_array($hasOne) ? $hasOne[1] : '_id');
                 $val = $val->get($rel_field);
             }
-        }
         // convert array content
-        if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields)) {
+        if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields))
             if($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
                 $val = serialize($val);
             elseif($fields[$key]['type'] == self::DT_TEXT_JSON)
                 $val = json_encode($val);
             else
                 trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
-        }
-        // add polyfills
-        if ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo') {
-            if (!empty($fields) && array_key_exists('nullable', $fields[$key]))
-                    if($fields[$key]['nullable'] === false && $val === false)
-                        trigger_error('unable to set a not nullable field to null');
-            if ($this->dbsType == 'DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
-                $val = new \MongoId($val);
-        }
+        // add nullable polyfill
+        if ($val === false && ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
+            && !empty($fields) && array_key_exists('nullable', $fields[$key])
+            && $fields[$key]['nullable'] === false)
+            trigger_error('unable to set a not nullable field to null');
+        // MongoId shorthand
+        if ($this->dbsType == 'DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
+            $val = new \MongoId($val);
+        // custom setter
+        if (method_exists($this, 'set_'.$key))
+            $val = $this->{'set_'.$key}($val);
         return $this->mapper->{$key} = $val;
     }
 
@@ -569,7 +570,11 @@ class Cortex extends \DB\Cursor {
                     return json_decode($this->mapper->{$key},true);
             }
         }
-        return $this->mapper->{$key};
+        // custom getter
+        if (method_exists($this, 'get_'.$key))
+            return $this->{'get_'.$key}($this->mapper->{$key});
+        else 
+            return $this->mapper->{$key};
     }
 
     /**
