@@ -23,16 +23,18 @@
  **/
 
 namespace DB;
+use Db\SQL\Schema;
 
-class Cortex extends \DB\Cursor {
+class Cortex extends Cursor {
 
     protected
         $mapper,    // ORM object
         $db,        // DB object
         $table,     // selected table
-        $dbsType;   // mapper engine type [Jig, SQL, Mongo]
+        $dbsType,   // mapper engine type [Jig, SQL, Mongo]
+        $fluid;     // fluid schema mode
 
-    protected static
+    protected
         $fieldConf; // field configuration
 
     const
@@ -48,28 +50,38 @@ class Cortex extends \DB\Cursor {
      * @param      $table
      * @param null $db
      */
-    public function __construct($db, $table)
+    public function __construct($db = NULL, $table = NULL)
     {
-        $this->db = $db;
-        $this->table = strtolower($table);
-        $this->dbsType = get_class($db);
+        if ($db)
+            $this->db = $db;
+        elseif (!$this->db = \Base::instance()->get($this->db))
+            trigger_error('No valid DB Connection given.');
+        if ($table)
+            $this->table = strtolower($table);
+        elseif (is_null($this->table) && !$this->fluid)
+            trigger_error('no table specified');
+        $this->dbsType = get_class($this->db);
+        if($this->fluid) {
+            if(!$this->table) $this->table = strtolower(get_class($this));
+            static::setup($this->db,$this->table);
+        }
         switch ($this->dbsType) {
             case 'DB\Jig':
-                $this->mapper = new \DB\Jig\Mapper($this->db, $this->table);
+                $this->mapper = new Jig\Mapper($this->db, $this->table);
                 break;
             case 'DB\SQL':
-                $this->mapper = new \DB\SQL\Mapper($this->db, $this->table);
+                $this->mapper = new SQL\Mapper($this->db, $this->table);
                 break;
             case 'DB\Mongo':
-                $this->mapper = new \DB\Mongo\Mapper($this->db, $this->table);
+                $this->mapper = new Mongo\Mapper($this->db, $this->table);
                 break;
             default:
                 trigger_error('Unknown DB system not supported: '.$this->dbsType);
         }
         $this->reset();
-        if(!empty(static::$fieldConf))
-            foreach(static::$fieldConf as $key=>&$conf)
-                $conf=self::resolveRelations($conf);
+        if(!empty($this->fieldConf))
+            foreach($this->fieldConf as $key=>&$conf)
+                $conf=static::resolveRelations($conf);
     }
 
     /**
@@ -84,7 +96,7 @@ class Cortex extends \DB\Cursor {
      * @param array $config
      */
     function setFieldConfiguration(array $config) {
-        static::$fieldConf = $config;
+        $this->fieldConf = $config;
         $this->reset();
     }
 
@@ -96,30 +108,41 @@ class Cortex extends \DB\Cursor {
      * @param $fields
      * @return bool
      */
-    static public function setup($db, $table, $fields=null)
+    static public function setup($db=null, $table=null, $fields=null)
     {
-        if(is_null($fields))
-            if(!empty(static::$fieldConf))
-                    $fields = static::$fieldConf;
-            else {
+        $refl = new \ReflectionClass(get_called_class());
+        $df = $refl->getDefaultProperties();
+        if (!$db) $db = $df['db'];
+        if (is_null($db) || (!is_object($db) && !$db = \Base::instance()->get($db)))
+            trigger_error('No valid DB Connection given.');
+        if (!$table) $table = $df['table'];
+        $table = strtolower($table);
+        if (is_null($table))
+            trigger_error('no table specified');
+        if (is_null($fields))
+            if(!empty($df['fieldConf']))
+                $fields = $df['fieldConf'];
+            elseif(!$df['fluid']) {
                 trigger_error('no field setup defined');
                 return false;
-            }
+            } else
+                $fields = array();
         $table = strtolower($table);
         $dbsType = get_class($db);
         if ($dbsType == 'DB\SQL') {
-            $schema = new \DB\SQL\Schema($db);
+            $schema = new Schema($db);
             // prepare field configuration
-            foreach($fields as &$field) {
-                // relation field types
-                $field = self::resolveRelations($field);
-                // transform array fields
-                if(in_array($field['type'], array(self::DT_TEXT_JSON, self::DT_TEXT_SERIALIZED)))
-                    $field['type']=$schema::DT_TEXT;
-                // defaults values
-                if(!array_key_exists('nullable', $field)) $field['nullable'] = true;
-               // if(!array_key_exists('default', $field)) $field['default'] = NULL;
-            }
+            if (!empty($fields))
+                foreach($fields as &$field) {
+                    // relation field types
+                    $field = static::resolveRelations($field);
+                    // transform array fields
+                    if(in_array($field['type'], array(self::DT_TEXT_JSON, self::DT_TEXT_SERIALIZED)))
+                        $field['type']=$schema::DT_TEXT;
+                    // defaults values
+                    if(!array_key_exists('nullable', $field)) $field['nullable'] = true;
+                   // if(!array_key_exists('default', $field)) $field['default'] = NULL;
+                }
             if (!in_array($table, $schema->getTables())) {
                 $table=$schema->createTable($table);
                 foreach ($fields as $field_key => $field_conf) {
@@ -133,6 +156,7 @@ class Cortex extends \DB\Cursor {
                 foreach ($fields as $field_key => $field_conf)
                     if (!in_array($field_key, $existingCols))
                         $table->addColumn($field_key, $field_conf);
+                $table->build();
                 // remove unused fields
 //                foreach ($existingCols as $col)
 //                    if (!in_array($col, array_keys($fields)) && $col!='id')
@@ -159,7 +183,7 @@ class Cortex extends \DB\Cursor {
                     unlink($dir.$table);
                 break;
             case 'DB\SQL':
-                $schema = new \DB\SQL\Schema($db);
+                $schema = new Schema($db);
                 if(in_array($table, $schema->getTables()))
                     $schema->dropTable($table);
                 break;
@@ -174,7 +198,7 @@ class Cortex extends \DB\Cursor {
         if (array_key_exists('has-one', $field)) {
             if (!is_array($hasOne = $field['has-one']))
                 $hasOne = array($hasOne, 'id');
-            if ($hasOne[1] == 'id') $field['type'] = \DB\SQL\Schema::DT_INT8;
+            if ($hasOne[1] == 'id') $field['type'] = Schema::DT_INT8;
             else {
                 $refl = new \ReflectionClass($hasOne[0]);
                 $fc = $refl->getDefaultProperties();
@@ -508,7 +532,7 @@ class Cortex extends \DB\Cursor {
      */
     function set($key, $val)
     {
-        $fields = static::$fieldConf;
+        $fields = $this->fieldConf;
         if(!empty($fields) && !in_array($key,array_keys($fields)))
             trigger_error(sprintf('Field %s does not exist in %s.',$key,get_class($this)));
         // handle relations
@@ -537,6 +561,34 @@ class Cortex extends \DB\Cursor {
         // MongoId shorthand
         if ($this->dbsType == 'DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
             $val = new \MongoId($val);
+        // fluid SQL
+        if ($this->fluid && $this->dbsType == 'DB\SQL') {
+            $schema = new Schema($this->db);
+            $table = $schema->alterTable($this->table);
+            // add missing field
+            if(!in_array($key,$table->getCols())) {
+                // determine data type
+                if (is_int($val)) $type = $schema::DT_INT;
+                elseif (is_double($val)) $type = $schema::DT_DOUBLE;
+                elseif (is_float($val)) $type = $schema::DT_FLOAT;
+                elseif (is_bool($val)) $type = $schema::DT_BOOLEAN;
+                elseif (date('Y-m-d H:i:s', strtotime($val)) == $val) $type = $schema::DT_DATETIME;
+                elseif (date('Y-m-d', strtotime($val)) == $val) $type = $schema::DT_DATE;
+                elseif (strlen($val)<256) $type = $schema::DT_VARCHAR256;
+                else $type = $schema::DT_TEXT;
+                $table->addColumn($key)->type($type);
+                $table->build();
+                // update mapper fields
+                $newField = $table->getCols(true);
+                $newField = $newField[$key];
+                $refl = new \ReflectionObject($this->mapper);
+                $prop = $refl->getProperty('fields');
+                $prop->setAccessible(true);
+                $fields = $prop->getValue($this->mapper);
+                $fields[$key] = $newField + array('value'=>NULL,'changed'=>NULL);
+                $prop->setValue($this->mapper,$fields);
+            }
+        }
         // custom setter
         if (method_exists($this, 'set_'.$key))
             $val = $this->{'set_'.$key}($val);
@@ -550,7 +602,7 @@ class Cortex extends \DB\Cursor {
      */
     function get($key)
     {
-        $fields = static::$fieldConf;
+        $fields = $this->fieldConf;
         if(!empty($fields) && array_key_exists($key, $fields)) {
             // load relations
             if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
@@ -586,16 +638,16 @@ class Cortex extends \DB\Cursor {
     function cast($obj = NULL, $relations = TRUE)
     {
         $fields = $this->mapper->cast( ($obj) ? $obj->mapper : null );
-        if ($this->dbsType == 'DB\SQL' && !empty(static::$fieldConf))
+        if ($this->dbsType == 'DB\SQL' && !empty($this->fieldConf))
             foreach ($fields as $key => &$val)
-                if(array_key_exists($key, static::$fieldConf)) {
-                    if($relations && array_key_exists('has-one', static::$fieldConf[$key])) {
+                if(array_key_exists($key, $this->fieldConf)) {
+                    if($relations && array_key_exists('has-one', $this->fieldConf[$key])) {
                         $val = ( !is_null( $obj = $this->get($key) )) ? $obj->cast() : null;
                     }
-                    elseif(array_key_exists('type', static::$fieldConf[$key]))
-                        if (static::$fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
+                    elseif(array_key_exists('type', $this->fieldConf[$key]))
+                        if ($this->fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
                             $val=unserialize($this->mapper->{$key});
-                        elseif (static::$fieldConf[$key]['type'] == self::DT_TEXT_JSON)
+                        elseif ($this->fieldConf[$key]['type'] == self::DT_TEXT_JSON)
                             $val=json_decode($this->mapper->{$key}, true);
                 }
         return $fields;
@@ -642,8 +694,8 @@ class Cortex extends \DB\Cursor {
         $this->mapper->reset();
         // set default values
         if($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo') {
-            if(!empty(static::$fieldConf))
-                foreach(static::$fieldConf as $field_key => $field_conf) {
+            if(!empty($this->fieldConf))
+                foreach($this->fieldConf as $field_key => $field_conf) {
                     if(array_key_exists('default',$field_conf))
                         $this->{$field_key} = $field_conf['default'];
                 }
