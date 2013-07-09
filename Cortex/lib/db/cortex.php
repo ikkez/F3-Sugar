@@ -23,7 +23,7 @@
  **/
 
 namespace DB;
-use Db\SQL\Schema;
+use DB\SQL\Schema;
 
 class Cortex extends Cursor {
 
@@ -32,9 +32,7 @@ class Cortex extends Cursor {
         $db,        // DB object
         $table,     // selected table
         $dbsType,   // mapper engine type [Jig, SQL, Mongo]
-        $fluid;     // fluid schema mode
-
-    protected
+        $fluid,     // fluid schema mode
         $fieldConf; // field configuration
 
     const
@@ -63,10 +61,10 @@ class Cortex extends Cursor {
     public function __construct($db = NULL, $table = NULL, $fluid = NULL)
     {
         if (!is_null($fluid))
-            $this->fluid = $fluid;    
+            $this->fluid = $fluid;
         if (!is_object($this->db=(is_string($db=($db?:$this->db))?\Base::instance()->get($db):$db)))
             trigger_error(self::E_CONNECTION);
-        if (strlen($table=strtolower($table?:$this->table))==0&&!$this->fluid)
+        if (strlen($this->table=strtolower($table?:$this->table))==0&&!$this->fluid)
             trigger_error(self::E_NOTABLE);
         if($this->fluid) {
             if(!$this->table) $this->table = strtolower(get_class($this));
@@ -234,6 +232,7 @@ class Cortex extends Cursor {
         if (is_string($cond))
             $cond = array($cond);
         $cond = $this->convertNamedParams($cond);
+        $cond[0] = str_replace(array('&&','||'),array('AND','OR'),$cond[0]);
         $ops = array('<=', '>=', '<>', '<', '>', '!=', '==', '=', 'like');
         foreach ($ops as &$op) $op = preg_quote($op);
         $op_quote = implode('|', $ops);
