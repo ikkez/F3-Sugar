@@ -43,28 +43,30 @@ class Cortex extends Cursor {
         DT_TEXT_JSON = 2,
 
         // error messages
-        E_ARRAYDATATYPE = 'Unable to save an Array in field %s. Use DT_SERIALIZED or DT_JSON.';
+        E_ARRAYDATATYPE = 'Unable to save an Array in field %s. Use DT_SERIALIZED or DT_JSON.',
+        E_CONNECTION = 'No valid DB Connection given.',
+        E_NOTABLE = 'No table specified.',
+        E_UNKNOWNDBENGINE = 'This unknown DB system is not supported: %s';
 
     /**
      * init the ORM, based on given DBS
-     * @param      $table
-     * @param null $db
+     * @param null|object $db
+     * @param string $table
+     * @param null|bool $fluid
      */
-    public function __construct($db = NULL, $table = NULL)
+    public function __construct($db = NULL, $table = NULL, $fluid = NULL)
     {
-        if ($db)
-            $this->db = $db;
-        elseif (!$this->db = \Base::instance()->get($this->db))
-            trigger_error('No valid DB Connection given.');
-        if ($table)
-            $this->table = strtolower($table);
-        elseif (is_null($this->table) && !$this->fluid)
-            trigger_error('no table specified');
-        $this->dbsType = get_class($this->db);
+        if (!is_null($fluid))
+            $this->fluid = $fluid;    
+        if (!is_object($this->db=(is_string($db=($db?:$this->db))?\Base::instance()->get($db):$db)))
+            trigger_error(self::E_CONNECTION);
+        if (strlen($table=strtolower($table?:$this->table))==0&&!$this->fluid)
+            trigger_error(self::E_NOTABLE);
         if($this->fluid) {
             if(!$this->table) $this->table = strtolower(get_class($this));
             static::setup($this->db,$this->table);
         }
+        $this->dbsType = get_class($this->db);
         switch ($this->dbsType) {
             case 'DB\Jig':
                 $this->mapper = new Jig\Mapper($this->db, $this->table);
@@ -76,7 +78,7 @@ class Cortex extends Cursor {
                 $this->mapper = new Mongo\Mapper($this->db, $this->table);
                 break;
             default:
-                trigger_error('Unknown DB system not supported: '.$this->dbsType);
+                trigger_error(sprintf(self::E_UNKNOWNDBENGINE,$this->dbsType));
         }
         $this->reset();
         if(!empty($this->fieldConf))
@@ -112,13 +114,10 @@ class Cortex extends Cursor {
     {
         $refl = new \ReflectionClass(get_called_class());
         $df = $refl->getDefaultProperties();
-        if (!$db) $db = $df['db'];
-        if (is_null($db) || (!is_object($db) && !$db = \Base::instance()->get($db)))
-            trigger_error('No valid DB Connection given.');
-        if (!$table) $table = $df['table'];
-        $table = strtolower($table);
-        if (is_null($table))
-            trigger_error('no table specified');
+        if(!is_object($db=(is_string($db=($db?:$df['db']))?\Base::instance()->get($db):$db)))
+            trigger_error(self::E_CONNECTION);
+        if (strlen($table=strtolower($table?:$df['table']))==0)
+            trigger_error(self::E_NOTABLE);
         if (is_null($fields))
             if(!empty($df['fieldConf']))
                 $fields = $df['fieldConf'];
@@ -144,23 +143,23 @@ class Cortex extends Cursor {
                    // if(!array_key_exists('default', $field)) $field['default'] = NULL;
                 }
             if (!in_array($table, $schema->getTables())) {
-                $table=$schema->createTable($table);
-                foreach ($fields as $field_key => $field_conf) {
+                // create table
+                $table = $schema->createTable($table);
+                foreach ($fields as $field_key => $field_conf)
                     $table->addColumn($field_key, $field_conf);
-                }
                 $table->build();
             } else {
+                // add missing fields
                 $table = $schema->alterTable($table);
                 $existingCols = $table->getCols();
-                // add missing fields
                 foreach ($fields as $field_key => $field_conf)
                     if (!in_array($field_key, $existingCols))
                         $table->addColumn($field_key, $field_conf);
-                $table->build();
                 // remove unused fields
-//                foreach ($existingCols as $col)
-//                    if (!in_array($col, array_keys($fields)) && $col!='id')
-//                        $schema->dropColumn($col);
+                // foreach ($existingCols as $col)
+                //     if (!in_array($col, array_keys($fields)) && $col!='id')
+                //     $table->dropColumn($col);
+                $table->build();
             }
         }
         return true;
@@ -533,7 +532,7 @@ class Cortex extends Cursor {
     function set($key, $val)
     {
         $fields = $this->fieldConf;
-        if(!empty($fields) && !in_array($key,array_keys($fields)))
+        if(!empty($fields) && !$this->fluid && !in_array($key,array_keys($fields)))
             trigger_error(sprintf('Field %s does not exist in %s.',$key,get_class($this)));
         // handle relations
         if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key]))
