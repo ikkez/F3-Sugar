@@ -46,7 +46,13 @@ class Cortex extends Cursor {
         E_ARRAYDATATYPE = 'Unable to save an Array in field %s. Use DT_SERIALIZED or DT_JSON.',
         E_CONNECTION = 'No valid DB Connection given.',
         E_NOTABLE = 'No table specified.',
-        E_UNKNOWNDBENGINE = 'This unknown DB system is not supported: %s';
+        E_UNKNOWNDBENGINE = 'This unknown DB system is not supported: %s',
+        E_FIELDSETUP = 'No field setup defined',
+        E_BRACKETS = 'Invalid query: unbalanced brackets found',
+        E_UNKNOWNFIELD = 'Field %s does not exist in %s.',
+        E_INVALIDRELATIONOBJECT = 'You can only save hydrated mapper objects',
+        E_NULLABLECOLLISION = 'Unable to set NULL to the NOT NULLABLE field: %s',
+        E_WRONGRELATIONCLASS = 'Relations only works with Cortex objects';
 
     /**
      * init the ORM, based on given DBS
@@ -122,7 +128,7 @@ class Cortex extends Cursor {
             if(!empty($df['fieldConf']))
                 $fields = $df['fieldConf'];
             elseif(!$df['fluid']) {
-                trigger_error('no field setup defined');
+                trigger_error(self::E_FIELDSETUP);
                 return false;
             } else
                 $fields = array();
@@ -349,7 +355,8 @@ class Cortex extends Cursor {
                     $ncond[] = ($this->_mongo_parse_logical_op($child));
                     $child = array();
                 } elseif ($b_offset < 0)
-                    trigger_error('unbalanced brackets'); else
+                    trigger_error(self::E_BRACKETS);
+                else
                     // add sub-bracket to parse array
                     $child[] = $part;
             } // add to parse array
@@ -364,11 +371,12 @@ class Cortex extends Cursor {
                 $ncond[] = $part;
         }
         if ($b_offset > 0)
-            trigger_error('unbalanced brackets');
+            trigger_error(self::E_BRACKETS);
         if (isset($add))
             return array('$and' => $ncond);
         elseif (isset($or))
-            return array('$or' => $ncond); else
+            return array('$or' => $ncond);
+        else
             return $ncond[0];
     }
 
@@ -455,6 +463,13 @@ class Cortex extends Cursor {
             return null;
     }
 
+    /**
+     * Return an array of result arrays matching criteria
+     * @param null  $filter
+     * @param array $options
+     * @param int   $ttl
+     * @return array
+     */
     public function afind($filter = NULL, array $options = NULL, $ttl = 0)
     {
         return array_map(array($this,'cast'),$this->find($filter,$options,$ttl));
@@ -533,12 +548,12 @@ class Cortex extends Cursor {
     {
         $fields = $this->fieldConf;
         if(!empty($fields) && !$this->fluid && !in_array($key,array_keys($fields)))
-            trigger_error(sprintf('Field %s does not exist in %s.',$key,get_class($this)));
+            trigger_error(sprintf(self::E_UNKNOWNFIELD,$key,get_class($this)));
         // handle relations
         if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key]))
             // fetch index value
             if (!$val instanceof self || $val->dry())
-                trigger_error('You can only save hydrated mapper objects');
+                trigger_error(self::E_INVALIDRELATIONOBJECT);
             else {
                 $hasOne = $fields[$key]['has-one'];
                 $rel_field = (is_array($hasOne) ? $hasOne[1] : '_id');
@@ -556,7 +571,7 @@ class Cortex extends Cursor {
         if ($val === false && ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
             && !empty($fields) && array_key_exists('nullable', $fields[$key])
             && $fields[$key]['nullable'] === false)
-            trigger_error('unable to set a not nullable field to null');
+            trigger_error(sprintf(self::E_NULLABLECOLLISION,$key));
         // MongoId shorthand
         if ($this->dbsType == 'DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
             $val = new \MongoId($val);
@@ -607,7 +622,7 @@ class Cortex extends Cursor {
             if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
                 $class = (is_array($hasOne = $fields[$key]['has-one'])) ? $hasOne[0] : $hasOne;
                 $rel = new $class;
-                if (!$rel instanceof self) trigger_error('Relations only works with Cortex');
+                if (!$rel instanceof self) trigger_error(self::E_WRONGRELATIONCLASS);
                 $rel_field = (is_array($hasOne) ? $hasOne[1] :
                     (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
                 $rel->load(array($rel_field.' = ?', $this->mapper->{$key}));
