@@ -648,14 +648,16 @@ class Cortex extends Cursor {
      * @param      $obj object
      * @param bool $relations resolve relations
      */
-    function cast($obj = NULL, $relations = TRUE)
+    public function cast($obj = NULL, $relations = TRUE)
     {
         $fields = $this->mapper->cast( ($obj) ? $obj->mapper : null );
         if ($this->dbsType == 'DB\SQL' && !empty($this->fieldConf))
             foreach ($fields as $key => &$val)
-                if(array_key_exists($key, $this->fieldConf)) {
-                    if($relations && array_key_exists('has-one', $this->fieldConf[$key])) {
-                        $val = ( !is_null( $obj = $this->get($key) )) ? $obj->cast() : null;
+                if (array_key_exists($key, $this->fieldConf)) {
+                    if ($relations && is_array($this->fieldConf[$key]) &&
+                        array_key_exists('has-one', $this->fieldConf[$key])) {
+                        $mp=$obj?:$this;
+                        $val=!is_null($mp=$mp->get($key))?$mp->cast():null;
                     }
                     elseif(array_key_exists('type', $this->fieldConf[$key]))
                         if ($this->fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
