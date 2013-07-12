@@ -11,7 +11,7 @@
     Copyright (c) 2012 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.3.2
+    @version 1.3.3
  **/
 
 class Pagination {
@@ -34,7 +34,7 @@ class Pagination {
      * @param $routeKey string the key for pagination in your routing
      */
     public function __construct( $items, $limit = 10, $routeKey = 'page' ) {
-	    $this->fw = \Base::instance();
+        $this->fw = \Base::instance();
         $this->items_count = is_array($items)?count($items):$items;
         $this->routeKey = $routeKey;
         $this->setLimit($limit);
@@ -46,7 +46,14 @@ class Pagination {
      * @param $limit int
      */
     public function setLimit($limit) {
-        if(is_numeric($limit)) $this->items_per_page = $limit;
+        if(is_numeric($limit))
+            $this->items_per_page = $limit;
+        $this->setCurrent( $this->fw->exists('PARAMS.'.$this->routeKey) ?
+            $this->fw->get('PARAMS.'.$this->routeKey) : 1);
+    }
+
+    public function setRouteKey($key) {
+        $this->routeKey = $key;
     }
 
     /**
@@ -208,9 +215,9 @@ class Pagination {
         if(array_key_exists('range',$attr))
             $pn_code .= '$pn->setRange('.$attr['range'].');';
         if(array_key_exists('src',$attr))
-            $pn_code .= '$pn->setTemplate('.$attr['src'].');';
+            $pn_code .= '$pn->setTemplate("'.$attr['src'].'");';
         if(array_key_exists('token',$attr))
-            $pn_code .= '$pn->routeKey('.$attr['token'].');';
+            $pn_code .= '$pn->setRouteKey("'.$attr['token'].'");';
         $pn_code .= 'echo $pn->serve();';
         return '<?php '.$pn_code.' ?>';
     }
