@@ -519,7 +519,7 @@ class Cortex extends Cursor {
     {
         $filter = $this->prepareFilter($filter);
         $options = $this->prepareOptions($options);
-        $result = $this->mapper->load($filter, $options);
+        $this->mapper->load($filter, $options);
         return $this;
     }
 
@@ -646,7 +646,8 @@ class Cortex extends Cursor {
             if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
                 $class = (is_array($hasOne = $fields[$key]['has-one'])) ? $hasOne[0] : $hasOne;
                 $rel = new $class;
-                if (!$rel instanceof Cortex) trigger_error(self::E_WRONGRELATIONCLASS);
+                if (!$rel instanceof Cortex)
+                    trigger_error(self::E_WRONGRELATIONCLASS);
                 $rel_field = (is_array($hasOne) ? $hasOne[1] :
                     (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
                 $rel->load(array($rel_field.' = ?', $this->mapper->{$key}));
@@ -699,7 +700,7 @@ class Cortex extends Cursor {
     public function cast($obj = NULL, $relations = TRUE)
     {
         $fields = $this->mapper->cast( ($obj) ? $obj->mapper : null );
-        if ($this->dbsType == 'DB\SQL' && !empty($this->fieldConf))
+        if (!empty($this->fieldConf))
             foreach ($fields as $key => &$val)
                 if (array_key_exists($key, $this->fieldConf)) {
                     if ($relations && is_array($this->fieldConf[$key])) {
@@ -712,7 +713,8 @@ class Cortex extends Cursor {
                                 foreach($val as &$item)
                                     $item = !is_null($item) ? $item->cast() : null;
                     }
-                    elseif(array_key_exists('type', $this->fieldConf[$key]))
+                    elseif ($this->dbsType == 'DB\SQL' &&
+                            array_key_exists('type', $this->fieldConf[$key]))
                         if ($this->fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
                             $val=unserialize($this->mapper->{$key});
                         elseif ($this->fieldConf[$key]['type'] == self::DT_TEXT_JSON)
@@ -747,7 +749,7 @@ class Cortex extends Cursor {
     }
 
     public function skip($ofs = 1) {
-        $result = $this->mapper->skip($ofs);
+        $this->mapper->skip($ofs);
         return $this;
     }
 
@@ -766,13 +768,11 @@ class Cortex extends Cursor {
     public function reset() {
         $this->mapper->reset();
         // set default values
-        if($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo') {
-            if(!empty($this->fieldConf))
-                foreach($this->fieldConf as $field_key => $field_conf) {
-                    if(array_key_exists('default',$field_conf))
-                        $this->{$field_key} = $field_conf['default'];
-                }
-        }
+        if(($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
+            && !empty($this->fieldConf))
+            foreach($this->fieldConf as $field_key => $field_conf)
+                if(array_key_exists('default',$field_conf))
+                    $this->{$field_key} = $field_conf['default'];
     }
 
     function exists($key) {
