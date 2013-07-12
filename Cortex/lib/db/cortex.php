@@ -68,7 +68,7 @@ class Cortex extends Cursor {
             trigger_error(self::E_NOTABLE);
         if($this->fluid) {
             if(!$this->table) $this->table = strtolower(get_class($this));
-            static::setup($this->db,$this->table);
+            static::setup($this->db,$this->table,($fluid?array():null));
         }
         $this->dbsType = get_class($this->db);
         switch ($this->dbsType) {
@@ -196,19 +196,31 @@ class Cortex extends Cursor {
         }
     }
 
-    protected static function resolveRelations($field) {
-        // relation field types
+    /**
+     * resolve relation field types
+     * @param $field
+     * @return mixed
+     */
+    protected static function resolveRelations($field)
+    {
         if (array_key_exists('has-one', $field)) {
+            // find primary field definition
             if (!is_array($hasOne = $field['has-one']))
                 $hasOne = array($hasOne, 'id');
-            if ($hasOne[1] == 'id') $field['type'] = Schema::DT_INT8;
+            // set field type
+            if ($hasOne[1] == 'id')
+                $field['type'] = Schema::DT_INT8;
             else {
+                // find foreign field type
                 $refl = new \ReflectionClass($hasOne[0]);
                 $fc = $refl->getDefaultProperties();
                 $field['type'] = $fc['fieldConf'][$hasOne[1]];
             }
             $field['nullable'] = true;
-            $field['default'] = null;
+        }
+        elseif(array_key_exists('has-many', $field)){
+            $field['type'] = self::DT_TEXT_JSON;
+            $field['nullable'] = true;
         }
         return $field;
     }
@@ -508,7 +520,7 @@ class Cortex extends Cursor {
         $filter = $this->prepareFilter($filter);
         $options = $this->prepareOptions($options);
         $result = $this->mapper->load($filter, $options);
-        return $result;
+        return $this;
     }
 
     /**
@@ -551,18 +563,31 @@ class Cortex extends Cursor {
         // handle relations
         if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key]))
             // fetch index value
-            if (!$val instanceof self || $val->dry())
+            if (!$val instanceof Cortex || $val->dry())
                 trigger_error(self::E_INVALIDRELATIONOBJECT);
             else {
                 $hasOne = $fields[$key]['has-one'];
-                $rel_field = (is_array($hasOne) ? $hasOne[1] : '_id');
+                $rel_field = (is_array($hasOne) ? $hasOne[1] :
+                    (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
                 $val = $val->get($rel_field);
             }
+        elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])) {
+            $fields[$key]['type'] = self::DT_TEXT_JSON;
+            if (!is_array($val))
+                trigger_error(self::E_INVALIDRELATIONOBJECT);
+            else foreach ($val as $index => &$item)
+                if (is_object($item))
+                    if (!$item instanceof Cortex || $item->dry())
+                        trigger_error(self::E_INVALIDRELATIONOBJECT);
+                    else
+                        $val[$index] = $item[($this->dbsType == 'DB\SQL') ? 'id' : '_id'];
+                        unset($item);
+        }
         // convert array content
         if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields))
-            if($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
+            if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
                 $val = serialize($val);
-            elseif($fields[$key]['type'] == self::DT_TEXT_JSON)
+            elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
                 $val = json_encode($val);
             else
                 trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
@@ -621,11 +646,34 @@ class Cortex extends Cursor {
             if (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
                 $class = (is_array($hasOne = $fields[$key]['has-one'])) ? $hasOne[0] : $hasOne;
                 $rel = new $class;
-                if (!$rel instanceof self) trigger_error(self::E_WRONGRELATIONCLASS);
+                if (!$rel instanceof Cortex) trigger_error(self::E_WRONGRELATIONCLASS);
                 $rel_field = (is_array($hasOne) ? $hasOne[1] :
                     (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
                 $rel->load(array($rel_field.' = ?', $this->mapper->{$key}));
                 return (!$rel->dry()) ? $rel : null;
+            }
+            elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])) {
+                $fields[$key]['type'] = self::DT_TEXT_JSON;
+                $result = json_decode($this->mapper->{$key}, true);
+                if(!is_array($result))
+                    return $result;
+                // hydrate mapper
+                $class = (is_array($hasOne = $fields[$key]['has-many'])) ? $hasOne[0] : $hasOne;
+                $rel = new $class;
+                if (!$rel instanceof Cortex)
+                    trigger_error(self::E_WRONGRELATIONCLASS);
+                $rel_field = (is_array($hasOne) ? $hasOne[1] :
+                    (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
+                foreach ($result as $el) {
+                    $where[] = $rel_field.' = ?';
+                    $filter[] = $el;
+                }
+                $crit = implode(' OR ', $where);
+                array_unshift($filter,$crit);
+                $result = $rel->find($filter);
+                foreach ($result as &$el)
+                    $el = (!$el->dry()) ? $this->factory($el) : null;
+                return $result;
             }
             // resolve array fields
             if ($this->dbsType == 'DB\SQL' && array_key_exists('type', $fields[$key])) {
@@ -654,10 +702,15 @@ class Cortex extends Cursor {
         if ($this->dbsType == 'DB\SQL' && !empty($this->fieldConf))
             foreach ($fields as $key => &$val)
                 if (array_key_exists($key, $this->fieldConf)) {
-                    if ($relations && is_array($this->fieldConf[$key]) &&
-                        array_key_exists('has-one', $this->fieldConf[$key])) {
-                        $mp=$obj?:$this;
-                        $val=!is_null($mp=$mp->get($key))?$mp->cast():null;
+                    if ($relations && is_array($this->fieldConf[$key])) {
+                        $mp = $obj ?: $this;
+                        $val = $mp->get($key);
+                        if (array_key_exists('has-one', $this->fieldConf[$key]))
+                            $val=!is_null($val)?$val->cast():null;
+                        elseif (is_array($val) &&
+                                array_key_exists('has-many', $this->fieldConf[$key]))
+                                foreach($val as &$item)
+                                    $item = !is_null($item) ? $item->cast() : null;
                     }
                     elseif(array_key_exists('type', $this->fieldConf[$key]))
                         if ($this->fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
@@ -694,15 +747,20 @@ class Cortex extends Cursor {
     }
 
     public function skip($ofs = 1) {
-        return $this->mapper->skip($ofs);
+        $result = $this->mapper->skip($ofs);
+        return $this;
     }
 
-    public function first() {
-        return $this->mapper->first();
+    public function first()
+    {
+        $this->mapper->first();
+        return $this;
     }
 
-    public function last() {
-        return $this->mapper->last();
+    public function last()
+    {
+        $this->mapper->last();
+        return $this;
     }
 
     public function reset() {
