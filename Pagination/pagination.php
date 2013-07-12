@@ -165,7 +165,7 @@ class Pagination {
      * @return int
      */
     public function getItemOffset() {
-        return ($this->current_page - 1) * $this->items_per_page;
+        return $this->current_page - 1;
     }
 
     /**
