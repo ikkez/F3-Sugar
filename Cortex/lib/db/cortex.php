@@ -813,6 +813,17 @@ class Cortex extends Cursor {
     }
 
     /**
+     * cast an array of mappers
+     * @param $mapper_arr;  array of mapper objects
+     * @return array;       array of associative arrays
+     **/
+    function castAll($mapper_arr = NULL)
+    {
+        if (!$mapper_arr) return NULL;
+        return array_map(array($this, 'cast'), $mapper_arr);
+    }
+
+    /**
      * wrap result mapper
      * @param $mapper
      * @return Cortex
