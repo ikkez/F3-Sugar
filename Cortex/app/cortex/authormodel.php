@@ -16,6 +16,9 @@ class AuthorModel extends \DB\Cortex {
             'news' => array(
                 'has-many' => array('\NewsModel','author'),
             ),
+            'profile' => array(
+                'has-one' => array('\ProfileModel','author'),
+            ),
         ),
         $table = 'author',
         $db = 'SQLDB';

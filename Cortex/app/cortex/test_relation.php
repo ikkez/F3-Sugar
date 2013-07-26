@@ -172,6 +172,24 @@ class Test_Relation {
             'belongs-to-many: relations created with split-able string'
         );
 
+        // has-one relation
+        ///////////////////////////////////
+
+        \ProfileModel::setdown();
+        \ProfileModel::setup();
+
+        $profile = new ProfileModel();
+        $profile->message = 'Hello World';
+        $profile->author = $author->load();
+        $profile->save();
+        $author->reset();
+        $author->load();
+        $test->expect(
+            json_encode($author->load()->profile->cast()) ==
+            '{"id":1,"message":"Hello World","image":null,"author":{"id":1,"name":"Johnny English","mail":null,"website":null}}',
+            'has-one inverse relation'
+        );
+
         // has-many relation
         ///////////////////////////////////
 
