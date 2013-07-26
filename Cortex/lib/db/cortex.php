@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.9.0
+        @version 0.9.1
         @date 17.01.2013
  **/
 
@@ -75,7 +75,6 @@ class Cortex extends Cursor {
             if(!$this->table) $this->table = strtolower(get_class($this));
             static::setup($this->db,$this->table,($fluid?array():null));
         }
-        $this->fieldsCache = array();
         $this->dbsType = get_class($this->db);
         switch ($this->dbsType) {
             case 'DB\Jig':
@@ -592,8 +591,6 @@ class Cortex extends Cursor {
         if (!is_int($val) && is_array($fields[$key])
             && array_key_exists('belongs-to', $fields[$key]))
             // one-to-many, one-to-one
-            // TODO: check one-to-one restrictions
-            // fetch index value
             if(is_null($val))
                 $val = NULL;
             elseif (!$val instanceof Cortex || $val->dry())
@@ -694,8 +691,7 @@ class Cortex extends Cursor {
             if(!array_key_exists($key,$this->fieldsCache)) {
                 // load relations
                 if (is_array($fields[$key]) && array_key_exists('belongs-to', $fields[$key])) {
-                    // one-to-many, bidirectional, direct way
-                    // TODO: one-to-one
+                    // one-to-X, bidirectional, direct way
                     $class = (is_array($bln = $fields[$key]['belongs-to'])) ? $bln[0] : $bln;
                     $rel = new $class;
                     if (!$rel instanceof Cortex)
@@ -707,28 +703,39 @@ class Cortex extends Cursor {
                 }
                 elseif (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
                     // one-to-one, bidirectional, inverse way
-                    //TODO: check that
-                    $class = (is_array($hasOne = $fields[$key]['has-one'])) ? $hasOne[0] : $hasOne;
-                    $rel = new $class;
-                    if (!$rel instanceof Cortex)
-                        trigger_error(self::E_WRONGRELATIONCLASS);
-                    $rel_field = (is_array($hasOne) ? $hasOne[1] :
-                        (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
-                    $rel->load(array($rel_field.' = ?', $this->mapper->{$key}));
-                    $this->fieldsCache[$key] = (!$rel->dry()) ? $rel : null;
-                }
-                elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])){
-                    // one-to-many, bidirectional, inverse way
-                    $fromConf = is_array($hasMany=$fields[$key]['has-many'])?$hasMany:array($hasMany,null);
+                    $fromConf = is_array($hasMany = $fields[$key]['has-one'])
+                        ? $hasMany : array($hasMany, null);
                     $rel = new $fromConf[0];
                     if (!$rel instanceof Cortex)
                         trigger_error(self::E_WRONGRELATIONCLASS);
                     $relFieldConf = $rel->getFieldConfiguration();
                     if (!is_null($fromConf[1]) && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
                         $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
+                        if (!is_array($toConf))
+                            $toConf = array($toConf, ($this->dbsType == 'DB\SQL') ? 'id' : '_id');
+                        $this->fieldsCache[$key] =
+                            $rel->load(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
+                    }
+                }
+                elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])){
+                    $fromConf = is_array($hasMany=$fields[$key]['has-many'])
+                        ? $hasMany : array($hasMany, null);
+                    $rel = new $fromConf[0];
+                    if (!$rel instanceof Cortex)
+                        trigger_error(self::E_WRONGRELATIONCLASS);
+                    $relFieldConf = $rel->getFieldConfiguration();
+                    // one-to-many, bidirectional, inverse way
+                    if (!is_null($fromConf[1]) && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
+                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
                         if(!is_array($toConf))
                             $toConf = array($toConf, ($this->dbsType == 'DB\SQL') ? 'id' : '_id');
-                        $this->fieldsCache[$key] = $rel->find(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
+                        $this->fieldsCache[$key] =
+                            $rel->find(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
+                    }
+                    // TODO: many-to-many, bidirectional
+                    elseif (!is_null($fromConf[1])
+                        && key($relFieldConf[$fromConf[1]]) == 'has-many') {
+                        // to be continued
                     }
                 } elseif (is_array($fields[$key]) && array_key_exists('belongs-to-many', $fields[$key])) {
                     // many-to-many, unidirectional
@@ -738,7 +745,8 @@ class Cortex extends Cursor {
                         $this->fieldsCache[$key] = $result;
                     else {
                         // hydrate mapper
-                        $class = (is_array($btlMany = $fields[$key]['belongs-to-many'])) ? $btlMany[0] : $btlMany;
+                        $class = (is_array($btlMany = $fields[$key]['belongs-to-many']))
+                            ? $btlMany[0] : $btlMany;
                         $rel = new $class;
                         if (!$rel instanceof Cortex)
                             trigger_error(self::E_WRONGRELATIONCLASS);
@@ -751,8 +759,6 @@ class Cortex extends Cursor {
                         $crit = implode(' OR ', $where);
                         array_unshift($filter, $crit);
                         $this->fieldsCache[$key] = $rel->find($filter);
-    //                foreach ($result as &$el)
-    //                    $el = (!$el->dry()) ? $this->factory($el) : null;
                     }
                 }
                 // resolve array fields
@@ -867,6 +873,7 @@ class Cortex extends Cursor {
 
     public function reset() {
         $this->mapper->reset();
+        $this->fieldsCache = array();
         // set default values
         if(($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
             && !empty($this->fieldConf))
