@@ -12,14 +12,23 @@ Copy the `router.php` file in your F3 `lib/` directory.
 
 #### Create Named Routes
 
-To register a new named route, use the register method. It used the same syntax and params like `$f3->route` did, but prepends an additional `$name` argument.
+To register a new named route, use the register method. It uses the same syntax and params like `$f3->route` did, but prepends an additional `$name` argument.
 
 ``` php
 $router = \Router::instance();
 
-$router->register('newsletter-signin-page','GET /newsletter/subscribe/',function() {
+$router->register('newsletter-signin-page','GET /newsletter/subscribe/',function($f3, $params) {
     echo "hi, please fill out the form for subscribing to the newsletter";
 });
+$router->register('newsletter-signin-page', 'POST /newsletter/subscribe/', '\App\NewsController');
+```
+
+*Notice:* You need to use the same route name for route pattern of the same URL, because different HTTP Verbs for the same URL are grouped internally.
+
+To create a named route mapped to a class, just use *MAP* as HTTP Verb in your pattern.
+
+``` php
+$router->register('news-map', 'MAP /news', '\App\NewsController');
 ```
 
 #### Access Route Template

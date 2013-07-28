@@ -10,7 +10,7 @@
     Copyright (c) 2013 by ikkez
     Christian Knuth <mail@ikkez.de>
  
-        @version 0.4.0
+        @version 0.4.1
         @date: 24.04.13 
  **/
 
@@ -28,10 +28,14 @@ class Router extends Prefab {
     {
         if(is_array($pattern))
             trigger_error('set multiple routes are not supported');
+        /** @var Base $f3 */
         $f3 = \Base::instance();
-        $f3->route($pattern,$handler,$ttl,$kbps);
-        $expl = explode(' ',$pattern,2);
-        $f3->set('ROUTES["'.$expl[1].'"].name',$name);
+        $expl = explode(' ', $pattern, 2);
+        if ($expl[0] === 'MAP')
+            $f3->map($expl[1], $handler, $ttl, $kbps);
+        else
+            $f3->route($pattern,$handler,$ttl,$kbps);
+        $f3->set('ROUTES["'.$expl[1].'"].name', $name);
     }
 
     /**
