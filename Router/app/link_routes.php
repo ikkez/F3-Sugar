@@ -9,7 +9,20 @@ class Link_Routes extends Controller {
         if(!$f3->exists('GET.foo'))
             $f3->reroute($f3->get('PARAMS.0').'?foo=bar');
 
-        $f3->set('rr', 'artikel-action');
+        $router = \Router::instance();
+        $router->register('home', 'GET /routing-2', function () {
+            echo "test";
+        });
+        $router->register('article-view', 'GET /article/view/@item', function ($f3, $params) {
+            echo "article";
+        });
+        $router->register('article-action', 'GET /article/@action/@item', function ($f3, $params) {
+            echo "works";
+        });
+
+        $router->register('class', 'MAP /routing-map', '\Foo\RouterMap');
+
+        $f3->set('rr', 'article-action');
         $f3->set('t1', 'groovy');
         $f3->set('querystring', 'foo=bar&baz=narf');
         $f3->set('querystringArray', array('foo'=>'bar','baz'=>'narf'));
@@ -26,7 +39,7 @@ class Link_Routes extends Controller {
 			'simple route'
 		);
 		$test->expect(
-			trim(array_shift($lines)) == '<a href="artikel/view/foo2">route with param</a><br/>',
+			trim(array_shift($lines)) == '<a href="article/view/foo2">route with param</a><br/>',
 			'route with param'
 		);
 		$test->expect(
@@ -34,15 +47,15 @@ class Link_Routes extends Controller {
 			'simple route 2'
 		);
 		$test->expect(
-			trim(array_shift($lines)) == '<a href="artikel/view/groovy">vars by token</a><br/>',
+			trim(array_shift($lines)) == '<a href="article/view/groovy">vars by token</a><br/>',
 			'resolve route param token'
 		);
 		$test->expect(
-			trim(array_shift($lines)) == '<a href="artikel/edit/groovy">multiple params</a><br/>',
+			trim(array_shift($lines)) == '<a href="article/edit/groovy">multiple params</a><br/>',
 			'multiple params'
 		);
 		$test->expect(
-			trim(array_shift($lines)) == '<a href="artikel/view/$blah">inject test</a><br/>',
+			trim(array_shift($lines)) == '<a href="article/view/$blah">inject test</a><br/>',
 			'inject test'
 		);
 		$test->expect(
