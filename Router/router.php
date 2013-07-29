@@ -72,6 +72,7 @@ class Router extends Prefab {
     {
         $attrib = $node['@attrib'];
         $params = '';
+        $queryString = '';
         if(array_key_exists('route', $attrib)) {
             if (array_key_exists('href', $attrib))
                 unset($attrib['href']);
@@ -80,6 +81,7 @@ class Router extends Prefab {
             $tmp = \Template::instance();
             $route_name = $attrib['route'];
             $absolute = 0;
+            $addQueryString = false;
             // find dynamic route token
             if (preg_match('/{{(.+?)}}/s', $route_name))
                 $dyn_route_name = $tmp->token($route_name);
@@ -102,10 +104,15 @@ class Router extends Prefab {
                 // fetch query string
                 elseif($key == 'query') {
                     if (preg_match('/{{(.+?)}}/s', $value))
-                        $queryString = '<?php $qvar = '.$tmp->token($value).'; '.
+                        $queryString .= '<?php $qvar = '.$tmp->token($value).'; '.
                             'echo (is_array($qvar)?htmlentities(http_build_query($qvar)):$qvar);?>';
                     else
-                        $queryString = htmlentities($value);
+                        $queryString .= htmlentities($value);
+                    unset($attrib[$key]);
+                }
+                // reuse existing query string in URL
+                elseif ($key == 'addQueryString' && strtoupper($value) == 'TRUE') {
+                    $addQueryString = true;
                     unset($attrib[$key]);
                 }
                 // absolute path option
@@ -140,8 +147,14 @@ class Router extends Prefab {
                 }
             }
             // query string
-            if(isset($queryString))
+            if($addQueryString && !empty($_SERVER['QUERY_STRING'])) {
+                if(!empty($queryString))
+                    $queryString = '&'.$queryString;
+                $queryString = '<?php echo $_SERVER["QUERY_STRING"];?>'.$queryString;
+            }
+            if(!empty($queryString)) {
                 $attrib['href'] .= '?'.$queryString;
+            }
             unset($attrib['route']);
         }
         foreach ($attrib as $key => $value)
