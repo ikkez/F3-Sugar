@@ -10,7 +10,7 @@
     Copyright (c) 2013 by ikkez
     Christian Knuth <mail@ikkez.de>
  
-        @version 0.4.1
+        @version 0.5.0
         @date: 24.04.13 
  **/
 
@@ -28,7 +28,6 @@ class Router extends Prefab {
     {
         if(is_array($pattern))
             trigger_error('set multiple routes are not supported');
-        /** @var Base $f3 */
         $f3 = \Base::instance();
         $expl = explode(' ', $pattern, 2);
         if ($expl[0] === 'MAP')
@@ -80,32 +79,45 @@ class Router extends Prefab {
             // process tokens
             $tmp = \Template::instance();
             $route_name = $attrib['route'];
-            // find route token
-            if(preg_match('/{{(.+?)}}/s',$route_name)) {
-                $route_name = $tmp->token($route_name);
-                foreach ($attrib as $key => $value)
-                    if (is_int(strpos($key, 'param-'))) {
+            // find dynamic route token
+            if (preg_match('/{{(.+?)}}/s', $route_name))
+                $dyn_route_name = $tmp->token($route_name);
+            foreach ($attrib as $key => $value) {
+                // fetch route token parameters
+                if (is_int(strpos($key, 'param-'))) {
+                    if (isset($dyn_route_name)) {
                         if (preg_match('/{{(.+?)}}/s', $value))
                             $value = $tmp->token($value);
                         else
-                            $value=var_export($value,true);
+                            $value = var_export($value, true);
                         $r_params[] = "'".substr($key, 6)."'=>$value";
-                        unset($attrib[$key]);
-                    }
-                $r_params = 'array('.implode(',',$r_params).')';
-                $attrib['href'] = '<?php echo \Router::instance()->getNamedRoute('.$route_name.','.
-                    $r_params.'); ?>';
-            } else {
-                // no route token
-                foreach ($attrib as $key => $value)
-                    if (is_int(strpos($key, 'param-'))) {
+                    } else {
                         if (preg_match('/{{(.+?)}}/s', $value))
                             $value = "<?php echo ".$tmp->token($value).";?>";
                         $r_params[substr($key, 6)] = $value;
-                        unset($attrib[$key]);
                     }
-                $attrib['href'] = self::instance()->getNamedRoute($attrib['route'],$r_params);
+                    unset($attrib[$key]);
+                }
+                // fetch query string
+                elseif($key == 'query') {
+                    if (preg_match('/{{(.+?)}}/s', $value))
+                        $queryString = '<?php $qvar = '.$tmp->token($value).'; '.
+                            'echo (is_array($qvar)?htmlentities(http_build_query($qvar)):$qvar);?>';
+                    else
+                        $queryString = htmlentities($value);
+                    unset($attrib[$key]);
+                }
             }
+            // route url
+            if (isset($dyn_route_name)) {
+                $r_params = 'array('.implode(',', $r_params).')';
+                $attrib['href'] = '<?php echo \Router::instance()->getNamedRoute('.$dyn_route_name.','.
+                    $r_params.'); ?>';
+            } else
+                $attrib['href'] = self::instance()->getNamedRoute($attrib['route'], $r_params);
+            // query string
+            if(isset($queryString))
+                $attrib['href'] .= '?'.$queryString;
             unset($attrib['route']);
         }
         foreach ($attrib as $key => $value)
