@@ -13,6 +13,7 @@ class Link_Routes extends Controller {
         $f3->set('t1', 'groovy');
         $f3->set('querystring', 'foo=bar&baz=narf');
         $f3->set('querystringArray', array('foo'=>'bar','baz'=>'narf'));
+        $f3->set('section', 'anchor-2');
 
         $template = \Template::instance();
         $test = new \Test;
@@ -77,6 +78,16 @@ class Link_Routes extends Controller {
         $test->expect(
 			trim(array_shift($lines)) == '<a href="routing-2?foo=bar">add existing query string to link</a><br/>',
 			'add existing query string to link'
+		);
+
+        $test->expect(
+			trim(array_shift($lines)) == '<a href="routing-2#anchor-1">link with anchor section</a><br/>',
+			'link with #anchor section'
+		);
+
+        $test->expect(
+			trim(array_shift($lines)) == '<a href="routing-2#anchor-2">link anchor from token</a><br/>',
+			'link #anchor from token'
 		);
 
 		$f3->set('results',$test->results());

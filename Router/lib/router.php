@@ -102,7 +102,7 @@ class Router extends Prefab {
                     unset($attrib[$key]);
                 }
                 // fetch query string
-                elseif($key == 'query') {
+                elseif ($key == 'query') {
                     if (preg_match('/{{(.+?)}}/s', $value))
                         $queryString .= '<?php $qvar = '.$tmp->token($value).'; '.
                             'echo (is_array($qvar)?htmlentities(http_build_query($qvar)):$qvar);?>';
@@ -116,7 +116,7 @@ class Router extends Prefab {
                     unset($attrib[$key]);
                 }
                 // absolute path option
-                elseif($key == 'absolute') {
+                elseif ($key == 'absolute') {
                     switch(strtoupper($value)) {
                         case 'TRUE':
                             $absolute = 1;
@@ -127,6 +127,13 @@ class Router extends Prefab {
                         default:
                             $absolute = 0;
                     }
+                    unset($attrib[$key]);
+                }
+                elseif ($key == 'section') {
+                    if (preg_match('/{{(.+?)}}/s', $value))
+                        $section = '<?php echo '.$tmp->token($value).';?>';
+                    else
+                        $section = htmlentities($value);
                     unset($attrib[$key]);
                 }
             }
@@ -152,9 +159,10 @@ class Router extends Prefab {
                     $queryString = '&'.$queryString;
                 $queryString = '<?php echo $_SERVER["QUERY_STRING"];?>'.$queryString;
             }
-            if(!empty($queryString)) {
+            if (!empty($queryString))
                 $attrib['href'] .= '?'.$queryString;
-            }
+            if (!empty($section))
+                $attrib['href'] .= '#'.$section;
             unset($attrib['route']);
         }
         foreach ($attrib as $key => $value)
