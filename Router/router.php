@@ -79,6 +79,7 @@ class Router extends Prefab {
             // process tokens
             $tmp = \Template::instance();
             $route_name = $attrib['route'];
+            $absolute = 0;
             // find dynamic route token
             if (preg_match('/{{(.+?)}}/s', $route_name))
                 $dyn_route_name = $tmp->token($route_name);
@@ -107,6 +108,20 @@ class Router extends Prefab {
                         $queryString = htmlentities($value);
                     unset($attrib[$key]);
                 }
+                // absolute path option
+                elseif($key == 'absolute') {
+                    switch(strtoupper($value)) {
+                        case 'TRUE':
+                            $absolute = 1;
+                            break;
+                        case 'FULL':
+                            $absolute = 2;
+                            break;
+                        default:
+                            $absolute = 0;
+                    }
+                    unset($attrib[$key]);
+                }
             }
             // route url
             if (isset($dyn_route_name)) {
@@ -115,6 +130,15 @@ class Router extends Prefab {
                     $r_params.'); ?>';
             } else
                 $attrib['href'] = self::instance()->getNamedRoute($attrib['route'], $r_params);
+            // absolute path
+            if ($absolute > 0) {
+                $attrib['href'] = '/'.$attrib['href'];
+                if($absolute > 1) {
+                    $f3 = \Base::instance();
+                    $attrib['href'] = $f3->get('SCHEME').'://'.$f3->get('HOST').
+                        $f3->get('BASE').$attrib['href'];
+                }
+            }
             // query string
             if(isset($queryString))
                 $attrib['href'] .= '?'.$queryString;
