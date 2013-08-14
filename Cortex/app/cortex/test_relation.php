@@ -87,13 +87,13 @@ class Test_Relation {
         // belongs-to author relation
         ///////////////////////////////////
 
-        $author->load('id = 1');
+        $author->load('_id = 1');
 
-        $news->load('id = 1');
+        $news->load('_id = 1');
         $news->author = $author;
         $news->save();
         $news->reset();
-        $news->load('id = 1');
+        $news->load('_id = 1');
         $test->expect(
             $news->author->name == 'Johnny English',
             'belongs-to: author relation created'
@@ -102,7 +102,7 @@ class Test_Relation {
         $news->author = NULL;
         $news->save();
         $news->reset();
-        $news->load('id = 1');
+        $news->load('_id = 1');
         $test->expect(
             empty($news->author),
             'belongs-to: author relation released'
@@ -110,7 +110,7 @@ class Test_Relation {
         $news->author = 1;
         $news->save();
         $news->reset();
-        $news->load('id = 1');
+        $news->load('_id = 1');
         $test->expect(
             $news->author->name == 'Johnny English',
             'belongs-to: relation created by raw id'
@@ -126,18 +126,18 @@ class Test_Relation {
         $news->tags = array($tag1,$tag2);
         $news->save();
         $news->reset();
-        $news->load('id = 1');
+        $news->load('_id = 1');
         $test->expect(
             $news->tags[0]->title == 'Web Design' && $news->tags[1]->title == 'Responsive',
             'belongs-to-many: relations created with array of mapper objects'
         );
 
         $news->reset();
-        $news->load('id = 2');
+        $news->load('_id = 2');
         $news->tags = array(2,3);
         $news->save();
         $news->reset();
-        $news->load('id = 2');
+        $news->load('_id = 2');
         $test->expect(
             $news->tags[0]->title == 'Responsive' && $news->tags[1]->title == 'Usability',
             'belongs-to-many: relations created with array of IDs'
@@ -146,27 +146,27 @@ class Test_Relation {
         $news->tags = null;
         $news->save();
         $news->reset();
-        $news->load('id = 2');
+        $news->load('_id = 2');
         $test->expect(
             empty($news->tags),
             'belongs-to-many: relations released'
         );
 
-        $news->tags = $tag->load('id > 1');
+        $news->tags = $tag->load('_id > 1');
         $news->save();
         $news->reset();
-        $news->load('id = 2');
+        $news->load('_id = 2');
         $test->expect(
             $news->tags[0]->title == 'Responsive' && $news->tags[1]->title == 'Usability',
             'belongs-to-many: relations created with hydrated mapper'
         );
 
         $news->reset();
-        $news->load('id = 3');
+        $news->load('_id = 3');
         $news->tags = '1;3';
         $news->save();
         $news->reset();
-        $news->load('id = 3');
+        $news->load('_id = 3');
         $test->expect(
             $news->tags[0]->title == 'Web Design' && $news->tags[1]->title == 'Usability',
             'belongs-to-many: relations created with split-able string'

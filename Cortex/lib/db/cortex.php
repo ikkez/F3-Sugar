@@ -312,9 +312,9 @@ class Cortex extends Cursor {
         if (array_key_exists('belongs-to', $field)) {
             // find primary field definition
             if (!is_array($relConf = $field['belongs-to']))
-                $relConf = array($relConf, 'id');
+                $relConf = array($relConf, '_id');
             // set field type
-            if ($relConf[1] == 'id')
+            if ($relConf[1] == '_id')
                 $field['type'] = Schema::DT_INT8;
             else {
                 // find foreign field type
@@ -385,7 +385,8 @@ class Cortex extends Cursor {
                 break;
 
             case 'DB\SQL':
-                // no need to change anything yet
+                // preserve identifier
+                $cond[0] = str_replace('_id','id',$cond[0]);
                 return $cond;
                 break;
         }
@@ -676,7 +677,7 @@ class Cortex extends Cursor {
                 $rel = new Cortex($this->db, $mmTable);
                 // delete all refs
                 if (is_null($val))
-                    $rel->erase(array($key.' = ?', $this->get('id')));
+                    $rel->erase(array($key.' = ?', $this->get('_id')));
                 // update refs
                 elseif (is_array($val)) {
                     $id = $this->get('_id');
@@ -722,8 +723,7 @@ class Cortex extends Cursor {
                 trigger_error(self::E_INVALIDRELATIONOBJECT);
             else {
                 $relConf = $fields[$key]['belongs-to'];
-                $rel_field = (is_array($relConf) ? $relConf[1] :
-                    (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
+                $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
                 $val = $val->get($rel_field);
             }
         elseif (is_array($fields[$key]) && array_key_exists('belongs-to-many', $fields[$key])) {
@@ -737,8 +737,7 @@ class Cortex extends Cursor {
                 trigger_error(sprintf(self::E_MMRELVALUE,$key));
             else {
                 $relConf = $fields[$key]['belongs-to-many'];
-                $rel_field = (is_array($relConf) ? $relConf[1] :
-                    (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
+                $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
                 if (is_object($val)) {
                     while (!$val->dry()) {
                         $nval[] = $val->get($rel_field);
@@ -833,13 +832,13 @@ class Cortex extends Cursor {
                 if (is_array($fields[$key])) {
                     if (array_key_exists('belongs-to', $fields[$key])) {
                         // one-to-X, bidirectional, direct way
-                        $class = (is_array($bln = $fields[$key]['belongs-to'])) ? $bln[0] : $bln;
-                        $rel = new $class;
+                        $relConf = $fields[$key]['belongs-to'];
+                        if (!is_array($relConf))
+                            $relConf = array($relConf, '_id');
+                        $rel = new $relConf[0];
                         if (!$rel instanceof Cortex)
                             trigger_error(self::E_WRONGRELATIONCLASS);
-                        $rel_field = (is_array($bln) ? $bln[1] :
-                            (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
-                        $rel->load(array($rel_field.' = ?', $this->mapper->{$key}));
+                        $rel->load(array($relConf[1].' = ?', $this->mapper->{$key}));
                         $this->fieldsCache[$key] = ((!$rel->dry()) ? $rel : null);
                     }
                     elseif (array_key_exists('has-one', $fields[$key])) {
@@ -853,7 +852,7 @@ class Cortex extends Cursor {
                         if (!is_null($fromConf[1]) && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
                             $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
                             if (!is_array($toConf))
-                                $toConf = array($toConf, ($this->dbsType == 'DB\SQL') ? 'id' : '_id');
+                                $toConf = array($toConf, '_id');
                             $this->fieldsCache[$key] =
                                 $rel->load(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
                         }
@@ -870,7 +869,7 @@ class Cortex extends Cursor {
                         if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
                             $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
                             if(!is_array($toConf))
-                                $toConf = array($toConf, ($this->dbsType == 'DB\SQL') ? 'id' : '_id');
+                                $toConf = array($toConf, '_id');
                             $this->fieldsCache[$key] =
                                 $rel->find(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
                         }
@@ -890,7 +889,7 @@ class Cortex extends Cursor {
                             $results = $rel->find(array($relConf['relField'].' = ?',$this->get('_id')));
                             // TODO: ->filter('news','tags2')->afind(); ???
                             foreach ($results as $el) {
-                                $where[] = 'id = ?'; // TODO: check for id and _id
+                                $where[] = '_id = ?';
                                 $filter[] = $el->get($key);
                             }
                             $crit = implode(' OR ', $where);
@@ -912,8 +911,7 @@ class Cortex extends Cursor {
                             $rel = new $class;
                             if (!$rel instanceof Cortex)
                                 trigger_error(self::E_WRONGRELATIONCLASS);
-                            $rel_field = (is_array($btlMany) ? $btlMany[1] :
-                                (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
+                            $rel_field = (is_array($btlMany) ? $btlMany[1] : '_id');
                             foreach ($result as $el) {
                                 $where[] = $rel_field.' = ?';
                                 $filter[] = $el;
