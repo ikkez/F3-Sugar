@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.9.1
+        @version 0.9.2
         @date 17.01.2013
  **/
 
@@ -29,15 +29,19 @@ class Cortex extends Cursor {
 
     protected
         // options
-        $db,        // DB object [ \DB\SQL, \DB\Jig, \DB\Mongo ]
-        $table,     // selected table, string
-        $fluid,     // fluid sql schema mode, boolean
-        $fieldConf, // field configuration, array
+        $db,            // DB object [ \DB\SQL, \DB\Jig, \DB\Mongo ]
+        $table,         // selected table, string
+        $fluid,         // fluid sql schema mode, boolean
+        $fieldConf,     // field configuration, array
 
         // internal vars, don't touch
-        $dbsType,   // mapper engine type [Jig, SQL, Mongo]
-        $mapper,    // ORM object
-        $fieldsCache; // relation field cache
+        $dbsType,       // mapper engine type [Jig, SQL, Mongo]
+        $mapper,        // ORM object
+        $fieldsCache,   // relation field cache
+        $saveCsd;       // mm rel save cascade
+
+    static
+        $init = false;  // just init without mapper
 
     const
         // special datatypes
@@ -69,13 +73,20 @@ class Cortex extends Cursor {
             $this->fluid = $fluid;
         if (!is_object($this->db=(is_string($db=($db?:$this->db))?\Base::instance()->get($db):$db)))
             trigger_error(self::E_CONNECTION);
+        $this->dbsType = get_class($this->db);
         if (strlen($this->table=strtolower($table?:$this->table))==0&&!$this->fluid)
             trigger_error(self::E_NOTABLE);
-        if($this->fluid) {
-            if(!$this->table) $this->table = strtolower(get_class($this));
-            static::setup($this->db,$this->table,($fluid?array():null));
-        }
-        $this->dbsType = get_class($this->db);
+        if (static::$init == TRUE) return;
+        if ($this->fluid)
+            static::setup($this->db,$this->getTable(),($fluid?array():null));
+        $this->initMapper();
+    }
+
+    /**
+     * create mapper instance
+     */
+    public function initMapper()
+    {
         switch ($this->dbsType) {
             case 'DB\Jig':
                 $this->mapper = new Jig\Mapper($this->db, $this->table);
@@ -97,13 +108,14 @@ class Cortex extends Cursor {
 
     /**
      * set model definition
-     *
-     * field example:
+     * config example:
      *  array('title' => array(
-     *        'type' => \DB\SQL\Schema::DT_TEXT,
-     *        'default' => 'new record title'
-     *  ))
-     *
+     *          'type' => \DB\SQL\Schema::DT_TEXT,
+     *          'default' => 'new record title',
+     *          'nullable' => true
+     *          )
+     *        '...' => ...
+     *  )
      * @param array $config
      */
     function setFieldConfiguration(array $config)
@@ -122,6 +134,40 @@ class Cortex extends Cursor {
     }
 
     /**
+     * kick start to just fetch the config
+     * @return array
+     */
+    static public function resolveConfiguration()
+    {
+        $refl = new \ReflectionClass(get_called_class());
+        $refl->setStaticPropertyValue('init', true);
+        $self = $refl->newInstance();
+        $refl->setStaticPropertyValue('init', false);
+
+        if (!$self instanceof Cortex)
+            trigger_error(self::E_WRONGRELATIONCLASS);
+        $conf = array (
+            'table'=>$self->getTable(),
+            'fieldConf'=>$self->getFieldConfiguration(),
+            'db'=> $self->db,
+            'fluid'=> $self->fluid,
+        );
+        unset($self);
+        return $conf;
+    }
+
+    /**
+     * returns model table name
+     * @return string
+     */
+    public function getTable()
+    {
+        if (!$this->table && $this->fluid)
+            $this->table = strtolower(get_class($this));
+        return $this->table;
+    }
+
+    /**
      * setup / update table schema
      * @static
      * @param $db
@@ -131,14 +177,15 @@ class Cortex extends Cursor {
      */
     static public function setup($db=null, $table=null, $fields=null)
     {
-        $refl = new \ReflectionClass(get_called_class());
-        $df = $refl->getDefaultProperties();
-        if(!is_object($db=(is_string($db=($db?:$df['db']))?\Base::instance()->get($db):$db)))
+        $self = get_called_class();
+        if (is_null($db) || is_null($table) || is_null($fields))
+            $df = $self::resolveConfiguration();
+        if (!is_object($db=(is_string($db=($db?:$df['db']))?\Base::instance()->get($db):$db)))
             trigger_error(self::E_CONNECTION);
         if (strlen($table=strtolower($table?:$df['table']))==0)
             trigger_error(self::E_NOTABLE);
         if (is_null($fields))
-            if(!empty($df['fieldConf']))
+            if (!empty($df['fieldConf']))
                 $fields = $df['fieldConf'];
             elseif(!$df['fluid']) {
                 trigger_error(self::E_FIELDSETUP);
@@ -154,16 +201,49 @@ class Cortex extends Cursor {
                 foreach($fields as $key => &$field) {
                     // fetch relation field types
                     $field = static::resolveRelationConf($field);
+                    // check m:m relation
+                    if (array_key_exists('has-many', $field)) {
+                        // m:m relation conf [class,to-key,from-key]
+                        if (!is_array($relConf = $field['has-many']))
+                            continue;
+                        $rel = $relConf[0]::resolveConfiguration();
+                        // check if foreign conf matches m:m
+                        if (array_key_exists($relConf[1],$rel['fieldConf']) && !is_null($relConf[1])
+                            && key($rel['fieldConf'][$relConf[1]]) == 'has-many') {
+                            // compute mm table name
+                            $fConf = $rel['fieldConf'][$relConf[1]]['has-many'];
+                            // check for a matching config
+                            if (!is_int(strpos($fConf[0],$self)))
+                                trigger_error(sprintf('mismatching m2m relation config from class `%s` to `%s`.',
+                                    $fConf[0],$self));
+                            if ($fConf[1] != $key)
+                                trigger_error(sprintf('mismatching m2m relation keys from `%s` to `%s`.',
+                                    $fConf[0].'.'.$fConf[1],$self.'.'.$key));
+                            // compute mm table name
+                            $mmTable = array($rel['table'].'__'.$relConf[1],
+                                             $table.'__'.$key);
+                            natcasesort($mmTable);
+                            $mmTable = strtolower(str_replace('\\','_',implode('_mm_',$mmTable)));
+                            // create dummy to invoke table
+                            $mmRel = new Cortex($db,$mmTable,true);
+                            $rand = rand(0,1000000);
+                            $mmRel->{$relConf[1]} = $rand;
+                            $mmRel->{$key} = $rand;
+                            $mmRel->save();
+                            $mmRel->reset();
+                            $mmRel->erase(array($relConf[1].' = :rand AND '.$key.' = :rand',':rand'=>$rand));
+                        }
+                    }
                     // skip virtual fields with no type
                     if (!array_key_exists('type', $field)) {
                         unset($fields[$key]);
                         continue;
                     }
                     // transform array fields
-                    if(in_array($field['type'], array(self::DT_TEXT_JSON, self::DT_TEXT_SERIALIZED)))
+                    if (in_array($field['type'], array(self::DT_TEXT_JSON, self::DT_TEXT_SERIALIZED)))
                         $field['type']=$schema::DT_TEXT;
                     // defaults values
-                    if(!array_key_exists('nullable', $field)) $field['nullable'] = true;
+                    if (!array_key_exists('nullable', $field)) $field['nullable'] = true;
                 }
             if (!in_array($table, $schema->getTables())) {
                 // create table
@@ -238,15 +318,27 @@ class Cortex extends Cursor {
                 $field['type'] = Schema::DT_INT8;
             else {
                 // find foreign field type
-                $refl = new \ReflectionClass($relConf[0]);
-                $fc = $refl->getDefaultProperties();
-                $field['type'] = $fc['fieldConf'][$relConf[1]];
+                $fc = $relConf[0]::resolveConfiguration();
+                $field['type'] = $fc['fieldConf'][$relConf[1]]['type'];
             }
             $field['nullable'] = true;
         }
-        elseif(array_key_exists('belongs-to-many', $field)){
+        elseif (array_key_exists('belongs-to-many', $field)){
             $field['type'] = self::DT_TEXT_JSON;
             $field['nullable'] = true;
+        }
+        elseif (array_key_exists('has-many', $field)){
+            $relConf = $field['has-many'];
+            if(!is_array($relConf))
+                return $field;
+            $rel = $relConf[0]::resolveConfiguration();
+            if(array_key_exists('has-many',$rel['fieldConf'][$relConf[1]])) {
+                $field['has-many']['rel'] = 'has-many';
+                $field['has-many']['relTable'] = $rel['table'];
+                $field['has-many']['relField'] = $relConf[1];
+            } else {
+                $field['has-many']['rel'] = 'belongs-to';
+            }
         }
         return $field;
     }
@@ -566,7 +658,40 @@ class Cortex extends Cursor {
      **/
     function save()
     {
-        return $this->dry() ? $this->insert() : $this->update();
+        $result = $this->dry() ? $this->insert() : $this->update();
+        // m:m save cascade
+        if (!empty($this->saveCsd)) {
+            $fields = $this->fieldConf;
+            foreach($this->saveCsd as $key => $val) {
+                $relConf = $fields[$key]['has-many'];
+                if (!array_key_exists('refTable', $relConf)) {
+                    // compute mm table name
+                    $mmTable = array($relConf['relTable'].'__'.$relConf['relField'],
+                                     $this->getTable().'__'.$key);
+                    natcasesort($mmTable);
+                    $mmTable = strtolower(str_replace('\\', '_', implode('_mm_', $mmTable)));
+                    $relConf['refTable'] = $mmTable;
+                } else
+                    $mmTable = $relConf['refTable'];
+                $rel = new Cortex($this->db, $mmTable);
+                // delete all refs
+                if (is_null($val))
+                    $rel->erase(array($key.' = ?', $this->get('id')));
+                // update refs
+                elseif (is_array($val)) {
+                    $id = $this->get('_id');
+                    $rel->erase(array($relConf['relField'].' = ?', $id));
+                    foreach($val as $v) {
+                        $rel->set($key,$v);
+                        $rel->set($relConf['relField'],$id);
+                        $rel->save();
+                        $rel->reset();
+                    }
+                }
+                unset($rel);
+            }
+        }
+        return $result;
     }
 
     public function count($filter = NULL)
@@ -628,6 +753,19 @@ class Cortex extends Cursor {
                             else $item = $item[$rel_field];
             }
         }
+        elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])) {
+            // many-to-many, bidirectional
+            $relConf = $fields[$key]['has-many'];
+            if ($relConf['rel'] == 'has-many') {
+                // custom setter
+                if (method_exists($this, 'set_'.$key))
+                    $val = $this->{'set_'.$key}($val);
+                $this->saveCsd[$key] = $val;
+                return;
+            } elseif ($relConf['rel'] == 'belongs-to') {
+                // many-to-one, bidirectional, inverse way
+            }
+        }
         // convert array content
         if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields))
             if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
@@ -686,79 +824,104 @@ class Cortex extends Cursor {
     function get($key)
     {
         $fields = $this->fieldConf;
+        if ($key == '_id' && $this->dbsType == 'DB\SQL')
+            $key = 'id';
         if(!empty($fields) && array_key_exists($key, $fields)) {
             // check field cache
             if(!array_key_exists($key,$this->fieldsCache)) {
                 // load relations
-                if (is_array($fields[$key]) && array_key_exists('belongs-to', $fields[$key])) {
-                    // one-to-X, bidirectional, direct way
-                    $class = (is_array($bln = $fields[$key]['belongs-to'])) ? $bln[0] : $bln;
-                    $rel = new $class;
-                    if (!$rel instanceof Cortex)
-                        trigger_error(self::E_WRONGRELATIONCLASS);
-                    $rel_field = (is_array($bln) ? $bln[1] :
-                        (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
-                    $rel->load(array($rel_field.' = ?', $this->mapper->{$key}));
-                    $this->fieldsCache[$key] = ((!$rel->dry()) ? $rel : null);
-                }
-                elseif (is_array($fields[$key]) && array_key_exists('has-one', $fields[$key])) {
-                    // one-to-one, bidirectional, inverse way
-                    $fromConf = is_array($hasMany = $fields[$key]['has-one'])
-                        ? $hasMany : array($hasMany, null);
-                    $rel = new $fromConf[0];
-                    if (!$rel instanceof Cortex)
-                        trigger_error(self::E_WRONGRELATIONCLASS);
-                    $relFieldConf = $rel->getFieldConfiguration();
-                    if (!is_null($fromConf[1]) && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
-                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
-                        if (!is_array($toConf))
-                            $toConf = array($toConf, ($this->dbsType == 'DB\SQL') ? 'id' : '_id');
-                        $this->fieldsCache[$key] =
-                            $rel->load(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
-                    }
-                }
-                elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])){
-                    $fromConf = is_array($hasMany=$fields[$key]['has-many'])
-                        ? $hasMany : array($hasMany, null);
-                    $rel = new $fromConf[0];
-                    if (!$rel instanceof Cortex)
-                        trigger_error(self::E_WRONGRELATIONCLASS);
-                    $relFieldConf = $rel->getFieldConfiguration();
-                    // one-to-many, bidirectional, inverse way
-                    if (!is_null($fromConf[1]) && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
-                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
-                        if(!is_array($toConf))
-                            $toConf = array($toConf, ($this->dbsType == 'DB\SQL') ? 'id' : '_id');
-                        $this->fieldsCache[$key] =
-                            $rel->find(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
-                    }
-                    // TODO: many-to-many, bidirectional
-                    elseif (!is_null($fromConf[1])
-                        && key($relFieldConf[$fromConf[1]]) == 'has-many') {
-                        // to be continued
-                    }
-                } elseif (is_array($fields[$key]) && array_key_exists('belongs-to-many', $fields[$key])) {
-                    // many-to-many, unidirectional
-                    $fields[$key]['type'] = self::DT_TEXT_JSON;
-                    $result = json_decode($this->mapper->{$key}, true);
-                    if (!is_array($result))
-                        $this->fieldsCache[$key] = $result;
-                    else {
-                        // hydrate mapper
-                        $class = (is_array($btlMany = $fields[$key]['belongs-to-many']))
-                            ? $btlMany[0] : $btlMany;
+                if (is_array($fields[$key])) {
+                    if (array_key_exists('belongs-to', $fields[$key])) {
+                        // one-to-X, bidirectional, direct way
+                        $class = (is_array($bln = $fields[$key]['belongs-to'])) ? $bln[0] : $bln;
                         $rel = new $class;
                         if (!$rel instanceof Cortex)
                             trigger_error(self::E_WRONGRELATIONCLASS);
-                        $rel_field = (is_array($btlMany) ? $btlMany[1] :
+                        $rel_field = (is_array($bln) ? $bln[1] :
                             (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
-                        foreach ($result as $el) {
-                            $where[] = $rel_field.' = ?';
-                            $filter[] = $el;
+                        $rel->load(array($rel_field.' = ?', $this->mapper->{$key}));
+                        $this->fieldsCache[$key] = ((!$rel->dry()) ? $rel : null);
+                    }
+                    elseif (array_key_exists('has-one', $fields[$key])) {
+                        // one-to-one, bidirectional, inverse way
+                        $fromConf = is_array($hasMany = $fields[$key]['has-one'])
+                            ? $hasMany : array($hasMany, null);
+                        $rel = new $fromConf[0];
+                        if (!$rel instanceof Cortex)
+                            trigger_error(self::E_WRONGRELATIONCLASS);
+                        $relFieldConf = $rel->getFieldConfiguration();
+                        if (!is_null($fromConf[1]) && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
+                            $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
+                            if (!is_array($toConf))
+                                $toConf = array($toConf, ($this->dbsType == 'DB\SQL') ? 'id' : '_id');
+                            $this->fieldsCache[$key] =
+                                $rel->load(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
                         }
-                        $crit = implode(' OR ', $where);
-                        array_unshift($filter, $crit);
-                        $this->fieldsCache[$key] = $rel->find($filter);
+                    }
+                    elseif (array_key_exists('has-many', $fields[$key])){
+                        $fromConf = $fields[$key]['has-many'];
+                        if (!is_array($fromConf))
+                            trigger_error('Incomplete has-many config. Linked key missing.');
+                        $rel = new $fromConf[0];
+                        if (!$rel instanceof Cortex)
+                            trigger_error(self::E_WRONGRELATIONCLASS);
+                        $relFieldConf = $rel->getFieldConfiguration();
+                        // one-to-many, bidirectional, inverse way
+                        if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
+                            $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
+                            if(!is_array($toConf))
+                                $toConf = array($toConf, ($this->dbsType == 'DB\SQL') ? 'id' : '_id');
+                            $this->fieldsCache[$key] =
+                                $rel->find(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
+                        }
+                        // many-to-many, bidirectional
+                        elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
+                            $relConf = $fields[$key]['has-many'];
+                            if (!array_key_exists('refTable', $relConf)) {
+                                // compute mm table name
+                                $mmTable = array($relConf['relTable'].'__'.$relConf['relField'],
+                                    $this->getTable().'__'.$key);
+                                natcasesort($mmTable);
+                                $mmTable = strtolower(str_replace('\\', '_', implode('_mm_', $mmTable)));
+                                $relConf['refTable'] = $mmTable;
+                            } else
+                                $mmTable = $relConf['refTable'];
+                            $rel = new Cortex($this->db, $mmTable);
+                            $results = $rel->find(array($relConf['relField'].' = ?',$this->get('_id')));
+                            // TODO: ->filter('news','tags2')->afind(); ???
+                            foreach ($results as $el) {
+                                $where[] = 'id = ?'; // TODO: check for id and _id
+                                $filter[] = $el->get($key);
+                            }
+                            $crit = implode(' OR ', $where);
+                            array_unshift($filter, $crit);
+                            unset($rel);
+                            $rel = new $relConf[0];
+                            $this->fieldsCache[$key] = $rel->find($filter);
+                        }
+                    } elseif (array_key_exists('belongs-to-many', $fields[$key])) {
+                        // many-to-many, unidirectional
+                        $fields[$key]['type'] = self::DT_TEXT_JSON;
+                        $result = json_decode($this->mapper->{$key}, true);
+                        if (!is_array($result))
+                            $this->fieldsCache[$key] = $result;
+                        else {
+                            // hydrate mapper
+                            $class = (is_array($btlMany = $fields[$key]['belongs-to-many']))
+                                ? $btlMany[0] : $btlMany;
+                            $rel = new $class;
+                            if (!$rel instanceof Cortex)
+                                trigger_error(self::E_WRONGRELATIONCLASS);
+                            $rel_field = (is_array($btlMany) ? $btlMany[1] :
+                                (($this->dbsType == 'DB\SQL') ? 'id' : '_id'));
+                            foreach ($result as $el) {
+                                $where[] = $rel_field.' = ?';
+                                $filter[] = $el;
+                            }
+                            $crit = implode(' OR ', $where);
+                            array_unshift($filter, $crit);
+                            $this->fieldsCache[$key] = $rel->find($filter);
+                        }
                     }
                 }
                 // resolve array fields
@@ -788,10 +951,9 @@ class Cortex extends Cursor {
         if(is_int($relations))
             $relations--;
         if (!empty($this->fieldConf)) {
-//            $fields += array_flip(array_keys($this->fieldConf));
-//            $fields = $table_fields + array_fill_keys(array_keys($this->fieldConf),NULL);
-//            $fields = $table_fields;
+//            $fields += array_fill_keys(array_keys($this->fieldConf),NULL);
             foreach ($fields as $key => &$val)
+                // post process configured fields
                 if (array_key_exists($key, $this->fieldConf)) {
                     if (($relations===TRUE || (is_int($relations) && $relations >= 0))
                         && is_array($this->fieldConf[$key])) {
@@ -874,6 +1036,7 @@ class Cortex extends Cursor {
     public function reset() {
         $this->mapper->reset();
         $this->fieldsCache = array();
+        $this->saveCsd = array();
         // set default values
         if(($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
             && !empty($this->fieldConf))
