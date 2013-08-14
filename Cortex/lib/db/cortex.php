@@ -38,7 +38,8 @@ class Cortex extends Cursor {
         $dbsType,       // mapper engine type [Jig, SQL, Mongo]
         $mapper,        // ORM object
         $fieldsCache,   // relation field cache
-        $saveCsd;       // mm rel save cascade
+        $saveCsd,       // mm rel save cascade
+        $relRegistry;
 
     static
         $init = false;  // just init without mapper
@@ -101,6 +102,7 @@ class Cortex extends Cursor {
                 trigger_error(sprintf(self::E_UNKNOWNDBENGINE,$this->dbsType));
         }
         $this->reset();
+        $this->relRegistry = array();
         if(!empty($this->fieldConf))
             foreach($this->fieldConf as $key=>&$conf)
                 $conf=static::resolveRelationConf($conf);
@@ -671,10 +673,11 @@ class Cortex extends Cursor {
                                      $this->getTable().'__'.$key);
                     natcasesort($mmTable);
                     $mmTable = strtolower(str_replace('\\', '_', implode('_mm_', $mmTable)));
-                    $relConf['refTable'] = $mmTable;
+                    $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
                 } else
                     $mmTable = $relConf['refTable'];
-                $rel = new Cortex($this->db, $mmTable);
+                $rel = (array_key_exists($mmTable, $this->relRegistry)) ?
+                    $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
                 // delete all refs
                 if (is_null($val))
                     $rel->erase(array($key.' = ?', $this->get('_id')));
@@ -835,9 +838,7 @@ class Cortex extends Cursor {
                         $relConf = $fields[$key]['belongs-to'];
                         if (!is_array($relConf))
                             $relConf = array($relConf, '_id');
-                        $rel = new $relConf[0];
-                        if (!$rel instanceof Cortex)
-                            trigger_error(self::E_WRONGRELATIONCLASS);
+                        $rel = $this->getRelInstance($relConf[0]);
                         $rel->load(array($relConf[1].' = ?', $this->mapper->{$key}));
                         $this->fieldsCache[$key] = ((!$rel->dry()) ? $rel : null);
                     }
@@ -845,9 +846,7 @@ class Cortex extends Cursor {
                         // one-to-one, bidirectional, inverse way
                         $fromConf = is_array($hasMany = $fields[$key]['has-one'])
                             ? $hasMany : array($hasMany, null);
-                        $rel = new $fromConf[0];
-                        if (!$rel instanceof Cortex)
-                            trigger_error(self::E_WRONGRELATIONCLASS);
+                        $rel = $this->getRelInstance($fromConf[0]);
                         $relFieldConf = $rel->getFieldConfiguration();
                         if (!is_null($fromConf[1]) && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
                             $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
@@ -861,9 +860,7 @@ class Cortex extends Cursor {
                         $fromConf = $fields[$key]['has-many'];
                         if (!is_array($fromConf))
                             trigger_error('Incomplete has-many config. Linked key missing.');
-                        $rel = new $fromConf[0];
-                        if (!$rel instanceof Cortex)
-                            trigger_error(self::E_WRONGRELATIONCLASS);
+                        $rel = $this->getRelInstance($fromConf[0]);
                         $relFieldConf = $rel->getFieldConfiguration();
                         // one-to-many, bidirectional, inverse way
                         if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
@@ -882,12 +879,12 @@ class Cortex extends Cursor {
                                     $this->getTable().'__'.$key);
                                 natcasesort($mmTable);
                                 $mmTable = strtolower(str_replace('\\', '_', implode('_mm_', $mmTable)));
-                                $relConf['refTable'] = $mmTable;
+                                $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
                             } else
                                 $mmTable = $relConf['refTable'];
-                            $rel = new Cortex($this->db, $mmTable);
+                            $rel = (array_key_exists($mmTable, $this->relRegistry)) ?
+                                $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
                             $results = $rel->find(array($relConf['relField'].' = ?',$this->get('_id')));
-                            // TODO: ->filter('news','tags2')->afind(); ???
                             foreach ($results as $el) {
                                 $where[] = '_id = ?';
                                 $filter[] = $el->get($key);
@@ -895,7 +892,7 @@ class Cortex extends Cursor {
                             $crit = implode(' OR ', $where);
                             array_unshift($filter, $crit);
                             unset($rel);
-                            $rel = new $relConf[0];
+                            $rel = $this->getRelInstance($relConf[0]);
                             $this->fieldsCache[$key] = $rel->find($filter);
                         }
                     } elseif (array_key_exists('belongs-to-many', $fields[$key])) {
@@ -906,14 +903,12 @@ class Cortex extends Cursor {
                             $this->fieldsCache[$key] = $result;
                         else {
                             // hydrate mapper
-                            $class = (is_array($btlMany = $fields[$key]['belongs-to-many']))
-                                ? $btlMany[0] : $btlMany;
-                            $rel = new $class;
-                            if (!$rel instanceof Cortex)
-                                trigger_error(self::E_WRONGRELATIONCLASS);
-                            $rel_field = (is_array($btlMany) ? $btlMany[1] : '_id');
+                            $relConf = $fields[$key]['belongs-to-many'];
+                            if (!is_array($relConf))
+                                $relConf = array($relConf, '_id');
+                            $rel = $this->getRelInstance($relConf[0]);
                             foreach ($result as $el) {
-                                $where[] = $rel_field.' = ?';
+                                $where[] = $relConf[1].' = ?';
                                 $filter[] = $el;
                             }
                             $crit = implode(' OR ', $where);
@@ -935,6 +930,22 @@ class Cortex extends Cursor {
         $val = (array_key_exists($key,$this->fieldsCache)) ? $this->fieldsCache[$key] : $this->mapper->{$key};
         // custom getter
         return (method_exists($this, 'get_'.$key)) ? $this->{'get_'.$key}($val) : $val;
+    }
+
+    /**
+     * creates and caches related mapper objects
+     * @param $name
+     * @return Cortex
+     */
+    protected function getRelInstance($name)
+    {
+        if (array_key_exists($name, $this->relRegistry))
+            return $this->relRegistry[$name];
+        $rel = new $name;
+        if (!$rel instanceof Cortex)
+            trigger_error(self::E_WRONGRELATIONCLASS);
+        $this->relRegistry[$name] = $rel;
+        return $rel;
     }
 
     /**
