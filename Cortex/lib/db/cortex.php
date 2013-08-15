@@ -826,8 +826,9 @@ class Cortex extends Cursor {
     function get($key)
     {
         $fields = $this->fieldConf;
+        $id = ($this->dbsType == 'DB\SQL')?'id':'_id';
         if ($key == '_id' && $this->dbsType == 'DB\SQL')
-            $key = 'id';
+            $key = $id;
         if(!empty($fields) && array_key_exists($key, $fields)) {
             // check field cache
             if(!array_key_exists($key,$this->fieldsCache)) {
@@ -837,7 +838,7 @@ class Cortex extends Cursor {
                         // one-to-X, bidirectional, direct way
                         $relConf = $fields[$key]['belongs-to'];
                         if (!is_array($relConf))
-                            $relConf = array($relConf, '_id');
+                            $relConf = array($relConf, $id);
                         $rel = $this->getRelInstance($relConf[0]);
                         $rel->load(array($relConf[1].' = ?', $this->mapper->{$key}));
                         $this->fieldsCache[$key] = ((!$rel->dry()) ? $rel : null);
@@ -848,10 +849,11 @@ class Cortex extends Cursor {
                             ? $hasMany : array($hasMany, null);
                         $rel = $this->getRelInstance($fromConf[0]);
                         $relFieldConf = $rel->getFieldConfiguration();
-                        if (!is_null($fromConf[1]) && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
+                        if (!is_null($fromConf[1])
+                            && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
                             $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
                             if (!is_array($toConf))
-                                $toConf = array($toConf, '_id');
+                                $toConf = array($toConf, $id);
                             $this->fieldsCache[$key] =
                                 $rel->load(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
                         }
@@ -866,7 +868,7 @@ class Cortex extends Cursor {
                         if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
                             $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
                             if(!is_array($toConf))
-                                $toConf = array($toConf, '_id');
+                                $toConf = array($toConf, $id);
                             $this->fieldsCache[$key] =
                                 $rel->find(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
                         }
@@ -878,13 +880,16 @@ class Cortex extends Cursor {
                                 $mmTable = array($relConf['relTable'].'__'.$relConf['relField'],
                                     $this->getTable().'__'.$key);
                                 natcasesort($mmTable);
-                                $mmTable = strtolower(str_replace('\\', '_', implode('_mm_', $mmTable)));
+                                $mmTable = strtolower(str_replace('\\', '_',
+                                    implode('_mm_', $mmTable)));
                                 $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
                             } else
                                 $mmTable = $relConf['refTable'];
+                            // create mm table mapper
                             $rel = (array_key_exists($mmTable, $this->relRegistry)) ?
                                 $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
-                            $results = $rel->find(array($relConf['relField'].' = ?',$this->get('_id')));
+                            $results = $rel->find(array($relConf['relField'].' = ?',
+                                                        $this->mapper->{$id}));
                             foreach ($results as $el) {
                                 $where[] = '_id = ?';
                                 $filter[] = $el->get($key);
@@ -892,6 +897,7 @@ class Cortex extends Cursor {
                             $crit = implode(' OR ', $where);
                             array_unshift($filter, $crit);
                             unset($rel);
+                            // create foreign table mapper
                             $rel = $this->getRelInstance($relConf[0]);
                             $this->fieldsCache[$key] = $rel->find($filter);
                         }
@@ -905,7 +911,7 @@ class Cortex extends Cursor {
                             // hydrate mapper
                             $relConf = $fields[$key]['belongs-to-many'];
                             if (!is_array($relConf))
-                                $relConf = array($relConf, '_id');
+                                $relConf = array($relConf, $id);
                             $rel = $this->getRelInstance($relConf[0]);
                             foreach ($result as $el) {
                                 $where[] = $relConf[1].' = ?';
@@ -927,7 +933,8 @@ class Cortex extends Cursor {
             }
         }
         // fetch cached value, if existing
-        $val = (array_key_exists($key,$this->fieldsCache)) ? $this->fieldsCache[$key] : $this->mapper->{$key};
+        $val = (array_key_exists($key,$this->fieldsCache)) ?
+            $this->fieldsCache[$key] : $this->mapper->{$key};
         // custom getter
         return (method_exists($this, 'get_'.$key)) ? $this->{'get_'.$key}($val) : $val;
     }
