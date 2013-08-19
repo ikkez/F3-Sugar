@@ -373,7 +373,7 @@ class Cortex extends Cursor {
             case 'DB\Jig':
                 return $this->_jig_parse_filter($cond);
             case 'DB\Mongo':
-                $parts = preg_split("/\s*(\)|\(|AND|OR)\s*/i", array_shift($cond), -1,
+                $parts = preg_split("/\s*(\)|\(|\bAND\b|\bOR\b)\s*/i", array_shift($cond), -1,
                     PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
                 foreach ($parts as &$part)
                     if (preg_match('/'.$op_quote.'/i', $part, $match)) {
@@ -420,7 +420,7 @@ class Cortex extends Cursor {
      */
     private function _jig_parse_filter($cond){
         // split logical
-        $parts = preg_split("/\s*(\)|\(|AND|OR)\s*/i", array_shift($cond), -1,
+        $parts = preg_split("/\s*(\)|\(|\bAND\b|\bOR\b)\s*/i", array_shift($cond), -1,
             PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
         $ncond = array();
         foreach ($parts as &$part) {
@@ -629,7 +629,7 @@ class Cortex extends Cursor {
      * Retrieve first object that satisfies criteria
      * @param null  $filter
      * @param array $options
-     * @return \Axon|\Jig|\M2
+     * @return Cortex
      */
     public function load($filter = NULL, array $options = NULL)
     {
@@ -905,7 +905,9 @@ class Cortex extends Cursor {
                     } elseif (array_key_exists('belongs-to-many', $fields[$key])) {
                         // many-to-many, unidirectional
                         $fields[$key]['type'] = self::DT_TEXT_JSON;
-                        $result = json_decode($this->mapper->{$key}, true);
+                        $result = $this->mapper->get($key);
+                        if ($this->dbsType == 'DB\SQL')
+                            $result = json_decode($result, true);
                         if (!is_array($result))
                             $this->fieldsCache[$key] = $result;
                         else {
