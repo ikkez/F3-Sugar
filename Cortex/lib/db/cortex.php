@@ -372,8 +372,6 @@ class Cortex extends Cursor {
         switch ($this->dbsType) {
             case 'DB\Jig':
                 return $this->_jig_parse_filter($cond);
-                break;
-
             case 'DB\Mongo':
                 $parts = preg_split("/\s*(\)|\(|AND|OR)\s*/i", array_shift($cond), -1,
                     PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
@@ -384,13 +382,10 @@ class Cortex extends Cursor {
                     }
                 $ncond = $this->_mongo_parse_logical_op($parts);
                 return $ncond;
-                break;
-
             case 'DB\SQL':
                 // preserve identifier
-                $cond[0] = str_replace('_id','id',$cond[0]);
+                $cond[0] = preg_replace('/(?!\B)_id/','id',$cond[0]);
                 return $cond;
-                break;
         }
     }
 
