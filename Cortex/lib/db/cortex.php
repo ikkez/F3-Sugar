@@ -432,7 +432,7 @@ class Cortex extends Cursor {
             if (in_array(strtoupper($part), array('AND', 'OR')))
                 continue;
             // prefix field names
-            $part = preg_replace('/([a-z]+)/i', '@$1', $part, -1, $count);
+            $part = preg_replace('/([a-z_-]+)/i', '@$1', $part, -1, $count);
             // value comparison
             if (is_int(strpos($part, '?'))) {
                 $val = array_shift($cond);
@@ -718,18 +718,20 @@ class Cortex extends Cursor {
             trigger_error(sprintf(self::E_UNKNOWNFIELD,$key,get_class($this)));
         // handle relations
         if (!is_int($val) && is_array($fields[$key])
-            && array_key_exists('belongs-to', $fields[$key]))
+            && array_key_exists('belongs-to', $fields[$key])) {
             // one-to-many, one-to-one
             if(is_null($val))
                 $val = NULL;
-            elseif (!$val instanceof Cortex || $val->dry())
-                trigger_error(self::E_INVALIDRELATIONOBJECT);
-            else {
-                $relConf = $fields[$key]['belongs-to'];
-                $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
-                $val = $val->get($rel_field);
+            elseif (!(is_string($val) && $this->dbsType == 'DB\Jig')) {
+                if (!$val instanceof Cortex || $val->dry())
+                    trigger_error(self::E_INVALIDRELATIONOBJECT);
+                else {
+                    $relConf = $fields[$key]['belongs-to'];
+                    $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
+                    $val = $val->get($rel_field);
+                }
             }
-        elseif (is_array($fields[$key]) && array_key_exists('belongs-to-many', $fields[$key])) {
+        } elseif (is_array($fields[$key]) && array_key_exists('belongs-to-many', $fields[$key])) {
             // many-to-many, unidirectional
             $fields[$key]['type'] = self::DT_TEXT_JSON;
             if (is_null($val))
@@ -894,12 +896,16 @@ class Cortex extends Cursor {
                                 $where[] = '_id = ?';
                                 $filter[] = $el->get($key);
                             }
-                            $crit = implode(' OR ', $where);
-                            array_unshift($filter, $crit);
-                            unset($rel);
-                            // create foreign table mapper
-                            $rel = $this->getRelInstance($relConf[0]);
-                            $this->fieldsCache[$key] = $rel->find($filter);
+                            if (!isset($where)) {
+                                $this->fieldsCache[$key] = NULL;
+                            } else {
+                                $crit = implode(' OR ', $where);
+                                array_unshift($filter, $crit);
+                                unset($rel);
+                                // create foreign table mapper
+                                $rel = $this->getRelInstance($relConf[0]);
+                                $this->fieldsCache[$key] = $rel->find($filter);
+                            }
                         }
                     } elseif (array_key_exists('belongs-to-many', $fields[$key])) {
                         // many-to-many, unidirectional
