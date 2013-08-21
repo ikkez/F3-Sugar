@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.9.2
+        @version 0.9.3
         @date 17.01.2013
  **/
 
@@ -709,104 +709,105 @@ class Cortex extends Cursor {
     {
         $fields = $this->fieldConf;
         unset($this->fieldsCache[$key]);
-        if(!empty($fields) && !$this->fluid && !in_array($key,array_keys($fields)))
-            trigger_error(sprintf(self::E_UNKNOWNFIELD,$key,get_class($this)));
-        // handle relations
-        if (!is_int($val) && is_array($fields[$key])
-            && array_key_exists('belongs-to', $fields[$key])) {
-            // one-to-many, one-to-one
-            if(is_null($val))
-                $val = NULL;
-            elseif (!(is_string($val) && $this->dbsType == 'DB\Jig')) {
-                if (!$val instanceof Cortex || $val->dry())
-                    trigger_error(self::E_INVALIDRELATIONOBJECT);
+        // pre-process if field config available
+        if (!empty($fields) && in_array($key,array_keys($fields))) {
+            // handle relations
+            if (!is_int($val) && is_array($fields[$key])
+                && array_key_exists('belongs-to', $fields[$key])) {
+                // one-to-many, one-to-one
+                if(is_null($val))
+                    $val = NULL;
+                elseif (!(is_string($val) && $this->dbsType == 'DB\Jig')) {
+                    if (!$val instanceof Cortex || $val->dry())
+                        trigger_error(self::E_INVALIDRELATIONOBJECT);
+                    else {
+                        $relConf = $fields[$key]['belongs-to'];
+                        $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
+                        $val = $val->get($rel_field);
+                    }
+                }
+            } elseif (is_array($fields[$key]) && array_key_exists('belongs-to-many', $fields[$key])) {
+                // many-to-many, unidirectional
+                $fields[$key]['type'] = self::DT_TEXT_JSON;
+                if (is_null($val))
+                    $val = NULL;
+                elseif (is_string($val))
+                    $val = \Base::instance()->split($val);
+                elseif (!is_array($val) && !(is_object($val) && $val instanceof Cortex && !$val->dry()))
+                    trigger_error(sprintf(self::E_MMRELVALUE,$key));
                 else {
-                    $relConf = $fields[$key]['belongs-to'];
+                    $relConf = $fields[$key]['belongs-to-many'];
                     $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
-                    $val = $val->get($rel_field);
+                    if (is_object($val)) {
+                        while (!$val->dry()) {
+                            $nval[] = $val->get($rel_field);
+                            $val->next();
+                        }
+                        $val = $nval;
+                    } else
+                        foreach ($val as $index => &$item)
+                            if (is_object($item))
+                                if (!$item instanceof Cortex || $item->dry())
+                                    trigger_error(self::E_INVALIDRELATIONOBJECT);
+                                else $item = $item[$rel_field];
                 }
             }
-        } elseif (is_array($fields[$key]) && array_key_exists('belongs-to-many', $fields[$key])) {
-            // many-to-many, unidirectional
-            $fields[$key]['type'] = self::DT_TEXT_JSON;
-            if (is_null($val))
-                $val = NULL;
-            elseif (is_string($val))
-                $val = \Base::instance()->split($val);
-            elseif (!is_array($val) && !(is_object($val) && $val instanceof Cortex && !$val->dry()))
-                trigger_error(sprintf(self::E_MMRELVALUE,$key));
-            else {
-                $relConf = $fields[$key]['belongs-to-many'];
-                $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
-                if (is_object($val)) {
-                    while (!$val->dry()) {
-                        $nval[] = $val->get($rel_field);
-                        $val->next();
-                    }
-                    $val = $nval;
-                } else
-                    foreach ($val as $index => &$item)
-                        if (is_object($item))
-                            if (!$item instanceof Cortex || $item->dry())
-                                trigger_error(self::E_INVALIDRELATIONOBJECT);
-                            else $item = $item[$rel_field];
+            elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])) {
+                // many-to-many, bidirectional
+                $relConf = $fields[$key]['has-many'];
+                if ($relConf['rel'] == 'has-many') {
+                    // custom setter
+                    if (method_exists($this, 'set_'.$key))
+                        $val = $this->{'set_'.$key}($val);
+                    $this->saveCsd[$key] = $val;
+                    return;
+                } elseif ($relConf['rel'] == 'belongs-to') {
+                    // many-to-one, bidirectional, inverse way
+                }
             }
-        }
-        elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])) {
-            // many-to-many, bidirectional
-            $relConf = $fields[$key]['has-many'];
-            if ($relConf['rel'] == 'has-many') {
-                // custom setter
-                if (method_exists($this, 'set_'.$key))
-                    $val = $this->{'set_'.$key}($val);
-                $this->saveCsd[$key] = $val;
-                return;
-            } elseif ($relConf['rel'] == 'belongs-to') {
-                // many-to-one, bidirectional, inverse way
-            }
-        }
-        // convert array content
-        if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields))
-            if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
-                $val = serialize($val);
-            elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
-                $val = json_encode($val);
-            else
-                trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
-        // add nullable polyfill
-        if ($val === NULL && ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
-            && !empty($fields) && array_key_exists('nullable', $fields[$key])
-            && $fields[$key]['nullable'] === false)
-            trigger_error(sprintf(self::E_NULLABLECOLLISION,$key));
-        // MongoId shorthand
-        if ($this->dbsType == 'DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
-            $val = new \MongoId($val);
-        // fluid SQL
-        if ($this->fluid && $this->dbsType == 'DB\SQL') {
-            $schema = new Schema($this->db);
-            $table = $schema->alterTable($this->table);
-            // add missing field
-            if(!in_array($key,$table->getCols())) {
-                // determine data type
-                if (is_int($val)) $type = $schema::DT_INT;
-                elseif (is_double($val)) $type = $schema::DT_DOUBLE;
-                elseif (is_float($val)) $type = $schema::DT_FLOAT;
-                elseif (is_bool($val)) $type = $schema::DT_BOOLEAN;
-                elseif (date('Y-m-d H:i:s', strtotime($val)) == $val) $type = $schema::DT_DATETIME;
-                elseif (date('Y-m-d', strtotime($val)) == $val) $type = $schema::DT_DATE;
-                elseif (strlen($val)<256) $type = $schema::DT_VARCHAR256;
-                else $type = $schema::DT_TEXT;
-                $table->addColumn($key)->type($type);
-                $table->build();
-                // update mapper fields
-                $newField = $table->getCols(true);
-                $newField = $newField[$key];
-                $refl = new \ReflectionObject($this->mapper);
-                $prop = $refl->getProperty('fields');
-                $prop->setAccessible(true);
-                $fields = $prop->getValue($this->mapper);
-                $fields[$key] = $newField + array('value'=>NULL,'changed'=>NULL);
-                $prop->setValue($this->mapper,$fields);
+            // convert array content
+            if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields))
+                if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
+                    $val = serialize($val);
+                elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
+                    $val = json_encode($val);
+                else
+                    trigger_error(sprintf(self::E_ARRAYDATATYPE, $key));
+            // add nullable polyfill
+            if ($val === NULL && ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
+                && !empty($fields) && array_key_exists('nullable', $fields[$key])
+                && $fields[$key]['nullable'] === false)
+                trigger_error(sprintf(self::E_NULLABLECOLLISION,$key));
+            // MongoId shorthand
+            if ($this->dbsType == 'DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
+                $val = new \MongoId($val);
+            // fluid SQL
+            if ($this->fluid && $this->dbsType == 'DB\SQL') {
+                $schema = new Schema($this->db);
+                $table = $schema->alterTable($this->table);
+                // add missing field
+                if(!in_array($key,$table->getCols())) {
+                    // determine data type
+                    if (is_int($val)) $type = $schema::DT_INT;
+                    elseif (is_double($val)) $type = $schema::DT_DOUBLE;
+                    elseif (is_float($val)) $type = $schema::DT_FLOAT;
+                    elseif (is_bool($val)) $type = $schema::DT_BOOLEAN;
+                    elseif (date('Y-m-d H:i:s', strtotime($val)) == $val) $type = $schema::DT_DATETIME;
+                    elseif (date('Y-m-d', strtotime($val)) == $val) $type = $schema::DT_DATE;
+                    elseif (strlen($val)<256) $type = $schema::DT_VARCHAR256;
+                    else $type = $schema::DT_TEXT;
+                    $table->addColumn($key)->type($type);
+                    $table->build();
+                    // update mapper fields
+                    $newField = $table->getCols(true);
+                    $newField = $newField[$key];
+                    $refl = new \ReflectionObject($this->mapper);
+                    $prop = $refl->getProperty('fields');
+                    $prop->setAccessible(true);
+                    $fields = $prop->getValue($this->mapper);
+                    $fields[$key] = $newField + array('value'=>NULL,'changed'=>NULL);
+                    $prop->setValue($this->mapper,$fields);
+                }
             }
         }
         // custom setter
@@ -961,53 +962,68 @@ class Cortex extends Cursor {
     /**
      * Return fields of mapper object as an associative array
      * @return array
-     * @param      $obj object
-     * @param bool $relations resolve relations
+     * @param bool|Cortex $obj
+     * @param bool|int $rel_depths depths to resolve relations
      */
-    public function cast($obj = NULL, $relations = TRUE)
+    public function cast($obj = NULL, $rel_depths = 1)
     {
         $fields = $this->mapper->cast( ($obj) ? $obj->mapper : null );
-        if(is_int($relations))
-            $relations--;
+        if(is_int($rel_depths))
+            $rel_depths--;
         if (!empty($this->fieldConf)) {
-//            $fields += array_fill_keys(array_keys($this->fieldConf),NULL);
-            foreach ($fields as $key => &$val)
+            $fields += array_fill_keys(array_keys($this->fieldConf),NULL);
+            $mp = $obj ? : $this;
+            foreach ($fields as $key => &$val) {
                 // post process configured fields
                 if (array_key_exists($key, $this->fieldConf)) {
-                    if (($relations===TRUE || (is_int($relations) && $relations >= 0))
-                        && is_array($this->fieldConf[$key])) {
-                        $mp = $obj ?: $this;
+                    // handle relations
+                    if ( $mp->exists($key) && is_array($this->fieldConf[$key])
+                        && (isset($this->fieldConf[$key]['belongs-to'])
+                            || isset($this->fieldConf[$key]['belongs-to-many'])
+                            || isset($this->fieldConf[$key]['has-many'])
+                            || isset($this->fieldConf[$key]['has-one']))
+                        && ($rel_depths===TRUE || (is_int($rel_depths) && $rel_depths >= 0))) {
+                        // cast relations
                         $val = $mp->get($key);
-                        if (array_key_exists('belongs-to', $this->fieldConf[$key]))
-                            // single object
-                            $val=!is_null($val)?$val->cast(null,$relations):null;
-                        elseif (is_array($val) &&
-                                array_key_exists('belongs-to-many', $this->fieldConf[$key]))
-                            // multiple objects
-                            foreach($val as &$item)
-                                $item = !is_null($item) ? $item->cast(null,$relations) : null;
+                        if (!is_null($val)) {
+                            if (isset($this->fieldConf[$key]['belongs-to'])
+                                || isset($this->fieldConf[$key]['has-one']))
+                                // single object
+                                $val = $val->cast(null, $rel_depths);
+                            elseif (isset($this->fieldConf[$key]['belongs-to-many'])
+                                    || isset($this->fieldConf[$key]['has-many']))
+                                // multiple objects
+                                foreach ($val as &$item)
+                                    $item = !is_null($item) ? $item->cast(null, $rel_depths) : null;
+                        }
                     }
+                    // decode array fields
                     elseif ($this->dbsType == 'DB\SQL'
-//                            && in_array($key,array_keys($table_fields))
                             && array_key_exists('type', $this->fieldConf[$key]))
                         if ($this->fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
                             $val=unserialize($this->mapper->{$key});
                         elseif ($this->fieldConf[$key]['type'] == self::DT_TEXT_JSON)
                             $val=json_decode($this->mapper->{$key}, true);
                 }
+            }
         }
         return $fields;
     }
 
     /**
      * cast an array of mappers
-     * @param $mapper_arr;  array of mapper objects
-     * @return array;       array of associative arrays
+     * @param string|array $mapper_arr  array of mapper objects, or field name
+     * @return array    array of associative arrays
      **/
-    function castAll($mapper_arr = NULL)
+    function castAll($mapper_arr)
     {
-        if (!$mapper_arr) return NULL;
-        return array_map(array($this, 'cast'), $mapper_arr);
+        if (is_string($mapper_arr))
+            $mapper_arr = $this->get($mapper_arr);
+        if (!$mapper_arr)
+            return NULL;
+        foreach ($mapper_arr as &$mp)
+            $mp = $mp->cast();
+        return $mapper_arr;
     }
 
     /**
