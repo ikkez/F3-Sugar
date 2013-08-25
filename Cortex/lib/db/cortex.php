@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.9.3
+        @version 0.9.4
         @date 17.01.2013
  **/
 
@@ -662,7 +662,7 @@ class Cortex extends Cursor {
             $fields = $this->fieldConf;
             foreach($this->saveCsd as $key => $val) {
                 $relConf = $fields[$key]['has-many'];
-                if (!array_key_exists('refTable', $relConf)) {
+                if (!isset($relConf['refTable'])) {
                     // compute mm table name
                     $mmTable = array($relConf['relTable'].'__'.$relConf['relField'],
                                      $this->getTable().'__'.$key);
@@ -671,7 +671,7 @@ class Cortex extends Cursor {
                     $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
                 } else
                     $mmTable = $relConf['refTable'];
-                $rel = (array_key_exists($mmTable, $this->relRegistry)) ?
+                $rel = (isset($this->relRegistry[$mmTable])) ?
                     $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
                 // delete all refs
                 if (is_null($val))
@@ -760,9 +760,10 @@ class Cortex extends Cursor {
                     if (method_exists($this, 'set_'.$key))
                         $val = $this->{'set_'.$key}($val);
                     $this->saveCsd[$key] = $val;
-                    return;
+                    return $val;
                 } elseif ($relConf['rel'] == 'belongs-to') {
-                    // many-to-one, bidirectional, inverse way
+                    // TODO: many-to-one, bidirectional, inverse way
+                    trigger_error("not implemented");
                 }
             }
             // convert array content
@@ -827,13 +828,15 @@ class Cortex extends Cursor {
         $id = ($this->dbsType == 'DB\SQL')?'id':'_id';
         if ($key == '_id' && $this->dbsType == 'DB\SQL')
             $key = $id;
-        if(!empty($fields) && array_key_exists($key, $fields)) {
+        if(!empty($fields) && isset($fields[$key])) {
             // check field cache
-            if(!array_key_exists($key,$this->fieldsCache)) {
+            if(!array_key_exists($key,$this->fieldsCache) && is_array($fields[$key])) {
                 // load relations
-                if (is_array($fields[$key])) {
-                    if (array_key_exists('belongs-to', $fields[$key])) {
-                        // one-to-X, bidirectional, direct way
+                if (isset($fields[$key]['belongs-to'])) {
+                    // one-to-X, bidirectional, direct way
+                    if (!$this->exists($key))
+                        $this->fieldsCache[$key] = null;
+                    else {
                         $relConf = $fields[$key]['belongs-to'];
                         if (!is_array($relConf))
                             $relConf = array($relConf, $id);
@@ -841,94 +844,100 @@ class Cortex extends Cursor {
                         $rel->load(array($relConf[1].' = ?', $this->mapper->{$key}));
                         $this->fieldsCache[$key] = ((!$rel->dry()) ? $rel : null);
                     }
-                    elseif (array_key_exists('has-one', $fields[$key])) {
-                        // one-to-one, bidirectional, inverse way
-                        $fromConf = is_array($hasMany = $fields[$key]['has-one'])
-                            ? $hasMany : array($hasMany, null);
-                        $rel = $this->getRelInstance($fromConf[0]);
-                        $relFieldConf = $rel->getFieldConfiguration();
-                        if (!is_null($fromConf[1])
-                            && key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
-                            $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
-                            if (!is_array($toConf))
-                                $toConf = array($toConf, $id);
-                            $this->fieldsCache[$key] =
-                                $rel->load(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
-                        }
+                }
+                elseif (isset($fields[$key]['has-one'])) {
+                    // one-to-one, bidirectional, inverse way
+                    $fromConf = $fields[$key]['has-one'];
+                    if (!is_array($fromConf))
+                        trigger_error('Incomplete has-one config. Linked key missing.');
+                    $rel = $this->getRelInstance($fromConf[0]);
+                    $relFieldConf = $rel->getFieldConfiguration();
+                    if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
+                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
+                        if (!is_array($toConf))
+                            $toConf = array($toConf, $id);
+                        if ($toConf[1] != $id && !$this->exists($toConf[1]))
+                            $this->fieldsCache[$key] = null;
+                        else
+                            $this->fieldsCache[$key] = $rel->load(
+                                array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
                     }
-                    elseif (array_key_exists('has-many', $fields[$key])){
-                        $fromConf = $fields[$key]['has-many'];
-                        if (!is_array($fromConf))
-                            trigger_error('Incomplete has-many config. Linked key missing.');
-                        $rel = $this->getRelInstance($fromConf[0]);
-                        $relFieldConf = $rel->getFieldConfiguration();
-                        // one-to-many, bidirectional, inverse way
-                        if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
-                            $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
-                            if(!is_array($toConf))
-                                $toConf = array($toConf, $id);
-                            $this->fieldsCache[$key] =
-                                $rel->find(array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
+                }
+                elseif (isset($fields[$key]['has-many'])){
+                    $fromConf = $fields[$key]['has-many'];
+                    if (!is_array($fromConf))
+                        trigger_error('Incomplete has-many config. Linked key missing.');
+                    $rel = $this->getRelInstance($fromConf[0]);
+                    $relFieldConf = $rel->getFieldConfiguration();
+                    // one-to-many, bidirectional, inverse way
+                    if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
+                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
+                        if(!is_array($toConf))
+                            $toConf = array($toConf, $id);
+                        if ($toConf[1] != $id && !$this->exists($toConf[1]))
+                            $this->fieldsCache[$key] = null;
+                        else
+                            $this->fieldsCache[$key] = $rel->find(
+                                array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
+                    }
+                    // many-to-many, bidirectional
+                    elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
+                        $relConf = $fields[$key]['has-many'];
+                        if (!array_key_exists('refTable', $relConf)) {
+                            // compute mm table name
+                            $mmTable = array($relConf['relTable'].'__'.$relConf['relField'],
+                                $this->getTable().'__'.$key);
+                            natcasesort($mmTable);
+                            $mmTable = strtolower(str_replace('\\', '_',
+                                implode('_mm_', $mmTable)));
+                            $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
+                        } else
+                            $mmTable = $relConf['refTable'];
+                        // create mm table mapper
+                        $rel = (array_key_exists($mmTable, $this->relRegistry)) ?
+                            $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
+                        $results = $rel->find(array($relConf['relField'].' = ?',
+                                                    $this->mapper->{$id}));
+                        foreach ($results as $el) {
+                            $where[] = '_id = ?';
+                            $filter[] = $el->get($key);
                         }
-                        // many-to-many, bidirectional
-                        elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
-                            $relConf = $fields[$key]['has-many'];
-                            if (!array_key_exists('refTable', $relConf)) {
-                                // compute mm table name
-                                $mmTable = array($relConf['relTable'].'__'.$relConf['relField'],
-                                    $this->getTable().'__'.$key);
-                                natcasesort($mmTable);
-                                $mmTable = strtolower(str_replace('\\', '_',
-                                    implode('_mm_', $mmTable)));
-                                $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
-                            } else
-                                $mmTable = $relConf['refTable'];
-                            // create mm table mapper
-                            $rel = (array_key_exists($mmTable, $this->relRegistry)) ?
-                                $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
-                            $results = $rel->find(array($relConf['relField'].' = ?',
-                                                        $this->mapper->{$id}));
-                            foreach ($results as $el) {
-                                $where[] = '_id = ?';
-                                $filter[] = $el->get($key);
-                            }
-                            if (!isset($where)) {
-                                $this->fieldsCache[$key] = NULL;
-                            } else {
-                                $crit = implode(' OR ', $where);
-                                array_unshift($filter, $crit);
-                                unset($rel);
-                                // create foreign table mapper
-                                $rel = $this->getRelInstance($relConf[0]);
-                                $this->fieldsCache[$key] = $rel->find($filter);
-                            }
-                        }
-                    } elseif (array_key_exists('belongs-to-many', $fields[$key])) {
-                        // many-to-many, unidirectional
-                        $fields[$key]['type'] = self::DT_TEXT_JSON;
-                        $result = $this->mapper->get($key);
-                        if ($this->dbsType == 'DB\SQL')
-                            $result = json_decode($result, true);
-                        if (!is_array($result))
-                            $this->fieldsCache[$key] = $result;
-                        else {
-                            // hydrate mapper
-                            $relConf = $fields[$key]['belongs-to-many'];
-                            if (!is_array($relConf))
-                                $relConf = array($relConf, $id);
-                            $rel = $this->getRelInstance($relConf[0]);
-                            foreach ($result as $el) {
-                                $where[] = $relConf[1].' = ?';
-                                $filter[] = $el;
-                            }
+                        if (!isset($where)) {
+                            $this->fieldsCache[$key] = NULL;
+                        } else {
                             $crit = implode(' OR ', $where);
                             array_unshift($filter, $crit);
+                            unset($rel);
+                            // create foreign table mapper
+                            $rel = $this->getRelInstance($relConf[0]);
                             $this->fieldsCache[$key] = $rel->find($filter);
                         }
                     }
+                } elseif (isset($fields[$key]['belongs-to-many'])) {
+                    // many-to-many, unidirectional
+                    $fields[$key]['type'] = self::DT_TEXT_JSON;
+                    $result = !$this->exists($key) ? null :$this->mapper->get($key);
+                    if ($this->dbsType == 'DB\SQL')
+                        $result = json_decode($result, true);
+                    if (!is_array($result))
+                        $this->fieldsCache[$key] = $result;
+                    else {
+                        // hydrate mapper
+                        $relConf = $fields[$key]['belongs-to-many'];
+                        if (!is_array($relConf))
+                            $relConf = array($relConf, $id);
+                        $rel = $this->getRelInstance($relConf[0]);
+                        foreach ($result as $el) {
+                            $where[] = $relConf[1].' = ?';
+                            $filter[] = $el;
+                        }
+                        $crit = implode(' OR ', $where);
+                        array_unshift($filter, $crit);
+                        $this->fieldsCache[$key] = $rel->find($filter);
+                    }
                 }
                 // resolve array fields
-                elseif ($this->dbsType == 'DB\SQL' && array_key_exists('type', $fields[$key])) {
+                elseif ($this->dbsType == 'DB\SQL' && isset($fields[$key]['type'])) {
                     if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
                         $this->fieldsCache[$key] = unserialize($this->mapper->{$key});
                     elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
@@ -937,8 +946,8 @@ class Cortex extends Cursor {
             }
         }
         // fetch cached value, if existing
-        $val = (array_key_exists($key,$this->fieldsCache)) ?
-            $this->fieldsCache[$key] : $this->mapper->{$key};
+        $val = array_key_exists($key,$this->fieldsCache) ? $this->fieldsCache[$key]
+                : (($this->exists($key) || $key == $id) ? $this->mapper->{$key} : null);
         // custom getter
         return (method_exists($this, 'get_'.$key)) ? $this->{'get_'.$key}($val) : $val;
     }
@@ -975,31 +984,36 @@ class Cortex extends Cursor {
             $mp = $obj ? : $this;
             foreach ($fields as $key => &$val) {
                 // post process configured fields
-                if (array_key_exists($key, $this->fieldConf)) {
+                if (isset($this->fieldConf[$key]) && is_array($this->fieldConf[$key])) {
                     // handle relations
-                    if ( $mp->exists($key) && is_array($this->fieldConf[$key])
-                        && (isset($this->fieldConf[$key]['belongs-to'])
-                            || isset($this->fieldConf[$key]['belongs-to-many'])
-                            || isset($this->fieldConf[$key]['has-many'])
-                            || isset($this->fieldConf[$key]['has-one']))
-                        && ($rel_depths===TRUE || (is_int($rel_depths) && $rel_depths >= 0))) {
+                    if (($rel_depths === TRUE || (is_int($rel_depths) && $rel_depths >= 0))) {
+                        $relTypes = array('belongs-to','has-many','belongs-to-many','has-one');
+                        foreach ($relTypes as $type)
+                            if (isset($this->fieldConf[$key][$type])) {
+                                $relType = $type;
+                                break;
+                            }
                         // cast relations
-                        $val = $mp->get($key);
-                        if (!is_null($val)) {
-                            if (isset($this->fieldConf[$key]['belongs-to'])
-                                || isset($this->fieldConf[$key]['has-one']))
-                                // single object
-                                $val = $val->cast(null, $rel_depths);
-                            elseif (isset($this->fieldConf[$key]['belongs-to-many'])
-                                    || isset($this->fieldConf[$key]['has-many']))
-                                // multiple objects
-                                foreach ($val as &$item)
-                                    $item = !is_null($item) ? $item->cast(null, $rel_depths) : null;
+                        if (isset($relType)) {
+                            // cast relations
+                            if (($relType == 'belongs-to' || $relType == 'belongs-to-many')
+                                && !$mp->exists($key))
+                                $val = null;
+                            else
+                                $val = $mp->get($key);
+                            if (!is_null($val)) {
+                                if ($relType == 'belongs-to' || $relType == 'has-one')
+                                    // single object
+                                    $val = $val->cast(null, $rel_depths);
+                                elseif ($relType == 'belongs-to-many' || $relType == 'has-many')
+                                    // multiple objects
+                                    foreach ($val as &$item)
+                                        $item = !is_null($item) ? $item->cast(null, $rel_depths) : null;
+                            }
                         }
                     }
                     // decode array fields
-                    elseif ($this->dbsType == 'DB\SQL'
-                            && array_key_exists('type', $this->fieldConf[$key]))
+                    elseif ($this->dbsType == 'DB\SQL' && isset($this->fieldConf[$key]['type']))
                         if ($this->fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
                             $val=unserialize($this->mapper->{$key});
                         elseif ($this->fieldConf[$key]['type'] == self::DT_TEXT_JSON)
@@ -1013,16 +1027,17 @@ class Cortex extends Cursor {
     /**
      * cast an array of mappers
      * @param string|array $mapper_arr  array of mapper objects, or field name
+     * @param int          $rel_depths  depths to resolve relations
      * @return array    array of associative arrays
-     **/
-    function castAll($mapper_arr)
+     */
+    function castAll($mapper_arr, $rel_depths=0)
     {
         if (is_string($mapper_arr))
             $mapper_arr = $this->get($mapper_arr);
         if (!$mapper_arr)
             return NULL;
         foreach ($mapper_arr as &$mp)
-            $mp = $mp->cast();
+            $mp = $mp->cast(null,$rel_depths);
         return $mapper_arr;
     }
 
