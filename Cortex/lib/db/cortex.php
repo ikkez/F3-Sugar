@@ -710,14 +710,15 @@ class Cortex extends Cursor {
         $fields = $this->fieldConf;
         unset($this->fieldsCache[$key]);
         // pre-process if field config available
-        if (!empty($fields) && in_array($key,array_keys($fields))) {
+        if (!empty($fields) && is_array($fields[$key]) && in_array($key,array_keys($fields))) {
             // handle relations
-            if (!is_int($val) && is_array($fields[$key])
-                && array_key_exists('belongs-to', $fields[$key])) {
+            if (isset($fields[$key]['belongs-to'])) {
                 // one-to-many, one-to-one
                 if(is_null($val))
                     $val = NULL;
-                elseif (!(is_string($val) && $this->dbsType == 'DB\Jig')) {
+                elseif (is_object($val) &&
+                    !($this->dbsType=='DB\Mongo' && $val instanceof \MongoId))
+                    // fetch fkey from mapper
                     if (!$val instanceof Cortex || $val->dry())
                         trigger_error(self::E_INVALIDRELATIONOBJECT);
                     else {
@@ -725,8 +726,7 @@ class Cortex extends Cursor {
                         $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
                         $val = $val->get($rel_field);
                     }
-                }
-            } elseif (is_array($fields[$key]) && array_key_exists('belongs-to-many', $fields[$key])) {
+            } elseif (isset($fields[$key]['belongs-to-many'])) {
                 // many-to-many, unidirectional
                 $fields[$key]['type'] = self::DT_TEXT_JSON;
                 if (is_null($val))
@@ -746,13 +746,14 @@ class Cortex extends Cursor {
                         $val = $nval;
                     } else
                         foreach ($val as $index => &$item)
-                            if (is_object($item))
+                            if (is_object($item) &&
+                                !($this->dbsType == 'DB\Mongo' && $item instanceof \MongoId))
                                 if (!$item instanceof Cortex || $item->dry())
                                     trigger_error(self::E_INVALIDRELATIONOBJECT);
                                 else $item = $item[$rel_field];
                 }
             }
-            elseif (is_array($fields[$key]) && array_key_exists('has-many', $fields[$key])) {
+            elseif (isset($fields[$key]['has-many'])) {
                 // many-to-many, bidirectional
                 $relConf = $fields[$key]['has-many'];
                 if ($relConf['rel'] == 'has-many') {
