@@ -17,17 +17,19 @@ class Cortex extends Controller
         );
 
         $results = array();
-        foreach ($dbs as $type => $db) {
 
+        // Test Syntax
+        foreach ($dbs as $type => $db) {
             $test = new \Test_Syntax();
-            $results = array_merge((array) $results, (array) (array) $test->run($db, $type));
+            $results = array_merge((array) $results, (array) $test->run($db, $type));
         }
 
-        // Test 2
-        $f3->set('SQLDB',$dbs['sql']);
-        $test2 = new \Test_Relation();
-        $results = array_merge((array) $results, (array) (array) $test2->run($f3));
-
+        // Test Relations
+        foreach ($dbs as $type => $db) {
+            $f3->set('DB',$db);
+            $test = new \Test_Relation();
+            $results = array_merge((array) $results, (array) $test->run($db, $type));
+        }
 
         $f3->set('results', $results);
     }

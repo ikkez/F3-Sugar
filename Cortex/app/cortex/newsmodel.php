@@ -1,6 +1,5 @@
 <?php
 
-
 class NewsModel extends \DB\Cortex {
 
     protected
@@ -17,8 +16,11 @@ class NewsModel extends \DB\Cortex {
             'tags' => array(
                 'belongs-to-many' => '\TagModel',
             ),
+            'tags2' => array(
+                'has-many' => array('\TagModel','news'),
+            ),
         ),
         $table = 'news',
-        $db = 'SQLDB';
+        $db = 'DB';
 
 }

@@ -21,6 +21,6 @@ class AuthorModel extends \DB\Cortex {
             ),
         ),
         $table = 'author',
-        $db = 'SQLDB';
+        $db = 'DB';
 
 }

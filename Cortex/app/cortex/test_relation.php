@@ -4,200 +4,241 @@ use App\Controller;
 
 class Test_Relation {
 
-    function run($f3)
+    /**
+     * unify results for better comparison
+     */
+    private function getResult($result)
+    {
+        foreach ($result as &$row) {
+            if(is_object($row))
+                $row = $row->cast();
+            unset($row['_id']);
+            unset($row['id']);
+            foreach ($row as $col => $val) {
+                if (empty($val) || is_null($val))
+                    unset($row[$col]);
+            }
+        }
+        return $result;
+    }
+
+    function run($f3,$type)
     {
         $test = new \Test();
 
+        // clear existing data
+        \AuthorModel::setdown();
+        \TagModel::setdown();
+        \NewsModel::setdown();
+        \ProfileModel::setdown();
+
+        // setup models
+        \AuthorModel::setup();
+        \TagModel::setup();
+        \NewsModel::setup();
+        \ProfileModel::setup();
+
         // setup Author
         ///////////////////////////////////
-
-        \AuthorModel::setdown();
-        \AuthorModel::setup();
+        $author_id = array();
 
         $author = new \AuthorModel();
         $author->name = 'Johnny English';
         $author->save();
+        $author_id[] = $author->_id;
         $author->reset();
         $author->name = 'Ridley Scott';
         $author->save();
+        $author_id[] = $author->_id;
         $author->reset();
         $author->name = 'James T. Kirk';
         $author->save();
+        $author_id[] = $author->_id;
         $author->reset();
 
-        $allauthors = $author->afind();
+        $allauthors = $author->castAll($author->find());
+        $allauthors = $this->getResult($allauthors);
 
         $test->expect(
             json_encode($allauthors) ==
-            '[{"id":1,"name":"Johnny English","mail":null,"website":null},{"id":2,"name":"Ridley Scott","mail":null,"website":null},{"id":3,"name":"James T. Kirk","mail":null,"website":null}]',
-            'all AuthorModel items created'
+            '[{"name":"Johnny English"},{"name":"Ridley Scott"},{"name":"James T. Kirk"}]',
+            $type.': all AuthorModel items created'
         );
 
         // setup Tags
         ///////////////////////////////////
-
-        \TagModel::setdown();
-        \TagModel::setup();
+        $tag_id = array();
 
         $tag = new \TagModel();
         $tag->title = 'Web Design';
         $tag->save();
+        $tag_id[] = $tag->_id;
         $tag->reset();
         $tag->title = 'Responsive';
         $tag->save();
+        $tag_id[] = $tag->_id;
         $tag->reset();
         $tag->title = 'Usability';
         $tag->save();
+        $tag_id[] = $tag->_id;
         $tag->reset();
 
-        $allTags = $tag->afind();
+        $allTags = $this->getResult($tag->find());
         $test->expect(
             json_encode($allTags) ==
-            '[{"id":1,"title":"Web Design"},{"id":2,"title":"Responsive"},{"id":3,"title":"Usability"}]',
-            'all TagModel items created'
+            '[{"title":"Web Design"},{"title":"Responsive"},{"title":"Usability"}]',
+            $type.': all TagModel items created'
         );
 
         // setup News
         ///////////////////////////////////
-
-        \NewsModel::setdown();
-        \NewsModel::setup();
+        $news_id = array();
 
         $news = new \NewsModel();
         $news->title = 'Responsive Images';
         $news->text = 'Lorem Ipsun';
         $news->save();
+        $news_id[] = $news->_id;
         $news->reset();
         $news->title = 'CSS3 Showcase';
         $news->text = 'News Text 2';
         $news->save();
+        $news_id[] = $news->_id;
         $news->reset();
         $news->title = 'Touchable Interfaces';
         $news->save();
+        $news_id[] = $news->_id;
         $news->reset();
 
-        $allnews = $news->afind();
-
+        $allnews = $this->getResult($news->find());
         $test->expect(
             json_encode($allnews) ==
-            '[{"id":1,"title":"Responsive Images","text":"Lorem Ipsun","author":null,"tags":null},{"id":2,"title":"CSS3 Showcase","text":"News Text 2","author":null,"tags":null},{"id":3,"title":"Touchable Interfaces","text":null,"author":null,"tags":null}]',
-            'all NewsModel items created'
+            '[{"title":"Responsive Images","text":"Lorem Ipsun"},{"title":"CSS3 Showcase","text":"News Text 2"},{"title":"Touchable Interfaces"}]',
+            $type.': all NewsModel items created'
         );
 
         // belongs-to author relation
         ///////////////////////////////////
 
-        $author->load('_id = 1');
-
-        $news->load('_id = 1');
+        $author->load();
+        $news->load(array('_id = ?',$news_id[0]));
         $news->author = $author;
         $news->save();
         $news->reset();
-        $news->load('_id = 1');
+        $news->load(array('_id = ?', $news_id[0]));
         $test->expect(
             $news->author->name == 'Johnny English',
-            'belongs-to: author relation created'
+            $type.'belongs-to: author relation created'
         );
 
         $news->author = NULL;
         $news->save();
         $news->reset();
-        $news->load('_id = 1');
+        $news->load(array('_id = ?', $news_id[0]));
         $test->expect(
             empty($news->author),
-            'belongs-to: author relation released'
+            $type.': belongs-to: author relation released'
         );
-        $news->author = 1;
+
+        $news->author = $author->_id;
         $news->save();
         $news->reset();
-        $news->load('_id = 1');
+        $news->load(array('_id = ?', $news_id[0]));
         $test->expect(
             $news->author->name == 'Johnny English',
-            'belongs-to: relation created by raw id'
+            $type.': belongs-to: relation created by raw id'
         );
 
         // belongs-to-many tag relation
         ///////////////////////////////////
 
         $tag1 = new \TagModel();
-        $tag1->load();
+        $tag1->load(array('_id = ?', $tag_id[0]));
         $tag2 = new \TagModel();
-        $tag2->load()->next();
+        $tag2->load(array('_id = ?', $tag_id[1]));
         $news->tags = array($tag1,$tag2);
         $news->save();
         $news->reset();
-        $news->load('_id = 1');
+        $news->load(array('_id = ?', $news_id[0]));
         $test->expect(
             $news->tags[0]->title == 'Web Design' && $news->tags[1]->title == 'Responsive',
-            'belongs-to-many: relations created with array of mapper objects'
+            $type.': belongs-to-many: relations created with array of mapper objects'
         );
 
         $news->reset();
-        $news->load('_id = 2');
-        $news->tags = array(2,3);
+        $news->load(array('_id = ?', $news_id[1]));
+        $news->tags = array($tag_id[1],$tag_id[2]);
         $news->save();
         $news->reset();
-        $news->load('_id = 2');
+        $news->load(array('_id = ?', $news_id[1]));
         $test->expect(
             $news->tags[0]->title == 'Responsive' && $news->tags[1]->title == 'Usability',
-            'belongs-to-many: relations created with array of IDs'
+            $type.': belongs-to-many: relations created with array of IDs'
         );
 
         $news->tags = null;
         $news->save();
         $news->reset();
-        $news->load('_id = 2');
+        $news->load(array('_id = ?', $news_id[1]));
         $test->expect(
             empty($news->tags),
-            'belongs-to-many: relations released'
+            $type.': belongs-to-many: relations released'
         );
 
-        $news->tags = $tag->load('_id > 1');
+        $tag->reset();
+        $news->load(array('_id = ?', $news_id[1]));
+
+        $news->tags = $tag->load(array('_id != ?',$tag_id[0]));
         $news->save();
         $news->reset();
-        $news->load('_id = 2');
+        $news->load(array('_id = ?', $news_id[1]));
         $test->expect(
             $news->tags[0]->title == 'Responsive' && $news->tags[1]->title == 'Usability',
-            'belongs-to-many: relations created with hydrated mapper'
+            $type.': belongs-to-many: relations created with hydrated mapper'
         );
 
+
         $news->reset();
-        $news->load('_id = 3');
-        $news->tags = '1;3';
+        $tag->reset();
+        $news->load(array('_id = ?', $news_id[2]));
+        $news->tags = $tag_id[0].';'.$tag_id[2];
         $news->save();
         $news->reset();
-        $news->load('_id = 3');
+        $news->load(array('_id = ?', $news_id[2]));
         $test->expect(
             $news->tags[0]->title == 'Web Design' && $news->tags[1]->title == 'Usability',
-            'belongs-to-many: relations created with split-able string'
+            $type.': belongs-to-many: relations created with split-able string'
         );
+
 
         // has-one relation
         ///////////////////////////////////
 
-        \ProfileModel::setdown();
-        \ProfileModel::setup();
-
         $profile = new ProfileModel();
         $profile->message = 'Hello World';
-        $profile->author = $author->load();
+        $profile->author = $author->load(array('_id = ?',$author_id[0]));
         $profile->save();
+        $profile_id = $profile->_id;
+        $profile->reset();
         $author->reset();
-        $author->load();
+        $author->load(array('_id = ?', $author_id[0]));
+        $profile->load(array('_id = ?', $profile_id));
         $test->expect(
-            json_encode($author->load()->profile->cast()) ==
-            '{"id":1,"message":"Hello World","image":null,"author":{"id":1,"name":"Johnny English","mail":null,"website":null}}',
-            'has-one inverse relation'
+            $author->profile->message == 'Hello World' &&
+            $profile->author->name == "Johnny English",
+            $type.': has-one inverse relation'
         );
 
         // has-many relation
         ///////////////////////////////////
 
-        $author->load();
+        $author->load(array('_id = ?', $author_id[0]));
+        $result = $this->getResult($author->news);
         $test->expect(
-            json_encode($author->castAll($author->news)) ==
-            '[{"id":1,"title":"Responsive Images","text":"Lorem Ipsun","author":1,"tags":"[1,2]"}]',
-            'has-many inverse relation'
+            $result[0]['title'] == "Responsive Images" &&
+            $result[0]['tags'][0]['title'] == 'Web Design' &&
+            $result[0]['tags'][1]['title'] == 'Responsive',
+            $type.': has-many inverse relation'
         );
 
         ///////////////////////////////////

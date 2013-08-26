@@ -15,6 +15,6 @@ class ProfileModel extends \DB\Cortex {
             )
         ),
         $table = 'profile',
-        $db = 'SQLDB';
+        $db = 'DB';
 
 }
