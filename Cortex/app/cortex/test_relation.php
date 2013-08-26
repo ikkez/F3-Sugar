@@ -128,7 +128,7 @@ class Test_Relation {
         $news->load(array('_id = ?', $news_id[0]));
         $test->expect(
             $news->author->name == 'Johnny English',
-            $type.'belongs-to: author relation created'
+            $type.': belongs-to: author relation created'
         );
 
         $news->author = NULL;
@@ -239,6 +239,20 @@ class Test_Relation {
             $result[0]['tags'][0]['title'] == 'Web Design' &&
             $result[0]['tags'][1]['title'] == 'Responsive',
             $type.': has-many inverse relation'
+        );
+
+        // many to many relation
+        ///////////////////////////////////
+
+        $news->load(array('_id = ?',$news_id[0]));
+        $news->tags2 = array($tag_id[0],$tag_id[1]);
+        $news->save();
+        $news->reset();
+        $news->load(array('_id = ?',$news_id[0]));
+        $test->expect(
+            $news->tags2[0]['title'] == 'Web Design' &&
+            $news->tags2[1]['title'] == 'Responsive',
+            $type.': many-to-many relation'
         );
 
         ///////////////////////////////////
