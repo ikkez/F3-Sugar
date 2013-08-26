@@ -543,7 +543,8 @@ class Cortex extends Cursor {
             elseif (!in_array($match[0], array('==', '='))) {
                 $opr = str_replace(array('<>', '<', '>', '!', '='),
                     array('$ne', '$lt', '$gt', '$n', 'e'), $match[0]);
-                $var = array($opr => (strtolower($var) == 'null') ? null : $var + 0);
+                $var = array($opr => (strtolower($var) == 'null') ? null :
+                    (is_object($var) ? $var : $var + 0));
             } elseif(trim($exp[0]) == '_id' && !$var instanceof \MongoId)
                 $var = new \MongoId($var);
             return array(trim($exp[0]) => $var);
