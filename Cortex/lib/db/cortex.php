@@ -216,17 +216,8 @@ class Cortex extends Cursor {
                             && key($rel['fieldConf'][$relConf[1]]) == 'has-many') {
                             // compute mm table name
                             $fConf = $rel['fieldConf'][$relConf[1]]['has-many'];
-                            // check for a matching config
-                            if (!is_int(strpos($fConf[0],$self)))
-                                trigger_error(sprintf(self::E_MM_REL_CLASS,$fConf[0],$self));
-                            if ($fConf[1] != $key)
-                                trigger_error(sprintf(self::E_MM_REL_FIELD,
-                                    $fConf[0].'.'.$fConf[1],$self.'.'.$key));
-                            // compute mm table name
-                            $mmTable = array($rel['table'].'__'.$relConf[1],
-                                             $table.'__'.$key);
-                            natcasesort($mmTable);
-                            $mmTable = strtolower(str_replace('\\','_',implode('_mm_',$mmTable)));
+                            $mmTable = static::getMMTableName(
+                                $rel['table'], $relConf[1], $table, $key, $fConf);
                             // create dummy to invoke table
                             $mmRel = new Cortex($db,$mmTable,true);
                             $rand = rand(0,1000000);
@@ -301,17 +292,8 @@ class Cortex extends Cursor {
                     && key($rel['fieldConf'][$relConf[1]]) == 'has-many') {
                     // compute mm table name
                     $fConf = $rel['fieldConf'][$relConf[1]]['has-many'];
-                    // check for a matching config
-                    if (!is_int(strpos($fConf[0],$self)))
-                        trigger_error(sprintf(self::E_MM_REL_CLASS,$fConf[0],$self));
-                    if ($fConf[1] != $key)
-                        trigger_error(sprintf(self::E_MM_REL_FIELD,
-                            $fConf[0].'.'.$fConf[1],$self.'.'.$key));
-                    // compute mm table name
-                    $mmTable = array($rel['table'].'__'.$relConf[1],
-                        $table.'__'.$key);
-                    natcasesort($mmTable);
-                    $mmTables[] = strtolower(str_replace('\\','_',implode('_mm_',$mmTable)));
+                    $mmTables[] = static::getMMTableName(
+                        $rel['table'], $relConf[1], $table, $key, $fConf);
                 }
             }
         }
@@ -343,6 +325,33 @@ class Cortex extends Cursor {
                     $db->{$mmt}->drop();
                 break;
         }
+    }
+
+    /**
+     * computes the m:m table name
+     * @param string $ftable foreign table
+     * @param string $fkey   foreign key
+     * @param string $ptable own table
+     * @param string $pkey   own key
+     * @param null|array $fConf  foreign conf [class,key]
+     * @return string
+     */
+    static protected function getMMTableName($ftable, $fkey, $ptable, $pkey, $fConf=null)
+    {
+        if ($fConf) {
+            list($fclass, $pfkey) = $fConf;
+            $self = get_called_class();
+            // check for a matching config
+            if (!is_int(strpos($fclass, $self)))
+                trigger_error(sprintf(self::E_MM_REL_CLASS, $fclass, $self));
+            if ($pfkey != $pkey)
+                trigger_error(sprintf(self::E_MM_REL_FIELD,
+                    $fclass.'.'.$pfkey, $self.'.'.$pkey));
+        }
+        $mmTable = array($ftable.'__'.$fkey, $ptable.'__'.$pkey);
+        natcasesort($mmTable);
+        $return = strtolower(str_replace('\\', '_', implode('_mm_', $mmTable)));
+        return $return;
     }
 
     /**
@@ -706,10 +715,8 @@ class Cortex extends Cursor {
                 $relConf = $fields[$key]['has-many'];
                 if (!isset($relConf['refTable'])) {
                     // compute mm table name
-                    $mmTable = array($relConf['relTable'].'__'.$relConf['relField'],
-                                     $this->getTable().'__'.$key);
-                    natcasesort($mmTable);
-                    $mmTable = strtolower(str_replace('\\', '_', implode('_mm_', $mmTable)));
+                    $mmTable = static::getMMTableName($relConf['relTable'],
+                        $relConf['relField'], $this->getTable(), $key);
                     $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
                 } else
                     $mmTable = $relConf['refTable'];
@@ -925,21 +932,18 @@ class Cortex extends Cursor {
                     }
                     // many-to-many, bidirectional
                     elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
-                        $relConf = $fields[$key]['has-many'];
-                        if (!array_key_exists('refTable', $relConf)) {
+                        if (!array_key_exists('refTable', $fromConf)) {
                             // compute mm table name
-                            $mmTable = array($relConf['relTable'].'__'.$relConf['relField'],
-                                $this->getTable().'__'.$key);
-                            natcasesort($mmTable);
-                            $mmTable = strtolower(str_replace('\\', '_',
-                                implode('_mm_', $mmTable)));
+                            $toConf = $relFieldConf[$fromConf[1]]['has-many'];
+                            $mmTable = static::getMMTableName($fromConf['relTable'],
+                                $fromConf['relField'], $this->getTable(), $key, $toConf);
                             $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
                         } else
-                            $mmTable = $relConf['refTable'];
+                            $mmTable = $fromConf['refTable'];
                         // create mm table mapper
                         $rel = (array_key_exists($mmTable, $this->relRegistry)) ?
                             $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
-                        $results = $rel->find(array($relConf['relField'].' = ?',
+                        $results = $rel->find(array($fromConf['relField'].' = ?',
                                                     $this->mapper->{$id}));
                         foreach ($results as $el) {
                             $where[] = '_id = ?';
@@ -952,7 +956,7 @@ class Cortex extends Cursor {
                             array_unshift($filter, $crit);
                             unset($rel);
                             // create foreign table mapper
-                            $rel = $this->getRelInstance($relConf[0]);
+                            $rel = $this->getRelInstance($fromConf[0]);
                             $this->fieldsCache[$key] = $rel->find($filter);
                         }
                     }
