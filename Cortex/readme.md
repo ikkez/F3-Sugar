@@ -318,25 +318,25 @@ To make relations work, you need to use a model class with field configuration. 
     <tr>
         <td>1:1</td>
         <td>belongs-to-one</td>
-        <td><- -></td>
+        <td>&lt;- -&gt;</td>
         <td>has-one</td>
     </tr>
     <tr>
         <td>1:m</td>
         <td>belongs-to-one</td>
-        <td><- -></td>
+        <td>&lt;- -&gt;</td>
         <td>has-many</td>
     </tr>
     <tr>
         <td>m:m</td>
         <td>has-many</td>
-        <td><- -></td>
+        <td>&lt;- -&gt;</td>
         <td>has-many</td>
     </tr>
     <tr>
         <td>m:m</td>
         <td>belongs-to-many</td>
-        <td> ---></td>
+        <td> ---&gt;</td>
         <td></td>
     </tr>
 </table>
