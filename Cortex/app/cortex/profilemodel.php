@@ -11,7 +11,7 @@ class ProfileModel extends \DB\Cortex {
                 'type' => \DB\SQL\Schema::DT_VARCHAR256
             ),
             'author' => array(
-                'belongs-to' => '\AuthorModel'
+                'belongs-to-one' => '\AuthorModel'
             )
         ),
         $table = 'profile',

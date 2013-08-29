@@ -128,7 +128,7 @@ class Test_Relation {
         $news->load(array('_id = ?', $news_id[0]));
         $test->expect(
             $news->author->name == 'Johnny English',
-            $type.': belongs-to: author relation created'
+            $type.': belongs-to-one: author relation created'
         );
 
         $news->author = NULL;
@@ -137,7 +137,7 @@ class Test_Relation {
         $news->load(array('_id = ?', $news_id[0]));
         $test->expect(
             empty($news->author),
-            $type.': belongs-to: author relation released'
+            $type.': belongs-to-one: author relation released'
         );
 
         $news->author = $author->_id;
@@ -146,7 +146,7 @@ class Test_Relation {
         $news->load(array('_id = ?', $news_id[0]));
         $test->expect(
             $news->author->name == 'Johnny English',
-            $type.': belongs-to: relation created by raw id'
+            $type.': belongs-to-one: relation created by raw id'
         );
 
         // belongs-to-many tag relation

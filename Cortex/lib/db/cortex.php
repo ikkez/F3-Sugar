@@ -361,9 +361,9 @@ class Cortex extends Cursor {
      */
     protected static function resolveRelationConf($field)
     {
-        if (array_key_exists('belongs-to', $field)) {
+        if (array_key_exists('belongs-to-one', $field)) {
             // find primary field definition
-            if (!is_array($relConf = $field['belongs-to']))
+            if (!is_array($relConf = $field['belongs-to-one']))
                 $relConf = array($relConf, '_id');
             // set field type
             if ($relConf[1] == '_id')
@@ -389,7 +389,7 @@ class Cortex extends Cursor {
                 $field['has-many']['relTable'] = $rel['table'];
                 $field['has-many']['relField'] = $relConf[1];
             } else {
-                $field['has-many']['rel'] = 'belongs-to';
+                $field['has-many']['rel'] = 'belongs-to-one';
             }
         }
         return $field;
@@ -761,7 +761,7 @@ class Cortex extends Cursor {
         // pre-process if field config available
         if (!empty($fields) && is_array($fields[$key]) && in_array($key,array_keys($fields))) {
             // handle relations
-            if (isset($fields[$key]['belongs-to'])) {
+            if (isset($fields[$key]['belongs-to-one'])) {
                 // one-to-many, one-to-one
                 if(is_null($val))
                     $val = NULL;
@@ -771,7 +771,7 @@ class Cortex extends Cursor {
                     if (!$val instanceof Cortex || $val->dry())
                         trigger_error(self::E_INVALID_RELATION_OBJECT);
                     else {
-                        $relConf = $fields[$key]['belongs-to'];
+                        $relConf = $fields[$key]['belongs-to-one'];
                         $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
                         $val = $val->get($rel_field);
                     }
@@ -811,7 +811,7 @@ class Cortex extends Cursor {
                         $val = $this->{'set_'.$key}($val);
                     $this->saveCsd[$key] = $val;
                     return $val;
-                } elseif ($relConf['rel'] == 'belongs-to') {
+                } elseif ($relConf['rel'] == 'belongs-to-one') {
                     // TODO: many-to-one, bidirectional, inverse way
                     trigger_error("not implemented");
                 }
@@ -882,12 +882,12 @@ class Cortex extends Cursor {
             // check field cache
             if(!array_key_exists($key,$this->fieldsCache) && is_array($fields[$key])) {
                 // load relations
-                if (isset($fields[$key]['belongs-to'])) {
+                if (isset($fields[$key]['belongs-to-one'])) {
                     // one-to-X, bidirectional, direct way
                     if (!$this->exists($key))
                         $this->fieldsCache[$key] = null;
                     else {
-                        $relConf = $fields[$key]['belongs-to'];
+                        $relConf = $fields[$key]['belongs-to-one'];
                         if (!is_array($relConf))
                             $relConf = array($relConf, $id);
                         $rel = $this->getRelInstance($relConf[0]);
@@ -902,8 +902,8 @@ class Cortex extends Cursor {
                         trigger_error(sprintf(self::E_REL_CONF_INC,$key));
                     $rel = $this->getRelInstance($fromConf[0]);
                     $relFieldConf = $rel->getFieldConfiguration();
-                    if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
-                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
+                    if (key($relFieldConf[$fromConf[1]]) == 'belongs-to-one') {
+                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
                         if (!is_array($toConf))
                             $toConf = array($toConf, $id);
                         if ($toConf[1] != $id && !$this->exists($toConf[1]))
@@ -920,8 +920,8 @@ class Cortex extends Cursor {
                     $rel = $this->getRelInstance($fromConf[0]);
                     $relFieldConf = $rel->getFieldConfiguration();
                     // one-to-many, bidirectional, inverse way
-                    if (key($relFieldConf[$fromConf[1]]) == 'belongs-to') {
-                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to'];
+                    if (key($relFieldConf[$fromConf[1]]) == 'belongs-to-one') {
+                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
                         if(!is_array($toConf))
                             $toConf = array($toConf, $id);
                         if ($toConf[1] != $id && !$this->exists($toConf[1]))
@@ -1034,7 +1034,7 @@ class Cortex extends Cursor {
                 if (isset($this->fieldConf[$key]) && is_array($this->fieldConf[$key])) {
                     // handle relations
                     if (($rel_depths === TRUE || (is_int($rel_depths) && $rel_depths >= 0))) {
-                        $relTypes = array('belongs-to','has-many','belongs-to-many','has-one');
+                        $relTypes = array('belongs-to-one','has-many','belongs-to-many','has-one');
                         foreach ($relTypes as $type)
                             if (isset($this->fieldConf[$key][$type])) {
                                 $relType = $type;
@@ -1043,13 +1043,13 @@ class Cortex extends Cursor {
                         // cast relations
                         if (isset($relType)) {
                             // cast relations
-                            if (($relType == 'belongs-to' || $relType == 'belongs-to-many')
+                            if (($relType == 'belongs-to-one' || $relType == 'belongs-to-many')
                                 && !$mp->exists($key))
                                 $val = null;
                             else
                                 $val = $mp->get($key);
                             if (!is_null($val)) {
-                                if ($relType == 'belongs-to' || $relType == 'has-one')
+                                if ($relType == 'belongs-to-one' || $relType == 'has-one')
                                     // single object
                                     $val = $val->cast(null, $rel_depths);
                                 elseif ($relType == 'belongs-to-many' || $relType == 'has-many')

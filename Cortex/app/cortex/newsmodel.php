@@ -11,7 +11,7 @@ class NewsModel extends \DB\Cortex {
                 'type' => \DB\SQL\Schema::DT_TEXT
             ),
             'author' => array(
-                'belongs-to' => '\AuthorModel',
+                'belongs-to-one' => '\AuthorModel',
             ),
             'tags' => array(
                 'belongs-to-many' => '\TagModel',
@@ -22,5 +22,4 @@ class NewsModel extends \DB\Cortex {
         ),
         $table = 'news',
         $db = 'DB';
-
 }
