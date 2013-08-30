@@ -69,7 +69,7 @@ $user->load(array('name like ? AND (deleted = 0 OR rights > ?)','Jack%',3));
 
 No need for complex criteria objects or confusing mongo where-array constructions. It's just as simple as you're used to. Using a Jig DB will automatically translate that query into:
 
-```
+``` php
 Array (
     [0] => (isset(@name) && preg_match(?,@name)) AND ( @deleted = 0 OR (isset(@rights) && @rights > ?) )
     [1] => /^Jack/
@@ -79,7 +79,7 @@ Array (
 
 And for MongoDB it translates into this:
 
-```
+``` php
 Array (
     [$and] => Array (
         [0] => Array (
@@ -109,7 +109,7 @@ You can use all the fancy methods from Cursor, like `load`, `find`, `cast`, `nex
 
 When you are prototyping some new objects or just don't want to bother with a table schema, while using Cortex along with a SQL DB backend, you can enable the SQL Fluid Mode. This way Cortex will create all necessary tables and columns automatically, so you can focus on writing your application code. It will try to guess the right datatype, based on the given sample data. To enable the fluid mode, just pass a third argument to the object's constructor:
 
-``` pho
+``` php
 $user = new \DB\Cortex($db, 'users', TRUE);
 $user->name = 'John';            // varchar(256)
 $user->age = 25;                 // integer
@@ -123,7 +123,7 @@ This way it also creates datatypes of datetime, float, text ( if strlen > 265) a
 
 Using the Cortex class directly is easy for some CRUD operations, but to enable some more advanced features, you'll need to wrap Cortex in a Model class like this:
 
-``` pho
+``` php
 // file user.php
 class User extends \DB\Cortex {
 
@@ -144,7 +144,7 @@ $user = new \Users();
 
 Your Cortex Model accepts some sort of field configuration. This way it's able to follow a defined schema of your data entity. It looks like this:
 
-``` pho
+``` php
 // file user.php
 class User extends \DB\Cortex {
 
@@ -200,7 +200,7 @@ class User extends \DB\Cortex {
 
 And in your `usermodel.ini` file:
 
-```
+``` ini
 [globals]
 usermodel.db = AppDB1
 usermodel.table = users
@@ -241,15 +241,11 @@ $fields = array(
 
 This method completly removes the specified table from the used database. So handle with care. 
 
-#### With Model class
-
 ``` php
+// With Model class
 \User::setdown();
-``` 
 
-#### Without Model class
-
-``` php
+// Without Model class
 \DB\Cortex::setdown($db, 'users');
 ``` 
 
@@ -279,7 +275,6 @@ class User extends \DB\Cortex {
     public function set_passwort($value) {        
         return \Bcrypt::instance()->hash($value);
     }
-    
 }
 ```
 
@@ -323,25 +318,25 @@ To make relations work, you need to use a model class with field configuration. 
     <tr>
         <td>1:1</td>
         <td>belongs-to-one</td>
-        <td><- -></td>
+        <td>&lt;- -&gt;</td>
         <td>has-one</td>
     </tr>
     <tr>
         <td>1:m</td>
         <td>belongs-to-one</td>
-        <td><- -></td>
+        <td>&lt;- -&gt;</td>
         <td>has-many</td>
     </tr>
     <tr>
         <td>m:m</td>
         <td>has-many</td>
-        <td><- -></td>
+        <td>&lt;- -&gt;</td>
         <td>has-many</td>
     </tr>
     <tr>
         <td>m:m</td>
         <td>belongs-to-many</td>
-        <td> ---></td>
+        <td> ---&gt;</td>
         <td></td>
     </tr>
 </table>
