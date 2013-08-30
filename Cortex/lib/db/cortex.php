@@ -650,14 +650,9 @@ class Cortex extends Cursor {
      */
     public function afind($filter = NULL, array $options = NULL, $ttl = 0)
     {
-        return array_map(array($this,'cast'),$this->find($filter,$options,$ttl));
+        $result = $this->find($filter, $options, $ttl);
+        return $this->castAll($result,1);
     }
-
-    /************************\
-     *
-     *  ORM specific methods
-     *
-    \************************/
 
     /**
      * Return an array of objects matching criteria
