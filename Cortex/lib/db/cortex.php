@@ -1025,6 +1025,8 @@ class Cortex extends Cursor {
             $fields += array_fill_keys(array_keys($this->fieldConf),NULL);
             $mp = $obj ? : $this;
             foreach ($fields as $key => &$val) {
+                //reset relType
+                unset($relType);
                 // post process configured fields
                 if (isset($this->fieldConf[$key]) && is_array($this->fieldConf[$key])) {
                     // handle relations
