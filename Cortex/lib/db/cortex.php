@@ -860,7 +860,7 @@ class Cortex extends Cursor {
                 // load relations
                 if (isset($fields[$key]['belongs-to-one'])) {
                     // one-to-X, bidirectional, direct way
-                    if (!$this->exists($key))
+                    if (!$this->exists($key) || is_null($this->mapper->{$key}))
                         $this->fieldsCache[$key] = null;
                     else {
                         $relConf = $fields[$key]['belongs-to-one'];
@@ -882,7 +882,8 @@ class Cortex extends Cursor {
                         $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
                         if (!is_array($toConf))
                             $toConf = array($toConf, $id);
-                        if ($toConf[1] != $id && !$this->exists($toConf[1]))
+                        if ($toConf[1] != $id && (!$this->exists($toConf[1])
+                            || is_null($this->mapper->{$toConf[1]})))
                             $this->fieldsCache[$key] = null;
                         else
                             $this->fieldsCache[$key] = $rel->load(
@@ -900,7 +901,8 @@ class Cortex extends Cursor {
                         $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
                         if(!is_array($toConf))
                             $toConf = array($toConf, $id);
-                        if ($toConf[1] != $id && !$this->exists($toConf[1]))
+                        if ($toConf[1] != $id && (!$this->exists($toConf[1])
+                            || is_null($this->mapper->{$toConf[1]})))
                             $this->fieldsCache[$key] = null;
                         else
                             $this->fieldsCache[$key] = $rel->find(
