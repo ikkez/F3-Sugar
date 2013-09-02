@@ -3,7 +3,7 @@
 
 With this plugin, you can create named routes in your application and access them easily in your template.
 
-Doing so gives you the possibility to change your route URLs, without touch all links in your templates again.
+Doing so gives you the possibility to change your route URLs, without touching all links in your templates again.
 
 ***
 ### Usage
@@ -16,7 +16,7 @@ $router = \Router::instance();
 
 #### Create Named Routes
 
-To register a new named route, use the register method. It uses the same syntax and params like `$f3->route` did, but prepends an additional `$name` argument.
+To register a new named route, use the register method. It uses the same syntax and params as `$f3->route`, but prepends an additional `$name` argument.
 
 ``` php
 $router->register( string $name, string $pattern, callback|string $handler, [ int $ttl = 0] , [ int $kbps = 0 ]);
@@ -31,9 +31,9 @@ $router->register('newsletter-signin-page','GET /newsletter/subscribe/',function
 $router->register('newsletter-signin-page', 'POST /newsletter/subscribe/', '\App\NewsController');
 ```
 
-**Notice:** You need to use the same route name for route pattern of the same URL, because different HTTP Verbs for the same URL are grouped internally.
+**Notice:** You need to use the same route name for different HTTP Verbs of the same URL.
 
-To create a named route mapped to a class, just use **MAP** as HTTP Verb in your pattern.
+To create a named route that is mapped to a class, just use **MAP** as HTTP Verb in your pattern. In example:
 
 ``` php
 $router->register('news-map', 'MAP /news', '\App\NewsController');
@@ -41,7 +41,7 @@ $router->register('news-map', 'MAP /news', '\App\NewsController');
 
 #### Access Routes from Template
 
-To used these named routes easiely, i've added a little template extension that will parse all your `<A>`-tags. So you just need to write:
+To use these named routes easiely, i've added a little template extension that will parse all your `<A>`-tags, so you just need to write:
 
 ``` html
 <a route="newsletter-signin-page">subscribe to the newsletter</a>
@@ -64,18 +64,18 @@ There is also support for token parameters in your route.
 $router->register('news-view','GET /view/@page','NewsController->viewPage');
 ```
 
-To fill that token, use an extra attribute in your `<a>`-tag, named like your route token and prepend it by `param-` like this:
+To fill that token, use an extra attribute in your `<a>`-tag, named like your route token and prepended by `param-`, like this:
 
 ``` html
 <a route="news-view" param-page="news123">read more about News123</a>
 ```
 
-This will create the link `<a href="view/news123">`
+This will create the link `<a href="view/news123">`.
 
 
 #### Template Tokens
 
-You can use dynamic template tokens too, in most of the available arguments.
+You can also use dynamic template tokens in most of the available arguments.
 
 ``` html
 <a route="{{@article_route}}" param-page="{{@article_id}}">read more</a>
