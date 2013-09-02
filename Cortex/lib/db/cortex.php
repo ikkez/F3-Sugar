@@ -60,7 +60,7 @@ class Cortex extends Cursor {
         E_INVALID_RELATION_OBJECT = 'You can only save hydrated mapper objects',
         E_NULLABLE_COLLISION = 'Unable to set NULL to the NOT NULLABLE field: %s',
         E_WRONG_RELATION_CLASS = 'Relations only works with Cortex objects',
-        E_MM_REL_VALUE = 'Invalid value for m:m field "%s". Expecting null, string, hydrated mapper object, or array of mapper objects.',
+        E_MM_REL_VALUE = 'Invalid value for many field "%s". Expecting null, split-able string, hydrated mapper object, or array of mapper objects.',
         E_MM_REL_CLASS = 'Mismatching m:m relation config from class `%s` to `%s`.',
         E_MM_REL_FIELD = 'Mismatching m:m relation keys from `%s` to `%s`.',
         E_REL_CONF_INC = 'Incomplete relation config for `%s`. Linked key is missing.';
@@ -754,7 +754,7 @@ class Cortex extends Cursor {
         $fields = $this->fieldConf;
         unset($this->fieldsCache[$key]);
         // pre-process if field config available
-        if (!empty($fields) && is_array($fields[$key]) && in_array($key,array_keys($fields))) {
+        if (!empty($fields) && isset($fields[$key]) && is_array($fields[$key])) {
             // handle relations
             if (isset($fields[$key]['belongs-to-one'])) {
                 // one-to-many, one-to-one
@@ -773,29 +773,9 @@ class Cortex extends Cursor {
             } elseif (isset($fields[$key]['belongs-to-many'])) {
                 // many-to-many, unidirectional
                 $fields[$key]['type'] = self::DT_TEXT_JSON;
-                if (is_null($val))
-                    $val = NULL;
-                elseif (is_string($val))
-                    $val = \Base::instance()->split($val);
-                elseif (!is_array($val) && !(is_object($val) && $val instanceof Cortex && !$val->dry()))
-                    trigger_error(sprintf(self::E_MM_REL_VALUE,$key));
-                else {
-                    $relConf = $fields[$key]['belongs-to-many'];
-                    $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
-                    if (is_object($val)) {
-                        while (!$val->dry()) {
-                            $nval[] = $val->get($rel_field);
-                            $val->next();
-                        }
-                        $val = $nval;
-                    } else
-                        foreach ($val as $index => &$item)
-                            if (is_object($item) &&
-                                !($this->dbsType == 'DB\Mongo' && $item instanceof \MongoId))
-                                if (!$item instanceof Cortex || $item->dry())
-                                    trigger_error(self::E_INVALID_RELATION_OBJECT);
-                                else $item = $item[$rel_field];
-                }
+                $relConf = $fields[$key]['belongs-to-many'];
+                $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
+                $val = $this->getForeignKeysArray($val, $rel_field, $key);
             }
             elseif (isset($fields[$key]['has-many'])) {
                 // many-to-many, bidirectional
@@ -804,7 +784,8 @@ class Cortex extends Cursor {
                     // custom setter
                     if (method_exists($this, 'set_'.$key))
                         $val = $this->{'set_'.$key}($val);
-                    $this->saveCsd[$key] = $val;
+                    $val = $this->getForeignKeysArray($val,'_id',$key);
+                    $this->saveCsd[$key] = $val; // array of keys
                     return $val;
                 } elseif ($relConf['rel'] == 'belongs-to-one') {
                     // TODO: many-to-one, bidirectional, inverse way
@@ -873,7 +854,7 @@ class Cortex extends Cursor {
         $id = ($this->dbsType == 'DB\SQL')?'id':'_id';
         if ($key == '_id' && $this->dbsType == 'DB\SQL')
             $key = $id;
-        if(!empty($fields) && isset($fields[$key])) {
+        if(!empty($fields) && isset($fields[$key]) && is_array($fields[$key])) {
             // check field cache
             if(!array_key_exists($key,$this->fieldsCache) && is_array($fields[$key])) {
                 // load relations
@@ -992,6 +973,42 @@ class Cortex extends Cursor {
                 : (($this->exists($key) || $key == $id) ? $this->mapper->{$key} : null);
         // custom getter
         return (method_exists($this, 'get_'.$key)) ? $this->{'get_'.$key}($val) : $val;
+    }
+
+    /**
+     * find the ID values of given relation collection
+     * @param $val string|array|object|bool
+     * @param $rel_field string
+     * @param $key string
+     * @return array|Cortex|null|object
+     */
+    protected function getForeignKeysArray($val, $rel_field, $key)
+    {
+        if (is_null($val))
+            $val = NULL;
+        elseif (is_string($val))
+            // split-able string of collection IDs
+            $val = \Base::instance()->split($val);
+        elseif (!is_array($val) && !(is_object($val) && $val instanceof Cortex && !$val->dry()))
+            trigger_error(sprintf(self::E_MM_REL_VALUE, $key));
+        else {
+            // hydrated mapper as collection
+            if (is_object($val)) {
+                while (!$val->dry()) {
+                    $nval[] = $val->get($rel_field);
+                    $val->next();
+                }
+                $val = $nval;
+            } elseif (is_array($val))
+                // array of single hydrated mappers, raw ID value or mixed
+                foreach ($val as $index => &$item)
+                    if (is_object($item) &&
+                        !($this->dbsType == 'DB\Mongo' && $item instanceof \MongoId))
+                        if (!$item instanceof Cortex || $item->dry())
+                            trigger_error(self::E_INVALID_RELATION_OBJECT);
+                        else $item = $item->get($rel_field);
+        }
+        return $val;
     }
 
     /**
