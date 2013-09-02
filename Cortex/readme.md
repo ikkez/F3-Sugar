@@ -435,11 +435,27 @@ $allNewsByAuthorX = $author->castAll('news'); // it now a multi-dimensional arra
 
 #### many-to-many, bidirectional
 
-When both models of a relation has a defined `has-many` configuration on their linkage fields, Cortex create a new reference table in setup, where the foreign keys of both models are linked together. This way you can query model A for related models of B and vice versa.
+When both models of a relation has a `has-many` configuration on their linkage fields, Cortex create a new reference table in setup, where the foreign keys of both models are linked together. This way you can query model A for related models of B and vice versa.
+
+To save many collections to a model you've got serveral ways:
 
 ``` php
 $news->load(array('_id = ?',1));
-$news->tags2 = array(12, 5); // IDs of TagModel
+
+// array of IDs from TagModel
+$news->tags2 = array(12, 5);
+// OR a split-able string
+$news->tags2 = '12;5;3;9'; // delimiter: [,;|]
+// OR an array of single mapper objects
+$tag = new \TagModel();
+$tag->load(array('_id = ?', 1));
+$tag2 = new \TagModel();
+$tag2->load(array('_id = ?', 2));
+$tag3 = $tag->findone(array('_id = ?', 3));
+$news->tags = array($tag,$tag2,$tag3);
+// OR a hydrated mapper that may contain multiple results
+$news->tags2 = $tag->load(array('_id != ?',42));
+
 $news->save();
 ```
  
