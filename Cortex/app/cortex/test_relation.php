@@ -252,7 +252,17 @@ class Test_Relation {
         $test->expect(
             $news->tags2[0]['title'] == 'Web Design' &&
             $news->tags2[1]['title'] == 'Responsive',
-            $type.': many-to-many relation'
+            $type.': many-to-many relation created'
+        );
+
+        $news->load(array('_id = ?', $news_id[0]));
+        $news->tags2 = NULL;
+        $news->save();
+        $news->reset();
+        $news->load(array('_id = ?', $news_id[0]));
+        $test->expect(
+            is_null($news->tags2),
+            $type.': many-to-many relation released'
         );
 
         ///////////////////////////////////

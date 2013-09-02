@@ -719,7 +719,7 @@ class Cortex extends Cursor {
                     $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
                 // delete all refs
                 if (is_null($val))
-                    $rel->erase(array($key.' = ?', $this->get('_id')));
+                    $rel->erase(array($relConf['relField'].' = ?', $this->get('_id')));
                 // update refs
                 elseif (is_array($val)) {
                     $id = $this->get('_id');
