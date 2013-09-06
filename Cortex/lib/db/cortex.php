@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.9.5
+        @version 0.10.0
         @date 17.01.2013
  **/
 
@@ -413,65 +413,93 @@ class Cortex extends Cursor {
         if (is_null($cond)) return $cond;
         if (is_string($cond))
             $cond = array($cond);
-        $cond = $this->convertNamedParams($cond);
-        $cond[0] = str_replace(array('&&','||'),array('AND','OR'),$cond[0]);
-        $ops = array('<=', '>=', '<>', '<', '>', '!=', '==', '=', 'like');
-        foreach ($ops as &$op) $op = preg_quote($op);
-        $op_quote = implode('|', $ops);
-
+        $where = array_shift($cond);
+        $args = $cond;
+        $where = str_replace(array('&&','||'),array('AND','OR'),$where);
+        // prepare IN condition
+        $where = preg_replace('/\bIN\b\s*\(\s*(\?|:\w+)?\s*\)/i', 'IN $1', $where);
         switch ($this->dbsType) {
             case 'DB\Jig':
-                return $this->_jig_parse_filter($cond);
+                return $this->_jig_parse_filter($where,$args);
             case 'DB\Mongo':
-                $parts = preg_split("/\s*(\)|\(|\bAND\b|\bOR\b)\s*/i", array_shift($cond), -1,
-                    PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+                $parts = $this->splitLogical($where);
+                if (is_int(strpos($where, ':')))
+                    list($parts, $args) = $this->convertNamedParams($parts, $args);
                 foreach ($parts as &$part)
-                    if (preg_match('/'.$op_quote.'/i', $part, $match)) {
-                        $bindValue = is_int(strpos($part,'?')) ? array_shift($cond) : null;
-                        $part = $this->_mongo_parse_relational_op($part, $bindValue);
-                    }
+                    $part = $this->_mongo_parse_relational_op($part, $args);
                 $ncond = $this->_mongo_parse_logical_op($parts);
                 return $ncond;
             case 'DB\SQL':
                 // preserve identifier
-                $cond[0] = preg_replace('/(?!\B)_id/','id',$cond[0]);
-                return $cond;
+                $where = preg_replace('/(?!\B)_id/','id',$where);
+                $parts = $this->splitLogical($where);
+                // ensure positional bind params
+                if (is_int(strpos($where, ':')))
+                    list($parts, $args) = $this->convertNamedParams($parts, $args);
+                $ncond = array();
+                foreach ($parts as &$part) {
+                    // enhanced IN handling
+                    if (is_int(strpos($part, '?'))) {
+                        $val = array_shift($args);
+                        if(is_int($pos = strpos($part,'IN ?'))) {
+                            if (!is_array($val))
+                                trigger_error('bind value for IN operator must be an array');
+                            $bindMarks = str_repeat('?,', count($val) - 1).'?';
+                            $part = substr($part,0,$pos).'IN ('.$bindMarks.')';
+                            $ncond = array_merge($ncond,$val);
+                        } else
+                            $ncond[] = $val;
+                    }
+                }
+                array_unshift($ncond, implode(' ', $parts));
+                return $ncond;
         }
+    }
+
+    /**
+     * split where criteria string into logical chunks
+     * @param $cond
+     * @return array
+     */
+    protected function splitLogical($cond)
+    {
+        return preg_split('/\s*(\)|\(|\bAND\b|\bOR\b)\s*/i', $cond, -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
     }
 
     /**
      * converts named parameter filter to positional
-     * @param $cond
+     * @param $parts
+     * @param $args
      * @return array
      */
-    function convertNamedParams($cond)
+    function convertNamedParams($parts,$args)
     {
-        if (count($cond)<=1) return $cond;
-        if (is_int(strpos($cond[0],':'))) {
-            // named param found
-            $where = explode(' ',array_shift($cond));
-            $params = array(0);
+        if (empty($args)) return array($parts,$args);
+            $params = array();
             $pos = 0;
-            foreach ($where as $val)
-                if (is_int(strpos($val,':')) && in_array($val,array_keys($cond))) {
-                    $where = str_replace($val, '?', $where);
-                    $params[] = $cond[$val];
-                } elseif($val == '?')
-                    $params[] = $cond[$pos++];
-            $cond = array(implode(' ',$where)) + $params;
-        }
-        return $cond;
+            foreach ($parts as &$part) {
+                if(preg_match('/:\w+/i',$part,$match)) {
+                    if(!isset($args[$match[0]]))
+                        trigger_error(sprintf('named bind value `%s` does not exist in filter arguments',$match[0]));
+                    $part = str_replace($match[0], '?', $part);
+                    $params[] = $args[$match[0]];
+                } elseif (is_int(strpos($part,'?')))
+                    $params[] = $args[$pos++];//
+            }
+        return array($parts,$params);
     }
 
     /**
      * convert filter array to jig syntax
-     * @param $cond
+     * @param $where
+     * @param $args
      * @return array
      */
-    private function _jig_parse_filter($cond){
-        // split logical
-        $parts = preg_split("/\s*(\)|\(|\bAND\b|\bOR\b)\s*/i", array_shift($cond), -1,
-            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+    private function _jig_parse_filter($where,$args){
+        $parts = $this->splitLogical($where);
+        if (is_int(strpos($where, ':')))
+            list($parts, $args) = $this->convertNamedParams($parts, $args);
         $ncond = array();
         foreach ($parts as &$part) {
             if (in_array(strtoupper($part), array('AND', 'OR')))
@@ -480,10 +508,10 @@ class Cortex extends Cursor {
             $part = preg_replace('/([a-z_-]+)/i', '@$1', $part, -1, $count);
             // value comparison
             if (is_int(strpos($part, '?'))) {
-                $val = array_shift($cond);
+                $val = array_shift($args);
                 preg_match('/(@\w+)/i', $part, $match);
                 // find like operator
-                if (is_int(strpos(strtoupper($part), ' @LIKE '))) {
+                if (is_int(strpos($upart=strtoupper($part), ' @LIKE '))) {
                     // %var% -> /var/
                     if (substr($val, 0, 1) == '%' && substr($val, -1, 1) == '%')
                         $val = str_replace('%', '/', $val);
@@ -494,6 +522,12 @@ class Cortex extends Cursor {
                     elseif (substr($val, 0, 1) == '%')
                         $val = '/'.substr($val, 1).'$/';
                     $part = 'preg_match(?,'.$match[0].')';
+                } // find IN operator
+                else if (is_int($pos=strpos($upart, ' @IN '))) {
+                    if($not = is_int($npos=strpos($upart,'@NOT')))
+                        $pos=$npos;
+                    $part = ($not?'!':'').'in_array('.substr($part, 0, $pos).
+                        ',array(\''.implode('\',\'',$val).'\'))';
                 }
                 // add existence check
                 $part = '(isset('.$match[0].') && '.$part.')';
@@ -559,18 +593,20 @@ class Cortex extends Cursor {
 
     /**
      * find and convert relational operators
-     * @param $cond
-     * @param $var
+     * @param $part
+     * @param $args
      * @return array|null
      */
-    private function _mongo_parse_relational_op($cond, $var)
+    private function _mongo_parse_relational_op($part, &$args)
     {
-        if (is_null($cond)) return $cond;
-        $ops = array('<=', '>=', '<>', '<', '>', '!=', '==', '=', 'like');
-        foreach ($ops as &$op) $op = preg_quote($op);
+        if (is_null($part)) return $part;
+        $ops = array('<=', '>=', '<>', '<', '>', '!=', '==', '=', 'like', 'in','not in');
+        foreach ($ops as &$op)
+            $op = preg_quote($op);
         $op_quote = implode('|', $ops);
-        if (preg_match('/'.$op_quote.'/i', $cond, $match)) {
-            $exp = explode($match[0], $cond);
+        if (preg_match('/'.$op_quote.'/i', $part, $match)) {
+            $var = is_int(strpos($part, '?')) ? array_shift($args) : null;
+            $exp = explode($match[0], $part);
             // unbound value
             if (is_numeric($exp[1]))
                 $var = $exp[1];
@@ -589,6 +625,10 @@ class Cortex extends Cursor {
                 elseif (substr($var, 0, 1) == '%')
                     $rgx = '/'.substr($var, 1).'$/';
                 $var = new \MongoRegex($rgx);
+            } elseif (strtoupper($match[0]) == 'IN') {
+                $var = array('$in'=>$var);
+            } elseif (strtoupper($match[0]) == 'NOT IN') {
+                $var = array('$nin'=>$var);
             } // translate operators
             elseif (!in_array($match[0], array('==', '='))) {
                 $opr = str_replace(array('<>', '<', '>', '!', '='),
@@ -599,7 +639,7 @@ class Cortex extends Cursor {
                 $var = new \MongoId($var);
             return array(trim($exp[0]) => $var);
         }
-        return $cond;
+        return $part;
     }
 
     /**
