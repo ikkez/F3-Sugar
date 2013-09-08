@@ -36,10 +36,15 @@ class Cortex extends Cursor {
 
         // internal vars, don't touch
         $dbsType,       // mapper engine type [Jig, SQL, Mongo]
-        $mapper,        // ORM object
         $fieldsCache,   // relation field cache
         $saveCsd,       // mm rel save cascade
         $relRegistry;
+
+    /** @var Cursor */
+    protected $mapper;
+
+    /** @var CortexQueryParser */
+    protected $queryParser;
 
     static
         $init = false;  // just init without mapper
@@ -55,7 +60,6 @@ class Cortex extends Cursor {
         E_NO_TABLE = 'No table specified.',
         E_UNKNOWN_DB_ENGINE = 'This unknown DB system is not supported: %s',
         E_FIELD_SETUP = 'No field setup defined',
-        E_BRACKETS = 'Invalid query: unbalanced brackets found',
         E_UNKNOWN_FIELD = 'Field %s does not exist in %s.',
         E_INVALID_RELATION_OBJECT = 'You can only save hydrated mapper objects',
         E_NULLABLE_COLLISION = 'Unable to set NULL to the NOT NULLABLE field: %s',
@@ -77,7 +81,12 @@ class Cortex extends Cursor {
             $this->fluid = $fluid;
         if (!is_object($this->db=(is_string($db=($db?:$this->db))?\Base::instance()->get($db):$db)))
             trigger_error(self::E_CONNECTION);
-        $this->dbsType = get_class($this->db);
+        if($this->db instanceof Jig)
+            $this->dbsType = 'jig';
+        elseif ($this->db instanceof SQL)
+            $this->dbsType = 'sql';
+        elseif ($this->db instanceof Mongo)
+            $this->dbsType = 'mongo';
         if (strlen($this->table=strtolower($table?:$this->table))==0&&!$this->fluid)
             trigger_error(self::E_NO_TABLE);
         if (static::$init == TRUE) return;
@@ -92,18 +101,19 @@ class Cortex extends Cursor {
     public function initMapper()
     {
         switch ($this->dbsType) {
-            case 'DB\Jig':
+            case 'jig':
                 $this->mapper = new Jig\Mapper($this->db, $this->table);
                 break;
-            case 'DB\SQL':
+            case 'sql':
                 $this->mapper = new SQL\Mapper($this->db, $this->table);
                 break;
-            case 'DB\Mongo':
+            case 'mongo':
                 $this->mapper = new Mongo\Mapper($this->db, $this->table);
                 break;
             default:
                 trigger_error(sprintf(self::E_UNKNOWN_DB_ENGINE,$this->dbsType));
         }
+        $this->queryParser = CortexQueryParser::instance();
         $this->reset();
         $this->relRegistry = array();
         if(!empty($this->fieldConf))
@@ -197,8 +207,7 @@ class Cortex extends Cursor {
                 return false;
             } else
                 $fields = array();
-        $dbsType = get_class($db);
-        if ($dbsType == 'DB\SQL') {
+        if ($db instanceof SQL) {
             $schema = new Schema($db);
             // prepare field configuration
             if (!empty($fields))
@@ -297,33 +306,29 @@ class Cortex extends Cursor {
                 }
             }
         }
-        $dbsType = get_class($db);
-        switch ($dbsType) {
-            case 'DB\Jig':
-                $refl = new \ReflectionObject($db);
-                $prop = $refl->getProperty('dir');
-                $prop->setAccessible(true);
-                $dir = $prop->getValue($db);
-                if(file_exists($dir.$table))
-                    unlink($dir.$table);
-                foreach ($mmTables as $mmt)
-                    if(file_exists($dir.$mmt))
-                        unlink($dir.$mmt);
-                break;
-            case 'DB\SQL':
-                $schema = new Schema($db);
-                $tables = $schema->getTables();
-                if(in_array($table, $tables))
-                    $schema->dropTable($table);
-                foreach ($mmTables as $mmt)
-                    if(in_array($mmt, $tables))
-                        $schema->dropTable($mmt);
-                break;
-            case 'DB\Mongo':
-                $db->{$table}->drop();
-                foreach ($mmTables as $mmt)
-                    $db->{$mmt}->drop();
-                break;
+        if($db instanceof Jig) {
+            // TODO: use new dir() method
+            $refl = new \ReflectionObject($db);
+            $prop = $refl->getProperty('dir');
+            $prop->setAccessible(true);
+            $dir = $prop->getValue($db);
+            if(file_exists($dir.$table))
+                unlink($dir.$table);
+            foreach ($mmTables as $mmt)
+                if(file_exists($dir.$mmt))
+                    unlink($dir.$mmt);
+        } elseif($db instanceof SQL) {
+            $schema = new Schema($db);
+            $tables = $schema->getTables();
+            if(in_array($table, $tables))
+                $schema->dropTable($table);
+            foreach ($mmTables as $mmt)
+                if(in_array($mmt, $tables))
+                    $schema->dropTable($mmt);
+        } elseif($db instanceof Mongo) {
+            $db->{$table}->drop();
+            foreach ($mmTables as $mmt)
+                $db->{$mmt}->drop();
         }
     }
 
@@ -396,292 +401,6 @@ class Cortex extends Cursor {
     }
 
     /**
-     * converts the given filter array to fit the used DBS
-     *
-     * example filter:
-     *   array('text = ? AND num = ?','bar',5)
-     *   array('num > ? AND num2 <= ?',5,10)
-     *   array('num1 > num2')
-     *   array('text like ?','%foo%')
-     *   array('(text like ? OR text like ?) AND num != ?','foo%','%bar',23)
-     *
-     * @param array $cond
-     * @return array|bool|null
-     */
-    private function prepareFilter($cond = NULL)
-    {
-        if (is_null($cond)) return $cond;
-        if (is_string($cond))
-            $cond = array($cond);
-        $where = array_shift($cond);
-        $args = $cond;
-        $where = str_replace(array('&&','||'),array('AND','OR'),$where);
-        // prepare IN condition
-        $where = preg_replace('/\bIN\b\s*\(\s*(\?|:\w+)?\s*\)/i', 'IN $1', $where);
-        switch ($this->dbsType) {
-            case 'DB\Jig':
-                return $this->_jig_parse_filter($where,$args);
-            case 'DB\Mongo':
-                $parts = $this->splitLogical($where);
-                if (is_int(strpos($where, ':')))
-                    list($parts, $args) = $this->convertNamedParams($parts, $args);
-                foreach ($parts as &$part)
-                    $part = $this->_mongo_parse_relational_op($part, $args);
-                $ncond = $this->_mongo_parse_logical_op($parts);
-                return $ncond;
-            case 'DB\SQL':
-                // preserve identifier
-                $where = preg_replace('/(?!\B)_id/','id',$where);
-                $parts = $this->splitLogical($where);
-                // ensure positional bind params
-                if (is_int(strpos($where, ':')))
-                    list($parts, $args) = $this->convertNamedParams($parts, $args);
-                $ncond = array();
-                foreach ($parts as &$part) {
-                    // enhanced IN handling
-                    if (is_int(strpos($part, '?'))) {
-                        $val = array_shift($args);
-                        if(is_int($pos = strpos($part,'IN ?'))) {
-                            if (!is_array($val))
-                                trigger_error('bind value for IN operator must be an array');
-                            $bindMarks = str_repeat('?,', count($val) - 1).'?';
-                            $part = substr($part,0,$pos).'IN ('.$bindMarks.')';
-                            $ncond = array_merge($ncond,$val);
-                        } else
-                            $ncond[] = $val;
-                    }
-                }
-                array_unshift($ncond, implode(' ', $parts));
-                return $ncond;
-        }
-    }
-
-    /**
-     * split where criteria string into logical chunks
-     * @param $cond
-     * @return array
-     */
-    protected function splitLogical($cond)
-    {
-        return preg_split('/\s*(\)|\(|\bAND\b|\bOR\b)\s*/i', $cond, -1,
-            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
-    }
-
-    /**
-     * converts named parameter filter to positional
-     * @param $parts
-     * @param $args
-     * @return array
-     */
-    function convertNamedParams($parts,$args)
-    {
-        if (empty($args)) return array($parts,$args);
-            $params = array();
-            $pos = 0;
-            foreach ($parts as &$part) {
-                if(preg_match('/:\w+/i',$part,$match)) {
-                    if(!isset($args[$match[0]]))
-                        trigger_error(sprintf('named bind value `%s` does not exist in filter arguments',$match[0]));
-                    $part = str_replace($match[0], '?', $part);
-                    $params[] = $args[$match[0]];
-                } elseif (is_int(strpos($part,'?')))
-                    $params[] = $args[$pos++];//
-            }
-        return array($parts,$params);
-    }
-
-    /**
-     * convert filter array to jig syntax
-     * @param $where
-     * @param $args
-     * @return array
-     */
-    private function _jig_parse_filter($where,$args){
-        $parts = $this->splitLogical($where);
-        if (is_int(strpos($where, ':')))
-            list($parts, $args) = $this->convertNamedParams($parts, $args);
-        $ncond = array();
-        foreach ($parts as &$part) {
-            if (in_array(strtoupper($part), array('AND', 'OR')))
-                continue;
-            // prefix field names
-            $part = preg_replace('/([a-z_-]+)/i', '@$1', $part, -1, $count);
-            // value comparison
-            if (is_int(strpos($part, '?'))) {
-                $val = array_shift($args);
-                preg_match('/(@\w+)/i', $part, $match);
-                // find like operator
-                if (is_int(strpos($upart=strtoupper($part), ' @LIKE '))) {
-                    // %var% -> /var/
-                    if (substr($val, 0, 1) == '%' && substr($val, -1, 1) == '%')
-                        $val = str_replace('%', '/', $val);
-                    // var%  -> /^var/
-                    elseif (substr($val, -1, 1) == '%')
-                        $val = '/^'.str_replace('%', '', $val).'/';
-                    // %var  -> /var$/
-                    elseif (substr($val, 0, 1) == '%')
-                        $val = '/'.substr($val, 1).'$/';
-                    $part = 'preg_match(?,'.$match[0].')';
-                } // find IN operator
-                else if (is_int($pos=strpos($upart, ' @IN '))) {
-                    if($not = is_int($npos=strpos($upart,'@NOT')))
-                        $pos=$npos;
-                    $part = ($not?'!':'').'in_array('.substr($part, 0, $pos).
-                        ',array(\''.implode('\',\'',$val).'\'))';
-                }
-                // add existence check
-                $part = '(isset('.$match[0].') && '.$part.')';
-                $ncond[] = $val;
-            } elseif ($count == 2) {
-                // field comparison
-                preg_match_all('/(@\w+)/i', $part, $matches);
-                $part = '(isset('.$matches[0][0].') && isset('.$matches[0][1].') && ('.$part.'))';
-            }
-        }
-        array_unshift($ncond, implode(' ', $parts));
-        return $ncond;
-    }
-
-    /**
-     * find and wrap logical operators AND, OR, (, )
-     * @param $parts
-     * @return array
-     */
-    private function _mongo_parse_logical_op($parts)
-    {
-        $b_offset = 0;
-        $ncond = array();
-        $child = array();
-        for ($i = 0, $max = count($parts); $i < $max; $i++) {
-            $part = $parts[$i];
-            if ($part == '(') {
-                // add sub-bracket to parse array
-                if ($b_offset > 0)
-                    $child[] = $part;
-                $b_offset++;
-            } elseif ($part == ')') {
-                $b_offset--;
-                // found closing bracket
-                if ($b_offset == 0) {
-                    $ncond[] = ($this->_mongo_parse_logical_op($child));
-                    $child = array();
-                } elseif ($b_offset < 0)
-                    trigger_error(self::E_BRACKETS);
-                else
-                    // add sub-bracket to parse array
-                    $child[] = $part;
-            } // add to parse array
-            elseif ($b_offset > 0)
-                $child[] = $part; // condition type
-            elseif (!is_array($part)) {
-                if (strtoupper($part) == 'AND')
-                    $add = true;
-                elseif (strtoupper($part) == 'OR')
-                    $or = true;
-            } else // skip
-                $ncond[] = $part;
-        }
-        if ($b_offset > 0)
-            trigger_error(self::E_BRACKETS);
-        if (isset($add))
-            return array('$and' => $ncond);
-        elseif (isset($or))
-            return array('$or' => $ncond);
-        else
-            return $ncond[0];
-    }
-
-    /**
-     * find and convert relational operators
-     * @param $part
-     * @param $args
-     * @return array|null
-     */
-    private function _mongo_parse_relational_op($part, &$args)
-    {
-        if (is_null($part)) return $part;
-        $ops = array('<=', '>=', '<>', '<', '>', '!=', '==', '=', 'like', 'in','not in');
-        foreach ($ops as &$op)
-            $op = preg_quote($op);
-        $op_quote = implode('|', $ops);
-        if (preg_match('/'.$op_quote.'/i', $part, $match)) {
-            $var = is_int(strpos($part, '?')) ? array_shift($args) : null;
-            $exp = explode($match[0], $part);
-            // unbound value
-            if (is_numeric($exp[1]))
-                $var = $exp[1];
-            // field comparison
-            elseif(!is_int(strpos($exp[1], '?')))
-                return array('$where' => 'this.'.trim($exp[0]).' '.$match[0].' this.'.trim($exp[1]));
-            // find like operator
-            if (strtoupper($match[0]) == 'LIKE') {
-                // %var% -> /var/
-                if (substr($var, 0, 1) == '%' && substr($var, -1, 1) == '%')
-                    $rgx = str_replace('%', '/', $var);
-                // var%  -> /^var/
-                elseif (substr($var, -1, 1) == '%')
-                    $rgx = '/^'.str_replace('%', '', $var).'/';
-                // %var  -> /var$/
-                elseif (substr($var, 0, 1) == '%')
-                    $rgx = '/'.substr($var, 1).'$/';
-                $var = new \MongoRegex($rgx);
-            } elseif (strtoupper($match[0]) == 'IN') {
-                $var = array('$in'=>$var);
-            } elseif (strtoupper($match[0]) == 'NOT IN') {
-                $var = array('$nin'=>$var);
-            } // translate operators
-            elseif (!in_array($match[0], array('==', '='))) {
-                $opr = str_replace(array('<>', '<', '>', '!', '='),
-                    array('$ne', '$lt', '$gt', '$n', 'e'), $match[0]);
-                $var = array($opr => (strtolower($var) == 'null') ? null :
-                    (is_object($var) ? $var : $var + 0));
-            } elseif(trim($exp[0]) == '_id' && !$var instanceof \MongoId)
-                $var = new \MongoId($var);
-            return array(trim($exp[0]) => $var);
-        }
-        return $part;
-    }
-
-    /**
-     * convert options array syntax
-     *
-     * example:
-     *   array('order'=>'location') // default direction is ASC
-     *   array('order'=>'num1 desc, num2 asc')
-     *
-     * @param $options
-     * @return array|null
-     */
-    private function prepareOptions($options)
-    {
-        if (!empty($options) && is_array($options)) {
-            switch ($this->dbsType) {
-                case 'DB\Jig':
-                    if (array_key_exists('order', $options))
-                        $options['order'] = str_replace(array('asc', 'desc'),
-                            array('SORT_ASC', 'SORT_DESC'), strtolower($options['order']));
-                    break;
-            }
-            switch ($this->dbsType) {
-                case 'DB\Mongo':
-                    if (array_key_exists('order', $options)) {
-                        $sorts = explode(',', $options['order']);
-                        $sorting = array();
-                        foreach ($sorts as $sort) {
-                            $sp = explode(' ', trim($sort));
-                            $sorting[$sp[0]] = (array_key_exists(1, $sp) &&
-                                strtoupper($sp[1]) == 'DESC') ? -1 : 1;
-                        }
-                        $options['order'] = $sorting;
-                    }
-                    break;
-            }
-            return $options;
-        } else
-            return null;
-    }
-
-    /**
      * Return an array of result arrays matching criteria
      * @param null  $filter
      * @param array $options
@@ -703,8 +422,8 @@ class Cortex extends Cursor {
      */
     public function find($filter = NULL, array $options = NULL, $ttl = 0)
     {
-        $filter = $this->prepareFilter($filter);
-        $options = $this->prepareOptions($options);
+        $filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
+        $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $result = $this->mapper->find($filter, $options, $ttl);
         foreach($result as &$mapper)
             $mapper = $this->factory($mapper);
@@ -719,8 +438,8 @@ class Cortex extends Cursor {
      */
     public function load($filter = NULL, array $options = NULL)
     {
-        $filter = $this->prepareFilter($filter);
-        $options = $this->prepareOptions($options);
+        $filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
+        $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $this->mapper->load($filter, $options);
         return $this;
     }
@@ -732,7 +451,7 @@ class Cortex extends Cursor {
      */
     public function erase($filter = null)
     {
-        $filter = $this->prepareFilter($filter);
+        $filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
         $this->mapper->erase($filter);
     }
 
@@ -779,7 +498,7 @@ class Cortex extends Cursor {
 
     public function count($filter = NULL)
     {
-        $filter = $this->prepareFilter($filter);
+        $filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
         return $this->mapper->count($filter);
     }
 
@@ -801,7 +520,7 @@ class Cortex extends Cursor {
                 if(is_null($val))
                     $val = NULL;
                 elseif (is_object($val) &&
-                    !($this->dbsType=='DB\Mongo' && $val instanceof \MongoId))
+                    !($this->dbsType=='mongo' && $val instanceof \MongoId))
                     // fetch fkey from mapper
                     if (!$val instanceof Cortex || $val->dry())
                         trigger_error(self::E_INVALID_RELATION_OBJECT);
@@ -833,7 +552,7 @@ class Cortex extends Cursor {
                 }
             }
             // convert array content
-            if (is_array($val) && $this->dbsType == 'DB\SQL' && !empty($fields))
+            if (is_array($val) && $this->dbsType == 'sql' && !empty($fields))
                 if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
                     $val = serialize($val);
                 elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
@@ -841,16 +560,16 @@ class Cortex extends Cursor {
                 else
                     trigger_error(sprintf(self::E_ARRAY_DATATYPE, $key));
             // add nullable polyfill
-            if ($val === NULL && ($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
+            if ($val === NULL && ($this->dbsType == 'jig' || $this->dbsType == 'mongo')
                 && !empty($fields) && array_key_exists('nullable', $fields[$key])
                 && $fields[$key]['nullable'] === false)
                 trigger_error(sprintf(self::E_NULLABLE_COLLISION,$key));
             // MongoId shorthand
-            if ($this->dbsType == 'DB\Mongo' && $key == '_id' && !$val instanceof \MongoId)
+            if ($this->dbsType == 'mongo' && $key == '_id' && !$val instanceof \MongoId)
                 $val = new \MongoId($val);
         }
         // fluid SQL
-        if ($this->fluid && $this->dbsType == 'DB\SQL') {
+        if ($this->fluid && $this->dbsType == 'sql') {
             $schema = new Schema($this->db);
             $table = $schema->alterTable($this->table);
             // add missing field
@@ -891,8 +610,8 @@ class Cortex extends Cursor {
     function get($key)
     {
         $fields = $this->fieldConf;
-        $id = ($this->dbsType == 'DB\SQL')?'id':'_id';
-        if ($key == '_id' && $this->dbsType == 'DB\SQL')
+        $id = ($this->dbsType == 'sql')?'id':'_id';
+        if ($key == '_id' && $this->dbsType == 'sql')
             $key = $id;
         if(!empty($fields) && isset($fields[$key]) && is_array($fields[$key])) {
             // check field cache
@@ -982,7 +701,7 @@ class Cortex extends Cursor {
                     // many-to-many, unidirectional
                     $fields[$key]['type'] = self::DT_TEXT_JSON;
                     $result = !$this->exists($key) ? null :$this->mapper->get($key);
-                    if ($this->dbsType == 'DB\SQL')
+                    if ($this->dbsType == 'sql')
                         $result = json_decode($result, true);
                     if (!is_array($result))
                         $this->fieldsCache[$key] = $result;
@@ -1002,7 +721,7 @@ class Cortex extends Cursor {
                     }
                 }
                 // resolve array fields
-                elseif ($this->dbsType == 'DB\SQL' && isset($fields[$key]['type'])) {
+                elseif ($this->dbsType == 'sql' && isset($fields[$key]['type'])) {
                     if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
                         $this->fieldsCache[$key] = unserialize($this->mapper->{$key});
                     elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
@@ -1045,7 +764,7 @@ class Cortex extends Cursor {
                 // array of single hydrated mappers, raw ID value or mixed
                 foreach ($val as $index => &$item)
                     if (is_object($item) &&
-                        !($this->dbsType == 'DB\Mongo' && $item instanceof \MongoId))
+                        !($this->dbsType == 'mongo' && $item instanceof \MongoId))
                         if (!$item instanceof Cortex || $item->dry())
                             trigger_error(self::E_INVALID_RELATION_OBJECT);
                         else $item = $item->get($rel_field);
@@ -1116,7 +835,7 @@ class Cortex extends Cursor {
                         }
                     }
                     // decode array fields
-                    elseif ($this->dbsType == 'DB\SQL' && isset($this->fieldConf[$key]['type']))
+                    elseif ($this->dbsType == 'sql' && isset($this->fieldConf[$key]['type']))
                         if ($this->fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
                             $val=unserialize($this->mapper->{$key});
                         elseif ($this->fieldConf[$key]['type'] == self::DT_TEXT_JSON)
@@ -1191,7 +910,7 @@ class Cortex extends Cursor {
         $this->fieldsCache = array();
         $this->saveCsd = array();
         // set default values
-        if(($this->dbsType == 'DB\Jig' || $this->dbsType == 'DB\Mongo')
+        if(($this->dbsType == 'jig' || $this->dbsType == 'mongo')
             && !empty($this->fieldConf))
             foreach($this->fieldConf as $field_key => $field_conf)
                 if(array_key_exists('default',$field_conf))
@@ -1220,5 +939,301 @@ class Cortex extends Cursor {
     public function __destruct()
     {
         unset($this->mapper);
+    }
+}
+
+
+class CortexQueryParser extends \Prefab {
+
+    const
+        E_BRACKETS = 'Invalid query: unbalanced brackets found',
+        E_INBINDVALUE = 'Bind value for IN operator must be an array',
+        E_MISSINGBINDKEY = 'Named bind parameter `%s` does not exist in filter arguments';
+
+    /**
+     * converts the given filter array to fit the used DBS
+     *
+     * example filter:
+     *   array('text = ? AND num = ?','bar',5)
+     *   array('num > ? AND num2 <= ?',5,10)
+     *   array('num1 > num2')
+     *   array('text like ?','%foo%')
+     *   array('(text like ? OR text like ?) AND num != ?','foo%','%bar',23)
+     *
+     * @param array $cond
+     * @param string $engine
+     * @return array|bool|null
+     */
+    public function prepareFilter($cond, $engine)
+    {
+        if (is_null($cond)) return $cond;
+        if (is_string($cond))
+            $cond = array($cond);
+        $where = array_shift($cond);
+        $args = $cond;
+        $where = str_replace(array('&&', '||'), array('AND', 'OR'), $where);
+        // prepare IN condition
+        $where = preg_replace('/\bIN\b\s*\(\s*(\?|:\w+)?\s*\)/i', 'IN $1', $where);
+        switch ($engine) {
+            case 'jig':
+                return $this->_jig_parse_filter($where, $args);
+            case 'mongo':
+                $parts = $this->splitLogical($where);
+                if (is_int(strpos($where, ':')))
+                    list($parts, $args) = $this->convertNamedParams($parts, $args);
+                foreach ($parts as &$part)
+                    $part = $this->_mongo_parse_relational_op($part, $args);
+                $ncond = $this->_mongo_parse_logical_op($parts);
+                return $ncond;
+            case 'sql':
+                // preserve identifier
+                $where = preg_replace('/(?!\B)_id/', 'id', $where);
+                $parts = $this->splitLogical($where);
+                // ensure positional bind params
+                if (is_int(strpos($where, ':')))
+                    list($parts, $args) = $this->convertNamedParams($parts, $args);
+                $ncond = array();
+                foreach ($parts as &$part) {
+                    // enhanced IN handling
+                    if (is_int(strpos($part, '?'))) {
+                        $val = array_shift($args);
+                        if (is_int($pos = strpos($part, 'IN ?'))) {
+                            if (!is_array($val))
+                                trigger_error(self::E_INBINDVALUE);
+                            $bindMarks = str_repeat('?,', count($val) - 1).'?';
+                            $part = substr($part, 0, $pos).'IN ('.$bindMarks.')';
+                            $ncond = array_merge($ncond, $val);
+                        } else
+                            $ncond[] = $val;
+                    }
+                }
+                array_unshift($ncond, implode(' ', $parts));
+                return $ncond;
+        }
+    }
+
+    /**
+     * split where criteria string into logical chunks
+     * @param $cond
+     * @return array
+     */
+    protected function splitLogical($cond)
+    {
+        return preg_split('/\s*(\)|\(|\bAND\b|\bOR\b)\s*/i', $cond, -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+    }
+
+    /**
+     * converts named parameter filter to positional
+     * @param $parts
+     * @param $args
+     * @return array
+     */
+    protected function convertNamedParams($parts, $args)
+    {
+        if (empty($args)) return array($parts, $args);
+        $params = array();
+        $pos = 0;
+        foreach ($parts as &$part) {
+            if (preg_match('/:\w+/i', $part, $match)) {
+                if (!isset($args[$match[0]]))
+                    trigger_error(sprintf(self::E_MISSINGBINDKEY,
+                        $match[0]));
+                $part = str_replace($match[0], '?', $part);
+                $params[] = $args[$match[0]];
+            } elseif (is_int(strpos($part, '?')))
+                $params[] = $args[$pos++];
+        }
+        return array($parts, $params);
+    }
+
+    /**
+     * convert filter array to jig syntax
+     * @param $where
+     * @param $args
+     * @return array
+     */
+    protected function _jig_parse_filter($where, $args)
+    {
+        $parts = $this->splitLogical($where);
+        if (is_int(strpos($where, ':')))
+            list($parts, $args) = $this->convertNamedParams($parts, $args);
+        $ncond = array();
+        foreach ($parts as &$part) {
+            if (in_array(strtoupper($part), array('AND', 'OR')))
+                continue;
+            // prefix field names
+            $part = preg_replace('/([a-z_-]+)/i', '@$1', $part, -1, $count);
+            // value comparison
+            if (is_int(strpos($part, '?'))) {
+                $val = array_shift($args);
+                preg_match('/(@\w+)/i', $part, $match);
+                // find like operator
+                if (is_int(strpos($upart = strtoupper($part), ' @LIKE '))) {
+                    // %var% -> /var/
+                    if (substr($val, 0, 1) == '%' && substr($val, -1, 1) == '%')
+                        $val = str_replace('%', '/', $val);
+                    // var%  -> /^var/
+                    elseif (substr($val, -1, 1) == '%')
+                        $val = '/^'.str_replace('%', '', $val).'/'; // %var  -> /var$/
+                    elseif (substr($val, 0, 1) == '%')
+                        $val = '/'.substr($val, 1).'$/';
+                    $part = 'preg_match(?,'.$match[0].')';
+                } // find IN operator
+                else if (is_int($pos = strpos($upart, ' @IN '))) {
+                    if ($not = is_int($npos = strpos($upart, '@NOT')))
+                        $pos = $npos;
+                    $part = ($not ? '!' : '').'in_array('.substr($part, 0, $pos).
+                        ',array(\''.implode('\',\'', $val).'\'))';
+                }
+                // add existence check
+                $part = '(isset('.$match[0].') && '.$part.')';
+                $ncond[] = $val;
+            } elseif ($count == 2) {
+                // field comparison
+                preg_match_all('/(@\w+)/i', $part, $matches);
+                $part = '(isset('.$matches[0][0].') && isset('.$matches[0][1].') && ('.$part.'))';
+            }
+        }
+        array_unshift($ncond, implode(' ', $parts));
+        return $ncond;
+    }
+
+    /**
+     * find and wrap logical operators AND, OR, (, )
+     * @param $parts
+     * @return array
+     */
+    protected function _mongo_parse_logical_op($parts)
+    {
+        $b_offset = 0;
+        $ncond = array();
+        $child = array();
+        for ($i = 0, $max = count($parts); $i < $max; $i++) {
+            $part = $parts[$i];
+            if ($part == '(') {
+                // add sub-bracket to parse array
+                if ($b_offset > 0)
+                    $child[] = $part;
+                $b_offset++;
+            } elseif ($part == ')') {
+                $b_offset--;
+                // found closing bracket
+                if ($b_offset == 0) {
+                    $ncond[] = ($this->_mongo_parse_logical_op($child));
+                    $child = array();
+                } elseif ($b_offset < 0)
+                    trigger_error(self::E_BRACKETS);
+                else
+                    // add sub-bracket to parse array
+                    $child[] = $part;
+            } // add to parse array
+            elseif ($b_offset > 0)
+                $child[] = $part; // condition type
+            elseif (!is_array($part)) {
+                if (strtoupper($part) == 'AND')
+                    $add = true;
+                elseif (strtoupper($part) == 'OR')
+                    $or = true;
+            } else // skip
+            $ncond[] = $part;
+        }
+        if ($b_offset > 0)
+            trigger_error(self::E_BRACKETS);
+        if (isset($add))
+            return array('$and' => $ncond);
+        elseif (isset($or))
+            return array('$or' => $ncond); else
+            return $ncond[0];
+    }
+
+    /**
+     * find and convert relational operators
+     * @param $part
+     * @param $args
+     * @return array|null
+     */
+    protected function _mongo_parse_relational_op($part, &$args)
+    {
+        if (is_null($part)) return $part;
+        $ops = array('<=', '>=', '<>', '<', '>', '!=', '==', '=', 'like', 'in', 'not in');
+        foreach ($ops as &$op)
+            $op = preg_quote($op);
+        $op_quote = implode('|', $ops);
+        if (preg_match('/'.$op_quote.'/i', $part, $match)) {
+            $var = is_int(strpos($part, '?')) ? array_shift($args) : null;
+            $exp = explode($match[0], $part);
+            // unbound value
+            if (is_numeric($exp[1]))
+                $var = $exp[1];
+            // field comparison
+            elseif (!is_int(strpos($exp[1], '?')))
+                return array('$where' => 'this.'.trim($exp[0]).' '.$match[0].' this.'.trim($exp[1]));
+            // find like operator
+            if (strtoupper($match[0]) == 'LIKE') {
+                // %var% -> /var/
+                if (substr($var, 0, 1) == '%' && substr($var, -1, 1) == '%')
+                    $rgx = str_replace('%', '/', $var);
+                // var%  -> /^var/
+                elseif (substr($var, -1, 1) == '%')
+                    $rgx = '/^'.str_replace('%', '', $var).'/'; // %var  -> /var$/
+                elseif (substr($var, 0, 1) == '%')
+                    $rgx = '/'.substr($var, 1).'$/';
+                $var = new \MongoRegex($rgx);
+            } elseif (strtoupper($match[0]) == 'IN') {
+                $var = array('$in' => $var);
+            } elseif (strtoupper($match[0]) == 'NOT IN') {
+                $var = array('$nin' => $var);
+            } // translate operators
+            elseif (!in_array($match[0], array('==', '='))) {
+                $opr = str_replace(array('<>', '<', '>', '!', '='),
+                    array('$ne', '$lt', '$gt', '$n', 'e'), $match[0]);
+                $var = array($opr => (strtolower($var) == 'null') ? null :
+                    (is_object($var) ? $var : $var + 0));
+            } elseif (trim($exp[0]) == '_id' && !$var instanceof \MongoId)
+                $var = new \MongoId($var);
+            return array(trim($exp[0]) => $var);
+        }
+        return $part;
+    }
+
+    /**
+     * convert options array syntax to given engine type
+     *
+     * example:
+     *   array('order'=>'location') // default direction is ASC
+     *   array('order'=>'num1 desc, num2 asc')
+     *
+     * @param array $options
+     * @param string $engine
+     * @return array|null
+     */
+    public function prepareOptions($options, $engine)
+    {
+        if (!empty($options) && is_array($options)) {
+            switch ($engine) {
+                case 'jig':
+                    if (array_key_exists('order', $options))
+                        $options['order'] = str_replace(array('asc', 'desc'),
+                            array('SORT_ASC', 'SORT_DESC'), strtolower($options['order']));
+                    break;
+            }
+            switch ($engine) {
+                case 'mongo':
+                    if (array_key_exists('order', $options)) {
+                        $sorts = explode(',', $options['order']);
+                        $sorting = array();
+                        foreach ($sorts as $sort) {
+                            $sp = explode(' ', trim($sort));
+                            $sorting[$sp[0]] = (array_key_exists(1, $sp) &&
+                                strtoupper($sp[1]) == 'DESC') ? -1 : 1;
+                        }
+                        $options['order'] = $sorting;
+                    }
+                    break;
+            }
+            return $options;
+        } else
+            return null;
     }
 }
