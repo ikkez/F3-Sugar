@@ -306,29 +306,25 @@ class Cortex extends Cursor {
                 }
             }
         }
+        $deletable[] = $table;
+        $deletable += $mmTables;
         if($db instanceof Jig) {
-            // TODO: use new dir() method
-            $refl = new \ReflectionObject($db);
-            $prop = $refl->getProperty('dir');
-            $prop->setAccessible(true);
-            $dir = $prop->getValue($db);
-            if(file_exists($dir.$table))
-                unlink($dir.$table);
-            foreach ($mmTables as $mmt)
-                if(file_exists($dir.$mmt))
-                    unlink($dir.$mmt);
+            /** @var Jig $db */
+            $dir = $db->dir();
+            foreach ($deletable as $item)
+                if(file_exists($dir.$item))
+                    unlink($dir.$item);
         } elseif($db instanceof SQL) {
+            /** @var SQL $db */
             $schema = new Schema($db);
             $tables = $schema->getTables();
-            if(in_array($table, $tables))
-                $schema->dropTable($table);
-            foreach ($mmTables as $mmt)
-                if(in_array($mmt, $tables))
-                    $schema->dropTable($mmt);
+            foreach ($deletable as $item)
+                if(in_array($item, $tables))
+                    $schema->dropTable($item);
         } elseif($db instanceof Mongo) {
-            $db->{$table}->drop();
-            foreach ($mmTables as $mmt)
-                $db->{$mmt}->drop();
+            /** @var Mongo $db */
+            foreach ($deletable as $item)
+                $db->{$item}->drop();
         }
     }
 
