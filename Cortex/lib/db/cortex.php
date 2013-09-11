@@ -37,8 +37,7 @@ class Cortex extends Cursor {
         // internal vars, don't touch
         $dbsType,       // mapper engine type [Jig, SQL, Mongo]
         $fieldsCache,   // relation field cache
-        $saveCsd,       // mm rel save cascade
-        $relRegistry;
+        $saveCsd;       // mm rel save cascade
 
     /** @var Cursor */
     protected $mapper;
@@ -67,7 +66,8 @@ class Cortex extends Cursor {
         E_MM_REL_VALUE = 'Invalid value for many field "%s". Expecting null, split-able string, hydrated mapper object, or array of mapper objects.',
         E_MM_REL_CLASS = 'Mismatching m:m relation config from class `%s` to `%s`.',
         E_MM_REL_FIELD = 'Mismatching m:m relation keys from `%s` to `%s`.',
-        E_REL_CONF_INC = 'Incomplete relation config for `%s`. Linked key is missing.';
+        E_REL_CONF_INC = 'Incomplete relation config for `%s`. Linked key is missing.',
+        E_MISSING_REL_CONF = 'Cannot create related model. Specify a model name or relConf array.';
 
     /**
      * init the ORM, based on given DBS
@@ -115,7 +115,6 @@ class Cortex extends Cursor {
         }
         $this->queryParser = CortexQueryParser::instance();
         $this->reset();
-        $this->relRegistry = array();
         if(!empty($this->fieldConf))
             foreach($this->fieldConf as $key=>&$conf)
                 $conf=static::resolveRelationConf($conf);
@@ -158,9 +157,6 @@ class Cortex extends Cursor {
         $refl->setStaticPropertyValue('init', true);
         $self = $refl->newInstance();
         $refl->setStaticPropertyValue('init', false);
-
-        if (!$self instanceof Cortex)
-            trigger_error(self::E_WRONG_RELATION_CLASS);
         $conf = array (
             'table'=>$self->getTable(),
             'fieldConf'=>$self->getFieldConfiguration(),
@@ -470,8 +466,7 @@ class Cortex extends Cursor {
                     $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
                 } else
                     $mmTable = $relConf['refTable'];
-                $rel = (isset($this->relRegistry[$mmTable])) ?
-                    $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
+                $rel = $this->getRelInstance(null, array('db'=>$this->db, 'table'=>$mmTable));
                 // delete all refs
                 if (is_null($val))
                     $rel->erase(array($relConf['relField'].' = ?', $this->get('_id')));
@@ -674,8 +669,7 @@ class Cortex extends Cursor {
                         } else
                             $mmTable = $fromConf['refTable'];
                         // create mm table mapper
-                        $rel = (array_key_exists($mmTable, $this->relRegistry)) ?
-                            $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
+                        $rel = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
                         $results = $rel->find(array($fromConf['relField'].' = ?',
                                                     $this->mapper->{$id}));
                         $fkeys = array();
@@ -771,17 +765,25 @@ class Cortex extends Cursor {
 
     /**
      * creates and caches related mapper objects
-     * @param $name
+     * @param string $model
+     * @param array $relConf
      * @return Cortex
      */
-    protected function getRelInstance($name)
+    protected function getRelInstance($model=null,$relConf=null)
     {
-        if (array_key_exists($name, $this->relRegistry))
-            return $this->relRegistry[$name];
-        $rel = new $name;
-        if (!$rel instanceof Cortex)
-            trigger_error(self::E_WRONG_RELATION_CLASS);
-        $this->relRegistry[$name] = $rel;
+        if (!$model && !$relConf)
+            trigger_error(self::E_MISSING_REL_CONF);
+        $relConf = $model ? $model::resolveConfiguration() : $relConf;
+        $relName = ($model?:'Cortex').'\\'.$relConf['db']->uuid().'\\'.$relConf['table'];
+        if (\Registry::exists($relName)) {
+            $rel = \Registry::get($relName);
+            $rel->reset();
+        } else {
+            $rel = $model ? new $model : new Cortex($relConf['db'], $relConf['table']);
+            if (!$rel instanceof Cortex)
+                trigger_error(self::E_WRONG_RELATION_CLASS);
+            \Registry::set($relName, $rel);
+        }
         return $rel;
     }
 
