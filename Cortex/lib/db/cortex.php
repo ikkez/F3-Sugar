@@ -414,6 +414,7 @@ class Cortex extends Cursor {
      */
     public function find($filter = NULL, array $options = NULL, $ttl = 0)
     {
+        $this->reset();
         $filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $result = $this->mapper->find($filter, $options, $ttl);
@@ -430,6 +431,7 @@ class Cortex extends Cursor {
      */
     public function load($filter = NULL, array $options = NULL)
     {
+        $this->reset();
         $filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $this->mapper->load($filter, $options);
@@ -617,8 +619,8 @@ class Cortex extends Cursor {
                         if (!is_array($relConf))
                             $relConf = array($relConf, $id);
                         $rel = $this->getRelInstance($relConf[0]);
-                        $rel->load(array($relConf[1].' = ?', $this->mapper->{$key}));
-                        $this->fieldsCache[$key] = ((!$rel->dry()) ? $rel : null);
+                        $result = $rel->findone(array($relConf[1].' = ?', $this->mapper->{$key}));
+                        $this->fieldsCache[$key] = ((!empty($result)) ? $result : null);
                     }
                 }
                 elseif (isset($fields[$key]['has-one'])) {
@@ -636,7 +638,7 @@ class Cortex extends Cursor {
                             || is_null($this->mapper->{$toConf[1]})))
                             $this->fieldsCache[$key] = null;
                         else
-                            $this->fieldsCache[$key] = $rel->load(
+                            $this->fieldsCache[$key] = $rel->findone(
                                 array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
                     }
                 }
@@ -888,24 +890,28 @@ class Cortex extends Cursor {
     }
 
     public function skip($ofs = 1) {
+        $this->reset(false);
         $this->mapper->skip($ofs);
         return $this;
     }
 
     public function first()
     {
+        $this->reset(false);
         $this->mapper->first();
         return $this;
     }
 
     public function last()
     {
+        $this->reset(false);
         $this->mapper->last();
         return $this;
     }
 
-    public function reset() {
-        $this->mapper->reset();
+    public function reset($mapper = true) {
+        if ($mapper)
+            $this->mapper->reset();
         $this->fieldsCache = array();
         $this->saveCsd = array();
         // set default values
