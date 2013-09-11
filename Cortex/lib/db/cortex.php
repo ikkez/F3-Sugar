@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.10.0
+        @version 0.10.1
         @date 17.01.2013
  **/
 
@@ -678,18 +678,18 @@ class Cortex extends Cursor {
                             $this->relRegistry[$mmTable] : new Cortex($this->db, $mmTable);
                         $results = $rel->find(array($fromConf['relField'].' = ?',
                                                     $this->mapper->{$id}));
-                        foreach ($results as $el) {
-                            $where[] = '_id = ?';
-                            $filter[] = $el->get($key);
-                        }
-                        if (!isset($where)) {
+                        $fkeys = array();
+                        // collect foreign keys
+                        foreach ($results as $el)
+                            $fkeys[] = $el->get($key);
+                        if (empty($fkeys))
                             $this->fieldsCache[$key] = NULL;
-                        } else {
-                            $crit = implode(' OR ', $where);
-                            array_unshift($filter, $crit);
-                            unset($rel);
+                        else {
                             // create foreign table mapper
+                            unset($rel);
                             $rel = $this->getRelInstance($fromConf[0]);
+                            // load foreign models
+                            $filter = array($id.' IN ?', $fkeys);
                             $this->fieldsCache[$key] = $rel->find($filter);
                         }
                     }
@@ -702,17 +702,16 @@ class Cortex extends Cursor {
                     if (!is_array($result))
                         $this->fieldsCache[$key] = $result;
                     else {
-                        // hydrate mapper
+                        // create foreign table mapper
                         $relConf = $fields[$key]['belongs-to-many'];
                         if (!is_array($relConf))
                             $relConf = array($relConf, $id);
                         $rel = $this->getRelInstance($relConf[0]);
-                        foreach ($result as $el) {
-                            $where[] = $relConf[1].' = ?';
-                            $filter[] = $el;
-                        }
-                        $crit = implode(' OR ', $where);
-                        array_unshift($filter, $crit);
+                        $fkeys = array();
+                        foreach ($result as $el)
+                            $fkeys[] = $el;
+                        // load foreign models
+                        $filter = array($relConf[1].' IN ?', $fkeys);
                         $this->fieldsCache[$key] = $rel->find($filter);
                     }
                 }
@@ -742,29 +741,31 @@ class Cortex extends Cursor {
     protected function getForeignKeysArray($val, $rel_field, $key)
     {
         if (is_null($val))
-            $val = NULL;
+            return NULL;
         elseif (is_string($val))
             // split-able string of collection IDs
             $val = \Base::instance()->split($val);
-        elseif (!is_array($val) && !(is_object($val) && $val instanceof Cortex && !$val->dry()))
+        elseif (!is_array($val) && !(is_object($val)
+                && $val instanceof Cortex && !$val->dry()))
             trigger_error(sprintf(self::E_MM_REL_VALUE, $key));
-        else {
-            // hydrated mapper as collection
-            if (is_object($val)) {
-                while (!$val->dry()) {
-                    $nval[] = $val->get($rel_field);
-                    $val->next();
-                }
-                $val = $nval;
-            } elseif (is_array($val))
-                // array of single hydrated mappers, raw ID value or mixed
-                foreach ($val as $index => &$item)
-                    if (is_object($item) &&
-                        !($this->dbsType == 'mongo' && $item instanceof \MongoId))
-                        if (!$item instanceof Cortex || $item->dry())
-                            trigger_error(self::E_INVALID_RELATION_OBJECT);
-                        else $item = $item->get($rel_field);
-        }
+        // hydrated mapper as collection
+        if (is_object($val)) {
+            while (!$val->dry()) {
+                $nval[] = $val->get($rel_field);
+                $val->next();
+            }
+            $val = $nval;
+        } elseif (is_array($val))
+            // array of single hydrated mappers, raw ID value or mixed
+            foreach ($val as $index => &$item) {
+                if ($this->dbsType == 'mongo' && $rel_field == '_id' && is_string($item))
+                    $item = new \MongoId($item);
+                elseif (is_object($item) &&
+                    !($this->dbsType == 'mongo' && $item instanceof \MongoId))
+                    if (!$item instanceof Cortex || $item->dry())
+                        trigger_error(self::E_INVALID_RELATION_OBJECT);
+                    else $item = $item->get($rel_field);
+            }
         return $val;
     }
 
