@@ -1075,13 +1075,16 @@ class CortexQueryParser extends \Prefab {
                 preg_match('/(@\w+)/i', $part, $match);
                 // find like operator
                 if (is_int(strpos($upart = strtoupper($part), ' @LIKE '))) {
+                    $fC = substr($val, 0, 1);
+                    $lC = substr($val, -1, 1);
                     // %var% -> /var/
-                    if (substr($val, 0, 1) == '%' && substr($val, -1, 1) == '%')
+                    if ($fC == '%' && $lC == '%')
                         $val = str_replace('%', '/', $val);
                     // var%  -> /^var/
-                    elseif (substr($val, -1, 1) == '%')
-                        $val = '/^'.str_replace('%', '', $val).'/'; // %var  -> /var$/
-                    elseif (substr($val, 0, 1) == '%')
+                    elseif ($lC == '%')
+                        $val = '/^'.str_replace('%', '', $val).'/';
+                    // %var  -> /var$/
+                    elseif ($fC == '%')
                         $val = '/'.substr($val, 1).'$/';
                     $part = 'preg_match(?,'.$match[0].')';
                 } // find IN operator
