@@ -67,21 +67,27 @@ class FileStream {
         return $ret;
     }
 
-    public function stream_stat(){
-        if (!empty($this->stream)) {
-            $stats = array(
-                'dev' => 1,
-                'ino' => 0,
-                'mode' => 33204,
-                'nlink' => 1,
-                'uid' => 0,
-                'gid' => 0,
-                'rdev' => 0,
-                'blksize' => -1,
-                'blocks' => -1,
-            );
-            return array_merge(array_values($stats), $stats);
-        }
+    public function stream_stat() {
+        $stats = array(
+            'dev' => 1,
+            'ino' => 0,
+            'mode' => 33204,
+            'nlink' => 1,
+            'uid' => 0,
+            'gid' => 0,
+            'rdev' => 0,
+            'size' => strlen($this->stream),
+//            'atime'=>time(),
+//            'mtime'=>time(),
+//            'ctime'=>time(),
+            'blksize' => -1,
+            'blocks' => -1,
+        );
+        return array_merge(array_values($stats), $stats);
+    }
+    
+    public function url_stat($path, $flag=0) {
+        return $this->stream_stat();
     }
 
 }
