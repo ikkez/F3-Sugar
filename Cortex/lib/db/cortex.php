@@ -1174,21 +1174,26 @@ class CortexQueryParser extends \Prefab {
             // field comparison
             elseif (!is_int(strpos($exp[1], '?')))
                 return array('$where' => 'this.'.trim($exp[0]).' '.$match[0].' this.'.trim($exp[1]));
-            // find like operator
-            if (strtoupper($match[0]) == 'LIKE') {
+            $upart = strtoupper($match[0]);
+            // find LIKE operator
+            if ($upart == 'LIKE') {
+                $fC = substr($var, 0, 1);
+                $lC = substr($var, -1, 1);
                 // %var% -> /var/
-                if (substr($var, 0, 1) == '%' && substr($var, -1, 1) == '%')
+                if ($fC == '%' && $lC == '%')
                     $rgx = str_replace('%', '/', $var);
                 // var%  -> /^var/
-                elseif (substr($var, -1, 1) == '%')
+                elseif ($lC == '%')
                     $rgx = '/^'.str_replace('%', '', $var).'/'; // %var  -> /var$/
-                elseif (substr($var, 0, 1) == '%')
+                elseif ($fC == '%')
                     $rgx = '/'.substr($var, 1).'$/';
                 $var = new \MongoRegex($rgx);
-            } elseif (strtoupper($match[0]) == 'IN') {
-                $var = array('$in' => $var);
-            } elseif (strtoupper($match[0]) == 'NOT IN') {
-                $var = array('$nin' => $var);
+            } // find IN operator
+            elseif (in_array($upart, array('IN','NOT IN'))) {
+                foreach ($var as &$id)
+                    if (!$id instanceof \MongoId)
+                        $id = new \MongoId($id);
+                $var = array(($upart=='NOT IN')?'$nin':'$in' => $var);
             } // translate operators
             elseif (!in_array($match[0], array('==', '='))) {
                 $opr = str_replace(array('<>', '<', '>', '!', '='),
