@@ -1,4 +1,4 @@
-## FAL
+![FAL LOGO](https://dl.dropboxusercontent.com/u/3077539/_linked/F3FAL.png)
 #### A File Abstraction Layer for the Fat-Free Framework
 
 This
@@ -22,9 +22,9 @@ Mount on your `files/` folder:
 $myFS = new \FAL\LocalFS('files/');
 ```
 
-You can also use this Prefab shortcut. It will mount on your layout directory defined in F3 **UI** var.
+You can also use this Prefab shortcut. It will create a mapper object and mounts the LocalFS on your layout directory defined in F3 **UI** var.
 ``` php
-$myFS = \FAL::instance();
+$fal = \FAL::instance();
 ```
 
 **FTP Adapter**
@@ -83,6 +83,8 @@ Some filesystems may have additional features. Look inside the code to get to kn
 #### Create a new file
 ``` php
 $fal = new \FAL($myFS); // pass filesystem object into constructor
+// or the shortcut to your local UI dir
+$fal = \FAL::instance();
 $fal->load('documents/important.txt'); // use existing file, or create new if it's not existing
 $fal->setContent = 'TOP SECRET DOCS CONTENT'; // write some data into the file
 $fal->save(); // save the file
