@@ -638,8 +638,8 @@ class Cortex extends Cursor {
                             || is_null($this->mapper->{$toConf[1]})))
                             $this->fieldsCache[$key] = null;
                         else
-                            $this->fieldsCache[$key] = $rel->findone(
-                                array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
+                            $this->fieldsCache[$key] = $rel->findone(array($fromConf[1].' = ?',
+                                $this->mapper->{$toConf[1]})) ?: NULL;
                     }
                 }
                 elseif (isset($fields[$key]['has-many'])){
@@ -657,8 +657,8 @@ class Cortex extends Cursor {
                             || is_null($this->mapper->{$toConf[1]})))
                             $this->fieldsCache[$key] = null;
                         else
-                            $this->fieldsCache[$key] = $rel->find(
-                                array($fromConf[1].' = ?', $this->mapper->{$toConf[1]}));
+                            $this->fieldsCache[$key] = $rel->find(array($fromConf[1].' = ?',
+                                $this->mapper->{$toConf[1]})) ?: NULL;
                     }
                     // many-to-many, bidirectional
                     elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
@@ -824,7 +824,7 @@ class Cortex extends Cursor {
                                 $val = null;
                             else
                                 $val = $mp->get($key);
-                            if (!is_null($val)) {
+                            if (is_array($val) || is_object($val)) {
                                 if ($relType == 'belongs-to-one' || $relType == 'has-one')
                                     // single object
                                     $val = $val->cast(null, $rel_depths);
