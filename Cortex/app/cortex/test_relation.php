@@ -9,7 +9,8 @@ class Test_Relation {
      */
     private function getResult($result)
     {
-        foreach ($result as &$row) {
+        $out = array();
+        foreach ($result as $row) {
             if(is_object($row))
                 $row = $row->cast();
             unset($row['_id']);
@@ -18,8 +19,9 @@ class Test_Relation {
                 if (empty($val) || is_null($val))
                     unset($row[$col]);
             }
+            $out[] = $row;
         }
-        return $result;
+        return $out;
     }
 
     function run($f3,$type)

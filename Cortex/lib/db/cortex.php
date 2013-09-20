@@ -18,8 +18,9 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 0.10.1
-        @date 17.01.2013
+        @version 1.0.0-alpha
+        @since 24.04.2012
+        @date 18.09.2013
  **/
 
 namespace DB;
@@ -38,6 +39,9 @@ class Cortex extends Cursor {
         $dbsType,       // mapper engine type [Jig, SQL, Mongo]
         $fieldsCache,   // relation field cache
         $saveCsd;       // mm rel save cascade
+
+    public
+        $collectionID;
 
     /** @var Cursor */
     protected $mapper;
@@ -285,7 +289,8 @@ class Cortex extends Cursor {
             $fields = $df['fieldConf'];
         else
             $fields = array();
-        $mmTables = array();
+        $deletable = array();
+        $deletable[] = $table;
         foreach ($fields as $key => $field) {
             $field = static::resolveRelationConf($field);
             if (array_key_exists('has-many',$field)) {
@@ -297,13 +302,11 @@ class Cortex extends Cursor {
                     && key($rel['fieldConf'][$relConf[1]]) == 'has-many') {
                     // compute mm table name
                     $fConf = $rel['fieldConf'][$relConf[1]]['has-many'];
-                    $mmTables[] = static::getMMTableName(
+                    $deletable[] = static::getMMTableName(
                         $rel['table'], $relConf[1], $table, $key, $fConf);
                 }
             }
         }
-        $deletable[] = $table;
-        $deletable += $mmTables;
         if($db instanceof Jig) {
             /** @var Jig $db */
             $dir = $db->dir();
@@ -410,7 +413,7 @@ class Cortex extends Cursor {
      * @param array|null $filter
      * @param array|null $options
      * @param int        $ttl
-     * @return array
+     * @return CortexCollection
      */
     public function find($filter = NULL, array $options = NULL, $ttl = 0)
     {
@@ -418,9 +421,13 @@ class Cortex extends Cursor {
         $filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $result = $this->mapper->find($filter, $options, $ttl);
+        if (empty($result))
+            return false;
         foreach($result as &$mapper)
             $mapper = $this->factory($mapper);
-        return $result;
+        $cc = new \DB\CortexCollection();
+        $cc->setModels($result);
+        return $cc;
     }
 
     /**
@@ -598,14 +605,17 @@ class Cortex extends Cursor {
     /**
      * Retrieve contents of key
      * @return mixed
-     * @param $key string
+     * @param string $key
+     * @param bool $raw
      */
-    function get($key)
+    function get($key,$raw = false)
     {
         $fields = $this->fieldConf;
         $id = ($this->dbsType == 'sql')?'id':'_id';
         if ($key == '_id' && $this->dbsType == 'sql')
             $key = $id;
+        if ($raw)
+            return $this->exists($key) ? $this->mapper->{$key} : NULL;
         if(!empty($fields) && isset($fields[$key]) && is_array($fields[$key])) {
             // check field cache
             if(!array_key_exists($key,$this->fieldsCache) && is_array($fields[$key])) {
@@ -615,40 +625,41 @@ class Cortex extends Cursor {
                     if (!$this->exists($key) || is_null($this->mapper->{$key}))
                         $this->fieldsCache[$key] = null;
                     else {
+                        // get config for this field
                         $relConf = $fields[$key]['belongs-to-one'];
                         if (!is_array($relConf))
                             $relConf = array($relConf, $id);
+                        // fetch related model
                         $rel = $this->getRelInstance($relConf[0]);
-                        $result = $rel->findone(array($relConf[1].' = ?', $this->mapper->{$key}));
-                        $this->fieldsCache[$key] = ((!empty($result)) ? $result : null);
+                        // am i part of a result collection?
+                        if ($this->collectionID) {
+                            $cx = CortexCollection::instance($this->collectionID);
+                            // does the collection has cached results for this key?
+                            if (!$cx->hasRelSet($key)) {
+                                // build the cache, find all values of current key
+                                $relKeys = array_unique($cx->getAll($key,true));
+                                // find related models
+                                $relSet = $rel->find(array($relConf[1].' IN ?', $relKeys));
+                                // cache relSet, sorted by ID
+                                $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
+                            }
+                            // get a subset of the preloaded set
+                            $result = $cx->getSubset($key,(string) $this->mapper->{$key});
+                            $this->fieldsCache[$key] = $result ? $result[0] : NULL;
+                        } else
+                            $this->fieldsCache[$key] = $rel->findone(
+                                array($relConf[1].' = ?', $this->mapper->{$key}));
                     }
                 }
-                elseif (isset($fields[$key]['has-one'])) {
-                    // one-to-one, bidirectional, inverse way
-                    $fromConf = $fields[$key]['has-one'];
-                    if (!is_array($fromConf))
-                        trigger_error(sprintf(self::E_REL_CONF_INC,$key));
-                    $rel = $this->getRelInstance($fromConf[0]);
-                    $relFieldConf = $rel->getFieldConfiguration();
-                    if (key($relFieldConf[$fromConf[1]]) == 'belongs-to-one') {
-                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
-                        if (!is_array($toConf))
-                            $toConf = array($toConf, $id);
-                        if ($toConf[1] != $id && (!$this->exists($toConf[1])
-                            || is_null($this->mapper->{$toConf[1]})))
-                            $this->fieldsCache[$key] = null;
-                        else
-                            $this->fieldsCache[$key] = $rel->findone(array($fromConf[1].' = ?',
-                                $this->mapper->{$toConf[1]})) ?: NULL;
-                    }
-                }
-                elseif (isset($fields[$key]['has-many'])){
-                    $fromConf = $fields[$key]['has-many'];
+                elseif (($type = isset($fields[$key]['has-one']))
+                    || isset($fields[$key]['has-many'])) {
+                    $type = $type ? 'has-one' : 'has-many';
+                    $fromConf = $fields[$key][$type];
                     if (!is_array($fromConf))
                         trigger_error(sprintf(self::E_REL_CONF_INC, $key));
                     $rel = $this->getRelInstance($fromConf[0]);
                     $relFieldConf = $rel->getFieldConfiguration();
-                    // one-to-many, bidirectional, inverse way
+                    // one-to-*, bidirectional, inverse way
                     if (key($relFieldConf[$fromConf[1]]) == 'belongs-to-one') {
                         $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
                         if(!is_array($toConf))
@@ -656,9 +667,23 @@ class Cortex extends Cursor {
                         if ($toConf[1] != $id && (!$this->exists($toConf[1])
                             || is_null($this->mapper->{$toConf[1]})))
                             $this->fieldsCache[$key] = null;
-                        else
-                            $this->fieldsCache[$key] = $rel->find(array($fromConf[1].' = ?',
-                                $this->mapper->{$toConf[1]})) ?: NULL;
+                        elseif($this->collectionID) {
+                            // part of a result set
+                            $cx = CortexCollection::instance($this->collectionID);
+                            if(!$cx->hasRelSet($key)) {
+                                // emit eager loading
+                                $relKeys = $cx->getAll($toConf[1],true);
+                                $relSet = $rel->find(array($fromConf[1].' IN ?', $relKeys));
+                                $cx->setRelSet($key, $relSet ? $relSet->getBy($toConf[1]) : NULL);
+                            }
+                            $result = $cx->getSubset($key, array($this->mapper->{$toConf[1]}));
+                            $this->fieldsCache[$key] = $result ? (($type == 'has-one')
+                                ? $result[0] : $result) : NULL;
+                        } else {
+                            $crit = array($fromConf[1].' = ?', $this->mapper->{$toConf[1]});
+                            $this->fieldsCache[$key] = (($type == 'has-one')
+                                ? $rel->findone($crit) : $rel->find($crit)) ?: NULL;
+                        }
                     }
                     // many-to-many, bidirectional
                     elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
@@ -672,24 +697,54 @@ class Cortex extends Cursor {
                             $mmTable = $fromConf['refTable'];
                         // create mm table mapper
                         $rel = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
-                        $results = $rel->find(array($fromConf['relField'].' = ?',
-                                                    $this->mapper->{$id}));
-                        $fkeys = array();
-                        // collect foreign keys
-                        foreach ($results as $el)
-                            $fkeys[] = $el->get($key);
-                        if (empty($fkeys))
-                            $this->fieldsCache[$key] = NULL;
+                        if ($this->collectionID) {
+                            $cx = CortexCollection::instance($this->collectionID);
+                            if (!$cx->hasRelSet($key)) {
+                                // get IDs of all results
+                                $relKeys = ($cx->getAll($id));
+                                // get all pivot IDs
+                                $mmRes = $rel->find(array($fromConf['relField'].' IN ?', $relKeys));
+                                if (!$mmRes)
+                                    $cx->setRelSet($key, NULL);
+                                else {
+                                    foreach($mmRes as $model) {
+                                        $pivotRel[$model->{$fromConf['relField']}][] = $model->{$key};
+                                        $pivotKeys[] = $model->{$key};
+                                    }
+                                    // cache pivot keys
+                                    $cx->setRelSet($key.'_pivot', $pivotRel);
+                                    // preload all rels
+                                    $pivotKeys = array_unique($pivotKeys);
+                                    $fRel = $this->getRelInstance($fromConf[0]);
+                                    $relSet = $fRel->find(array($id.' IN ?', $pivotKeys));
+                                    $cx->setRelSet($key, $relSet->getBy($id));
+                                    unset($fRel);
+                                }
+                            }
+                            // fetch subset from preloaded rels using cached pivot keys
+                            $fkeys = $cx->getSubset($key.'_pivot', $this->mapper->{$id});
+                            $this->fieldsCache[$key] = $fkeys ?
+                                $cx->getSubset($key, $fkeys[0]) : NULL;
+                        } // no collection
                         else {
-                            // create foreign table mapper
-                            unset($rel);
-                            $rel = $this->getRelInstance($fromConf[0]);
-                            // load foreign models
-                            $filter = array($id.' IN ?', $fkeys);
-                            $this->fieldsCache[$key] = $rel->find($filter);
+                            // find foreign keys
+                            $results = $rel->find(
+                                array($fromConf['relField'].' = ?', $this->mapper->{$id}));
+                            if(!$results)
+                                $this->fieldsCache[$key] = NULL;
+                            else {
+                                $fkeys = $results->getAll($key);
+                                // create foreign table mapper
+                                unset($rel);
+                                $rel = $this->getRelInstance($fromConf[0]);
+                                // load foreign models
+                                $filter = array($id.' IN ?', $fkeys);
+                                $this->fieldsCache[$key] = $rel->find($filter);
+                            }
                         }
                     }
-                } elseif (isset($fields[$key]['belongs-to-many'])) {
+                }
+                elseif (isset($fields[$key]['belongs-to-many'])) {
                     // many-to-many, unidirectional
                     $fields[$key]['type'] = self::DT_TEXT_JSON;
                     $result = !$this->exists($key) ? null :$this->mapper->get($key);
@@ -705,10 +760,32 @@ class Cortex extends Cursor {
                         $rel = $this->getRelInstance($relConf[0]);
                         $fkeys = array();
                         foreach ($result as $el)
-                            $fkeys[] = $el;
-                        // load foreign models
-                        $filter = array($relConf[1].' IN ?', $fkeys);
-                        $this->fieldsCache[$key] = $rel->find($filter);
+                            $fkeys[] = (string) $el;
+                        // if part of a result set
+                        if ($this->collectionID) {
+                            $cx = CortexCollection::instance($this->collectionID);
+                            if (!$cx->hasRelSet($key)) {
+                                // find all keys
+                                $relKeys = ($cx->getAll($key,true));
+                                if ($this->dbsType == 'sql'){
+                                    foreach ($relKeys as &$val)
+                                        $val = substr($val, 1, -1);
+                                    $relKeys = json_decode('['.implode(',',$relKeys).']');
+                                } else
+                                    $relKeys = call_user_func_array('array_merge', $relKeys);
+                                // get related models
+                                $relSet = $rel->find(
+                                    array($relConf[1].' IN ?', array_unique($relKeys)));
+                                // cache relSet, sorted by ID
+                                $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
+                            }
+                            // get a subset of the preloaded set
+                            $this->fieldsCache[$key] = $cx->getSubset($key, $fkeys);
+                        } else {
+                            // load foreign models
+                            $filter = array($relConf[1].' IN ?', $fkeys);
+                            $this->fieldsCache[$key] = $rel->find($filter);
+                        }
                     }
                 }
                 // resolve array fields
@@ -738,11 +815,13 @@ class Cortex extends Cursor {
     {
         if (is_null($val))
             return NULL;
+        if (is_object($val) && $val instanceof CortexCollection)
+            $val = $val->expose();
         elseif (is_string($val))
             // split-able string of collection IDs
             $val = \Base::instance()->split($val);
         elseif (!is_array($val) && !(is_object($val)
-                && $val instanceof Cortex && !$val->dry()))
+                && ($val instanceof Cortex && !$val->dry())))
             trigger_error(sprintf(self::E_MM_REL_VALUE, $key));
         // hydrated mapper as collection
         if (is_object($val)) {
@@ -830,8 +909,8 @@ class Cortex extends Cursor {
                                     $val = $val->cast(null, $rel_depths);
                                 elseif ($relType == 'belongs-to-many' || $relType == 'has-many')
                                     // multiple objects
-                                    foreach ($val as &$item)
-                                        $item = !is_null($item) ? $item->cast(null, $rel_depths) : null;
+                                    foreach ($val as $k => $item)
+                                        $val[$k] = !is_null($item) ? $item->cast(null, $rel_depths) : null;
                             }
                         }
                     }
@@ -859,9 +938,10 @@ class Cortex extends Cursor {
             $mapper_arr = $this->get($mapper_arr);
         if (!$mapper_arr)
             return NULL;
-        foreach ($mapper_arr as &$mp)
-            $mp = $mp->cast(null,$rel_depths);
-        return $mapper_arr;
+        $out = array();
+        foreach ($mapper_arr as $mp)
+            $out[] = $mp->cast(null,$rel_depths);
+        return $out;
     }
 
     /**
@@ -923,6 +1003,7 @@ class Cortex extends Cursor {
     }
 
     function exists($key) {
+        if ($this->dbsType != 'sql' && $key == '_id') return true;
         return $this->mapper->exists($key);
     }
 
@@ -1249,4 +1330,162 @@ class CortexQueryParser extends \Prefab {
         } else
             return null;
     }
+}
+
+class CortexCollection extends \Magic implements \Iterator {
+
+    protected
+        $models = array(),
+        $relSets = array(),
+        $pointer = 0,
+        $cid;
+
+    const
+        E_UnknownCID = 'This Collection does not exist: %s';
+
+    public function __construct() {
+        $this->cid = uniqid('cortex_collection_');
+        \Registry::set($this->cid,$this);
+    }
+
+    public function __destruct() {
+        \Registry::clear($this->cid);
+    }
+
+    /* Magic implementation */
+
+    function exists($key) {
+        return isset($this->models[$key]) && !empty($this->models[$key]);
+    }
+
+    function set($key, $val) {
+        return $this->models[$key] = $val;
+    }
+
+    function get($key) {
+        if (!isset($this->models[$key])) return null;
+        return $this->models[$key];
+    }
+
+    function clear($key) {
+        return $this->models[$key] = NULL;
+    }
+
+    /* Iterator implementation */
+
+    public function current() {
+        return $this->models[$this->pointer];
+    }
+
+    public function next() {
+        $this->pointer++;
+    }
+
+    public function key() {
+        return $this->pointer;
+    }
+
+    public function valid() {
+        return $this->pointer < count($this->models);
+    }
+
+    public function rewind() {
+        $this->pointer = 0;
+    }
+
+    /**
+     * set a collection of models
+     * @param $models
+     */
+    function setModels($models) {
+        array_map(array($this,'add'),$models);
+    }
+
+    /**
+     * add single model to collection
+     * @param $model
+     */
+    function add(Cortex $model)
+    {
+        $model->collectionID = $this->cid;
+        $this->models[] = $model;
+    }
+
+    public function getRelSet($key) {
+        return (isset($this->relSets[$key])) ? $this->relSets[$key] : null;
+    }
+
+    public function setRelSet($key,$set) {
+        $this->relSets[$key] = $set;
+    }
+
+    public function hasRelSet($key) {
+        return array_key_exists($key,$this->relSets);
+    }
+
+    public function &expose() {
+        return $this->models;
+    }
+
+    /**
+     * get an intersection from a cached relation-set, based on given keys
+     * @param string $prop
+     * @param array $keys
+     * @return array
+     */
+    public function getSubset($prop,$keys) {
+        if (!is_array($keys))
+            $keys = \Base::instance()->split($keys);
+        if (!$this->hasRelSet($prop))
+            return null;
+        return array_values(array_intersect_key($this->getRelSet($prop), array_flip($keys)));
+    }
+
+    /**
+     * returns all values of a specified property from all models
+     * @param string $prop
+     * @param bool $raw
+     * @return array
+     */
+    public function getAll($prop, $raw = false)
+    {
+        $out = array();
+        foreach ($this->models as $model)
+            if ($model->exists($prop)) {
+                $val = $model->get($prop, $raw);
+                if (!empty($val))
+                    $out[] = $val;
+            }
+        return $out;
+    }
+
+    /**
+     * return all models keyed by a specified index key
+     * @param string $index
+     * @param bool $nested
+     * @return array
+     */
+    public function getBy($index, $nested = false)
+    {
+        $out = array();
+        foreach ($this->models as $model)
+            if ($model->exists($index)) {
+                $val = $model->get($index, true);
+                if (!empty($val))
+                    if($nested) $out[(string) $val][] = $model;
+                    else        $out[(string) $val] = $model;
+            }
+        return $out;
+    }
+
+    /**
+     * @param $cid
+     * @return CortexCollection
+     */
+    static public function instance($cid) {
+        if (!\Registry::exists($cid))
+            trigger_error(sprintf(self::E_UnknownCID, $cid));
+        return \Registry::get($cid);
+    }
+
 }

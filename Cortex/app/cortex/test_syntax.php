@@ -307,7 +307,8 @@ class Test_Syntax {
      */
     private function getResult($result)
     {
-        foreach ($result as &$row) {
+        $out = array();
+        foreach ($result as $row) {
             $row = $row->cast();
             unset($row['_id']);
             unset($row['id']);
@@ -315,7 +316,8 @@ class Test_Syntax {
                 if (empty($val) || is_null($val))
                     unset($row[$col]);
             }
+            $out[] = $row;
         }
-        return $result;
+        return $out;
     }
 }
