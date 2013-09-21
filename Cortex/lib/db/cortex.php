@@ -1436,9 +1436,9 @@ class CortexCollection extends \Magic implements \Iterator {
     public function getSubset($prop,$keys) {
         if (!is_array($keys))
             $keys = \Base::instance()->split($keys);
-        if (!$this->hasRelSet($prop))
+        if (!$this->hasRelSet($prop) || !($relSet = $this->getRelSet($prop)))
             return null;
-        return array_values(array_intersect_key($this->getRelSet($prop), array_flip($keys)));
+        return array_values(array_intersect_key($relSet, array_flip($keys)));
     }
 
     /**
