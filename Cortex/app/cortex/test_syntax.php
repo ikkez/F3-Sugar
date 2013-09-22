@@ -175,6 +175,23 @@ class Test_Syntax {
             $type.': operator check: <='
         );
 
+        // operator without binding
+        $result = $this->getResult($cx->find(array('num1 > 4')));
+        $expected = array(
+            0 => array(
+                'title' => 'foo8',
+                'num1' => 5,
+            ),
+            1 => array(
+                'title' => 'foo9',
+                'num1' => 8,
+            ),
+        );
+        $test->expect(
+            json_encode($result) == json_encode($expected),
+            $type.': operator without binding'
+        );
+
         // field comparision
         $result = $this->getResult($cx->find(
             array('num2 > num1', 1)));
@@ -293,9 +310,26 @@ class Test_Syntax {
                 'num2' => 1,
             ),
         );
+
         $test->expect(
             json_encode($result) == json_encode($expected),
             $type.': check order'
+        );
+
+        // IN search
+        $rc = $cx->find(array('num1 IN ?',array(4,5,8)));
+        $result = $rc->getAll('title');
+        sort($result);
+        $test->expect(
+            json_encode($result) == json_encode(array('foo3','foo8','foo9')),
+            $type.': IN operator'
+        );
+
+        $rc = $cx->find(array('num1 IN ? && num2 > ? && num2 NOT IN ?',array(3,4),1,array(10)));
+        $result = $rc->getAll('title');
+        $test->expect(
+            json_encode($result) == json_encode(array('foo5')),
+            $type.': enhanced IN, NOT IN operator'
         );
 
         ///////////////////////////////////
