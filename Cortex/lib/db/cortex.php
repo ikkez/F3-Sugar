@@ -1178,10 +1178,13 @@ class CortexQueryParser extends \Prefab {
                 // add existence check
                 $part = '(isset('.$match[0].') && '.$part.')';
                 $ncond[] = $val;
-            } elseif ($count == 2) {
+            } elseif ($count >= 1) {
                 // field comparison
                 preg_match_all('/(@\w+)/i', $part, $matches);
-                $part = '(isset('.$matches[0][0].') && isset('.$matches[0][1].') && ('.$part.'))';
+                $chks = array();
+                foreach ($matches[0] as $field)
+                    $chks[] = 'isset('.$field.')';
+                $part = '('.implode(' && ',$chks).' && ('.$part.'))';
             }
         }
         array_unshift($ncond, implode(' ', $parts));
@@ -1274,9 +1277,10 @@ class CortexQueryParser extends \Prefab {
                 $var = new \MongoRegex($rgx);
             } // find IN operator
             elseif (in_array($upart, array('IN','NOT IN'))) {
-                foreach ($var as &$id)
-                    if (!$id instanceof \MongoId)
-                        $id = new \MongoId($id);
+                if (trim($exp[0])=='_id')
+                    foreach ($var as &$id)
+                        if (!$id instanceof \MongoId)
+                            $id = new \MongoId($id);
                 $var = array(($upart=='NOT IN')?'$nin':'$in' => $var);
             } // translate operators
             elseif (!in_array($match[0], array('==', '='))) {
