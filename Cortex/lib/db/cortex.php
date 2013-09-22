@@ -417,7 +417,6 @@ class Cortex extends Cursor {
      */
     public function find($filter = NULL, array $options = NULL, $ttl = 0)
     {
-        $this->reset();
         $filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $result = $this->mapper->find($filter, $options, $ttl);
@@ -952,7 +951,7 @@ class Cortex extends Cursor {
     protected function factory($mapper)
     {
         $cx = clone($this);
-        $cx->reset();
+        $cx->reset(false);
         $cx->mapper = $mapper;
         return $cx;
     }
@@ -989,7 +988,8 @@ class Cortex extends Cursor {
         return $this;
     }
 
-    public function reset($mapper = true) {
+    public function reset($mapper = true)
+    {
         if ($mapper)
             $this->mapper->reset();
         $this->fieldsCache = array();
