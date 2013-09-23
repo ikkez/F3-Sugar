@@ -211,6 +211,10 @@ class Test_Relation {
             $news->tags[0]->title == 'Web Design' && $news->tags[1]->title == 'Usability',
             $type.': belongs-to-many: relations created with split-able string'
         );
+        $test->expect(
+            is_object($news->tags) && $news->tags instanceof \DB\CortexCollection,
+            $type.': belongs-to-many: result is collection'
+        );
 
 
         // has-one relation
@@ -257,6 +261,11 @@ class Test_Relation {
             $type.': many-to-many relation created'
         );
 
+        $test->expect(
+            is_object($news->tags2) && $news->tags2 instanceof \DB\CortexCollection,
+            $type.': many-to-many: result is collection'
+        );
+
         $news->load(array('_id = ?', $news_id[0]));
         $news->tags2 = NULL;
         $news->save();
@@ -266,6 +275,27 @@ class Test_Relation {
             is_null($news->tags2),
             $type.': many-to-many relation released'
         );
+
+        $all = $news->find();
+        $test->expect(
+            $all[1]->tags2 === NULL
+            && $all[2]->author === NULL,
+            $type.': empty relations are NULL'
+        );
+
+        $arr = $news->cast();
+        $test->expect(
+            is_array($arr['tags']),
+            $type.': collection becomes array in casted model'
+        );
+
+        if ($type == 'mongo') {
+            $test->expect(
+                is_string($arr['_id']),
+                $type.': id becomes string in casted model'
+            );
+        }
+
 
         ///////////////////////////////////
         return $test->results();

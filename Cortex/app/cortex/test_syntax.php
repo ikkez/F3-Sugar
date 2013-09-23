@@ -110,7 +110,7 @@ class Test_Syntax {
                 'num1' => 8,
             ),
         );
-
+        
         $test->expect(
             json_encode($result) == json_encode($expected),
             $type.': init mapper, adding records'
