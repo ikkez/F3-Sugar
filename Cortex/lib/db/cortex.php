@@ -912,6 +912,8 @@ class Cortex extends Cursor {
                                         $val[$k] = !is_null($item) ? $item->cast(null, $rel_depths) : null;
                             }
                         }
+                        if ($val instanceof CortexCollection)
+                            $val = $val->expose();
                     }
                     // decode array fields
                     elseif ($this->dbsType == 'sql' && isset($this->fieldConf[$key]['type']))
@@ -920,6 +922,8 @@ class Cortex extends Cursor {
                         elseif ($this->fieldConf[$key]['type'] == self::DT_TEXT_JSON)
                             $val=json_decode($this->mapper->{$key}, true);
                 }
+                if ($this->dbsType == 'mongo' && $key == '_id')
+                    $val = (string) $val;
             }
         }
         return $fields;
