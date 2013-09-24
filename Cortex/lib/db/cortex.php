@@ -54,8 +54,8 @@ class Cortex extends Cursor {
 
     const
         // special datatypes
-        DT_TEXT_SERIALIZED = 1,
-        DT_TEXT_JSON = 2,
+        DT_SERIALIZED = 'SERIALIZED',
+        DT_JSON = 'JSON',
 
         // error messages
         E_ARRAY_DATATYPE = 'Unable to save an Array in field %s. Use DT_SERIALIZED or DT_JSON.',
@@ -243,7 +243,7 @@ class Cortex extends Cursor {
                         continue;
                     }
                     // transform array fields
-                    if (in_array($field['type'], array(self::DT_TEXT_JSON, self::DT_TEXT_SERIALIZED)))
+                    if (in_array($field['type'], array(self::DT_JSON, self::DT_SERIALIZED)))
                         $field['type']=$schema::DT_TEXT;
                     // defaults values
                     if (!array_key_exists('nullable', $field)) $field['nullable'] = true;
@@ -376,7 +376,7 @@ class Cortex extends Cursor {
             $field['nullable'] = true;
         }
         elseif (array_key_exists('belongs-to-many', $field)){
-            $field['type'] = self::DT_TEXT_JSON;
+            $field['type'] = self::DT_JSON;
             $field['nullable'] = true;
         }
         elseif (array_key_exists('has-many', $field)){
@@ -532,7 +532,7 @@ class Cortex extends Cursor {
                     }
             } elseif (isset($fields[$key]['belongs-to-many'])) {
                 // many-to-many, unidirectional
-                $fields[$key]['type'] = self::DT_TEXT_JSON;
+                $fields[$key]['type'] = self::DT_JSON;
                 $relConf = $fields[$key]['belongs-to-many'];
                 $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
                 $val = $this->getForeignKeysArray($val, $rel_field, $key);
@@ -554,9 +554,9 @@ class Cortex extends Cursor {
             }
             // convert array content
             if (is_array($val) && $this->dbsType == 'sql' && !empty($fields))
-                if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
+                if ($fields[$key]['type'] == self::DT_SERIALIZED)
                     $val = serialize($val);
-                elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
+                elseif ($fields[$key]['type'] == self::DT_JSON)
                     $val = json_encode($val);
                 else
                     trigger_error(sprintf(self::E_ARRAY_DATATYPE, $key));
@@ -747,7 +747,7 @@ class Cortex extends Cursor {
                 }
                 elseif (isset($fields[$key]['belongs-to-many'])) {
                     // many-to-many, unidirectional
-                    $fields[$key]['type'] = self::DT_TEXT_JSON;
+                    $fields[$key]['type'] = self::DT_JSON;
                     $result = !$this->exists($key) ? null :$this->mapper->get($key);
                     if ($this->dbsType == 'sql')
                         $result = json_decode($result, true);
@@ -791,9 +791,9 @@ class Cortex extends Cursor {
                 }
                 // resolve array fields
                 elseif ($this->dbsType == 'sql' && isset($fields[$key]['type'])) {
-                    if ($fields[$key]['type'] == self::DT_TEXT_SERIALIZED)
+                    if ($fields[$key]['type'] == self::DT_SERIALIZED)
                         $this->fieldsCache[$key] = unserialize($this->mapper->{$key});
-                    elseif ($fields[$key]['type'] == self::DT_TEXT_JSON)
+                    elseif ($fields[$key]['type'] == self::DT_JSON)
                         $this->fieldsCache[$key] = json_decode($this->mapper->{$key},true);
                 }
             }
@@ -919,9 +919,9 @@ class Cortex extends Cursor {
                     }
                     // decode array fields
                     elseif ($this->dbsType == 'sql' && isset($this->fieldConf[$key]['type']))
-                        if ($this->fieldConf[$key]['type'] == self::DT_TEXT_SERIALIZED)
+                        if ($this->fieldConf[$key]['type'] == self::DT_SERIALIZED)
                             $val=unserialize($this->mapper->{$key});
-                        elseif ($this->fieldConf[$key]['type'] == self::DT_TEXT_JSON)
+                        elseif ($this->fieldConf[$key]['type'] == self::DT_JSON)
                             $val=json_decode($this->mapper->{$key}, true);
                 }
                 if ($this->dbsType == 'mongo' && $key == '_id')
