@@ -492,6 +492,8 @@ class Cortex extends Cursor {
                 unset($rel);
             }
         }
+        if (is_object($result))
+            $result = $this->factory($result);
         return $result;
     }
 
