@@ -926,6 +926,10 @@ class Cortex extends Cursor {
                 }
                 if ($this->dbsType == 'mongo' && $key == '_id')
                     $val = (string) $val;
+                if ($this->dbsType == 'sql' && $key == 'id') {
+                    $fields['_id'] = $val;
+                    unset($fields[$key]);
+                }
             }
         }
         return $fields;
