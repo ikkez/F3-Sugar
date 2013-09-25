@@ -1346,10 +1346,9 @@ class CortexQueryParser extends \Prefab {
     }
 }
 
-class CortexCollection extends \Magic implements \Iterator {
+class CortexCollection extends \ArrayIterator {
 
     protected
-        $models = array(),
         $relSets = array(),
         $pointer = 0,
         $cid;
@@ -1360,51 +1359,11 @@ class CortexCollection extends \Magic implements \Iterator {
     public function __construct() {
         $this->cid = uniqid('cortex_collection_');
         \Registry::set($this->cid,$this);
+        parent::__construct();
     }
 
     public function __destruct() {
         \Registry::clear($this->cid);
-    }
-
-    /* Magic implementation */
-
-    function exists($key) {
-        return isset($this->models[$key]) && !empty($this->models[$key]);
-    }
-
-    function set($key, $val) {
-        return $this->models[$key] = $val;
-    }
-
-    function get($key) {
-        if (!isset($this->models[$key])) return null;
-        return $this->models[$key];
-    }
-
-    function clear($key) {
-        return $this->models[$key] = NULL;
-    }
-
-    /* Iterator implementation */
-
-    public function current() {
-        return $this->models[$this->pointer];
-    }
-
-    public function next() {
-        $this->pointer++;
-    }
-
-    public function key() {
-        return $this->pointer;
-    }
-
-    public function valid() {
-        return $this->pointer < count($this->models);
-    }
-
-    public function rewind() {
-        $this->pointer = 0;
     }
 
     /**
@@ -1422,7 +1381,7 @@ class CortexCollection extends \Magic implements \Iterator {
     function add(Cortex $model)
     {
         $model->collectionID = $this->cid;
-        $this->models[] = $model;
+        $this->append($model);
     }
 
     public function getRelSet($key) {
@@ -1437,8 +1396,8 @@ class CortexCollection extends \Magic implements \Iterator {
         return array_key_exists($key,$this->relSets);
     }
 
-    public function &expose() {
-        return $this->models;
+    public function expose() {
+        return $this->getArrayCopy();
     }
 
     /**
@@ -1464,7 +1423,7 @@ class CortexCollection extends \Magic implements \Iterator {
     public function getAll($prop, $raw = false)
     {
         $out = array();
-        foreach ($this->models as $model)
+        foreach ($this->getArrayCopy() as $model)
             if ($model->exists($prop)) {
                 $val = $model->get($prop, $raw);
                 if (!empty($val))
@@ -1482,7 +1441,7 @@ class CortexCollection extends \Magic implements \Iterator {
     public function getBy($index, $nested = false)
     {
         $out = array();
-        foreach ($this->models as $model)
+        foreach ($this->getArrayCopy() as $model)
             if ($model->exists($index)) {
                 $val = $model->get($index, true);
                 if (!empty($val))
