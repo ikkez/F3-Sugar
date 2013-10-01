@@ -18,9 +18,9 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.0.0-alpha
+        @version 1.0.0-beta
         @since 24.04.2012
-        @date 18.09.2013
+        @date 01.10.2013
  **/
 
 namespace DB;
@@ -1013,7 +1013,7 @@ class Cortex extends Cursor {
     }
 
     function exists($key) {
-        if ($this->dbsType != 'sql' && $key == '_id') return true;
+        if ($key == '_id') return true;
         return $this->mapper->exists($key);
     }
 
