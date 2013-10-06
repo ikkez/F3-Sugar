@@ -492,8 +492,6 @@ class Cortex extends Cursor {
                 unset($rel);
             }
         }
-        if (is_object($result))
-            $result = $this->factory($result);
         return $result;
     }
 
@@ -1022,11 +1020,15 @@ class Cortex extends Cursor {
     }
 
     function insert() {
-        return $this->mapper->insert();
+        $res = $this->mapper->insert();
+        return is_int($res) ? $this :
+            (is_object($res) ? $this->factory($res) : $res);
     }
 
     function update() {
-        return $this->mapper->update();
+        $res = $this->mapper->update();
+        return is_int($res) ? $this :
+            (is_object($res) ? $this->factory($res) : $res);
     }
 
     /**
