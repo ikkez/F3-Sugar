@@ -674,11 +674,11 @@ class Cortex extends Cursor {
                                 // emit eager loading
                                 $relKeys = $cx->getAll($toConf[1],true);
                                 $relSet = $rel->find(array($fromConf[1].' IN ?', $relKeys));
-                                $cx->setRelSet($key, $relSet ? $relSet->getBy($toConf[1]) : NULL);
+                                $cx->setRelSet($key, $relSet ? $relSet->getBy($fromConf[1],true) : NULL);
                             }
                             $result = $cx->getSubset($key, array($this->mapper->{$toConf[1]}));
                             $this->fieldsCache[$key] = $result ? (($type == 'has-one')
-                                ? $result[0] : $result) : NULL;
+                                ? $result[0][0] : $result[0]) : NULL;
                         } else {
                             $crit = array($fromConf[1].' = ?', $this->mapper->{$toConf[1]});
                             $this->fieldsCache[$key] = (($type == 'has-one')
