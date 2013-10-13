@@ -29,14 +29,12 @@ use DB\SQL\Schema;
 class Cortex extends Cursor {
 
     protected
-        // options
         $db,            // DB object [ \DB\SQL, \DB\Jig, \DB\Mongo ]
         $table,         // selected table, string
         $fluid,         // fluid sql schema mode, boolean
         $fieldConf,     // field configuration, array
-
-        // internal vars, don't touch
-        $dbsType,       // mapper engine type [Jig, SQL, Mongo]
+        $smartLoading,  // intelligent lazy eager loading, boolean
+        $dbsType,       // mapper engine type [jig, sql, mongo]
         $fieldsCache,   // relation field cache
         $saveCsd;       // mm rel save cascade
 
@@ -119,6 +117,9 @@ class Cortex extends Cursor {
         }
         $this->queryParser = CortexQueryParser::instance();
         $this->reset();
+        $f3 = \Base::instance();
+        $this->smartLoading = $f3->exists('CORTEX.smartLoading') ?
+            $f3->get('CORTEX.smartLoading') : TRUE;
         if(!empty($this->fieldConf))
             foreach($this->fieldConf as $key=>&$conf)
                 $conf=static::resolveRelationConf($conf);
@@ -631,7 +632,7 @@ class Cortex extends Cursor {
                         // fetch related model
                         $rel = $this->getRelInstance($relConf[0]);
                         // am i part of a result collection?
-                        if ($this->collectionID) {
+                        if ($this->collectionID && $this->smartLoading) {
                             $cx = CortexCollection::instance($this->collectionID);
                             // does the collection has cached results for this key?
                             if (!$cx->hasRelSet($key)) {
@@ -666,7 +667,7 @@ class Cortex extends Cursor {
                         if ($toConf[1] != $id && (!$this->exists($toConf[1])
                             || is_null($this->mapper->{$toConf[1]})))
                             $this->fieldsCache[$key] = null;
-                        elseif($this->collectionID) {
+                        elseif($this->collectionID && $this->smartLoading) {
                             // part of a result set
                             $cx = CortexCollection::instance($this->collectionID);
                             if(!$cx->hasRelSet($key)) {
@@ -696,7 +697,7 @@ class Cortex extends Cursor {
                             $mmTable = $fromConf['refTable'];
                         // create mm table mapper
                         $rel = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
-                        if ($this->collectionID) {
+                        if ($this->collectionID && $this->smartLoading) {
                             $cx = CortexCollection::instance($this->collectionID);
                             if (!$cx->hasRelSet($key)) {
                                 // get IDs of all results
@@ -761,7 +762,7 @@ class Cortex extends Cursor {
                         foreach ($result as $el)
                             $fkeys[] = (string) $el;
                         // if part of a result set
-                        if ($this->collectionID) {
+                        if ($this->collectionID && $this->smartLoading) {
                             $cx = CortexCollection::instance($this->collectionID);
                             if (!$cx->hasRelSet($key)) {
                                 // find all keys
