@@ -38,7 +38,7 @@ class Cortex extends Cursor {
         $fieldsCache,   // relation field cache
         $saveCsd;       // mm rel save cascade
 
-    public
+    protected
         $collectionID;
 
     /** @var Cursor */
@@ -170,6 +170,10 @@ class Cortex extends Cursor {
         );
         unset($self);
         return $conf;
+    }
+
+    public function addToCollection($cID) {
+        $this->collectionID = $cID;
     }
 
     /**
@@ -969,12 +973,17 @@ class Cortex extends Cursor {
         return $this->mapper->dry();
     }
 
-    public function copyfrom($key) {
-        $this->mapper->copyfrom($key);
+    public function copyfrom($key,$fieldConfOnly=false)
+    {
+        $fields = \Base::instance()->get($key);
+        if ($fieldConfOnly)
+            $fields = array_intersect_key($fields,$this->fieldConf);
+        foreach($fields as $key=>$val)
+            $this->set($key,$val);
     }
 
     public function copyto($key) {
-        $this->mapper->copyto($key);
+        \Base::instance()->set($key, $this->cast(null,0));
     }
 
     public function skip($ofs = 1) {
@@ -1383,7 +1392,7 @@ class CortexCollection extends \ArrayIterator {
      */
     function add(Cortex $model)
     {
-        $model->collectionID = $this->cid;
+        $model->addToCollection($this->cid);
         $this->append($model);
     }
 
