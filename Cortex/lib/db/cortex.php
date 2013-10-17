@@ -427,8 +427,10 @@ class Cortex extends Cursor {
         $result = $this->mapper->find($filter, $options, $ttl);
         if (empty($result))
             return false;
-        foreach($result as &$mapper)
+        foreach($result as &$mapper) {
             $mapper = $this->factory($mapper);
+            unset($mapper);
+        }
         $cc = new \DB\CortexCollection();
         $cc->setModels($result);
         return $cc;
@@ -772,8 +774,10 @@ class Cortex extends Cursor {
                                 // find all keys
                                 $relKeys = ($cx->getAll($key,true));
                                 if ($this->dbsType == 'sql'){
-                                    foreach ($relKeys as &$val)
+                                    foreach ($relKeys as &$val) {
                                         $val = substr($val, 1, -1);
+                                        unset($val);
+                                    }
                                     $relKeys = json_decode('['.implode(',',$relKeys).']');
                                 } else
                                     $relKeys = call_user_func_array('array_merge', $relKeys);
@@ -1031,14 +1035,20 @@ class Cortex extends Cursor {
 
     function insert() {
         $res = $this->mapper->insert();
-        return is_int($res) ? $this :
-            (is_object($res) ? $this->factory($res) : $res);
+        if (is_array($res))
+            $res = $this->mapper;
+        if (is_object($res))
+            $res = $this->factory($res);
+        return is_int($res) ? $this : $res;
     }
 
     function update() {
         $res = $this->mapper->update();
-        return is_int($res) ? $this :
-            (is_object($res) ? $this->factory($res) : $res);
+        if (is_array($res))
+            $res = $this->mapper;
+        if (is_object($res))
+            $res = $this->factory($res);
+        return is_int($res) ? $this : $res;
     }
 
     /**
