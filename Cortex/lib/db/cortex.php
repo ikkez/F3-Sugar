@@ -484,10 +484,10 @@ class Cortex extends Cursor {
                 $rel = $this->getRelInstance(null, array('db'=>$this->db, 'table'=>$mmTable));
                 // delete all refs
                 if (is_null($val))
-                    $rel->erase(array($relConf['relField'].' = ?', $this->get('_id')));
+                    $rel->erase(array($relConf['relField'].' = ?', $this->get('_id',true)));
                 // update refs
                 elseif (is_array($val)) {
-                    $id = $this->get('_id');
+                    $id = $this->get('_id',true);
                     $rel->erase(array($relConf['relField'].' = ?', $id));
                     foreach($val as $v) {
                         $rel->set($key,$v);
@@ -526,15 +526,17 @@ class Cortex extends Cursor {
                 if(is_null($val))
                     $val = NULL;
                 elseif (is_object($val) &&
-                    !($this->dbsType=='mongo' && $val instanceof \MongoId))
+                    !($this->dbsType=='mongo' && $val instanceof \MongoId)) {
                     // fetch fkey from mapper
                     if (!$val instanceof Cortex || $val->dry())
                         trigger_error(self::E_INVALID_RELATION_OBJECT);
                     else {
                         $relConf = $fields[$key]['belongs-to-one'];
                         $rel_field = (is_array($relConf) ? $relConf[1] : '_id');
-                        $val = $val->get($rel_field);
+                        $val = $val->get($rel_field,true);
                     }
+                } elseif ($this->dbsType == 'mongo' && !$val instanceof \MongoId)
+                    $val = new \MongoId($val);
             } elseif (isset($fields[$key]['belongs-to-many'])) {
                 // many-to-many, unidirectional
                 $fields[$key]['type'] = self::DT_JSON;
@@ -620,8 +622,21 @@ class Cortex extends Cursor {
         $id = ($this->dbsType == 'sql')?'id':'_id';
         if ($key == '_id' && $this->dbsType == 'sql')
             $key = $id;
-        if ($raw)
-            return $this->exists($key) ? $this->mapper->{$key} : NULL;
+        if ($raw) {
+            $out = $this->exists($key) ? $this->mapper->{$key} : NULL;
+            // ensure to return a MongoID object
+            // TODO: just for compatibility, test for dropping this part
+            if ($this->dbsType == 'mongo' && isset($this->fieldConf[$key])) {
+                if (is_string($out) &&
+                    (isset($this->fieldConf[$key]['belongs-to-one'])
+                        || isset($this->fieldConf[$key]['belongs-to-many'])
+                        || isset($this->fieldConf[$key]['has-one'])
+                        || isset($this->fieldConf[$key]['has-many']))) {
+                    $out = new \MongoId($out);
+                }
+            }
+            return $out;
+        }
         if(!empty($fields) && isset($fields[$key]) && is_array($fields[$key])) {
             // check field cache
             if(!array_key_exists($key,$this->fieldsCache) && is_array($fields[$key])) {
@@ -650,11 +665,11 @@ class Cortex extends Cursor {
                                 $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
                             }
                             // get a subset of the preloaded set
-                            $result = $cx->getSubset($key,(string) $this->mapper->{$key});
+                            $result = $cx->getSubset($key,(string) $this->get($key,true));
                             $this->fieldsCache[$key] = $result ? $result[0] : NULL;
                         } else
                             $this->fieldsCache[$key] = $rel->findone(
-                                array($relConf[1].' = ?', $this->mapper->{$key}));
+                                array($relConf[1].' = ?', $this->get($key,true)));
                     }
                 }
                 elseif (($type = isset($fields[$key]['has-one']))
@@ -682,11 +697,11 @@ class Cortex extends Cursor {
                                 $relSet = $rel->find(array($fromConf[1].' IN ?', $relKeys));
                                 $cx->setRelSet($key, $relSet ? $relSet->getBy($fromConf[1],true) : NULL);
                             }
-                            $result = $cx->getSubset($key, array($this->mapper->{$toConf[1]}));
+                            $result = $cx->getSubset($key, array($this->get($toConf[1])));
                             $this->fieldsCache[$key] = $result ? (($type == 'has-one')
                                 ? $result[0][0] : $result[0]) : NULL;
                         } else {
-                            $crit = array($fromConf[1].' = ?', $this->mapper->{$toConf[1]});
+                            $crit = array($fromConf[1].' = ?', $this->get($toConf[1],true));
                             $this->fieldsCache[$key] = (($type == 'has-one')
                                 ? $rel->findone($crit) : $rel->find($crit)) ?: NULL;
                         }
@@ -707,15 +722,16 @@ class Cortex extends Cursor {
                             $cx = CortexCollection::instance($this->collectionID);
                             if (!$cx->hasRelSet($key)) {
                                 // get IDs of all results
-                                $relKeys = ($cx->getAll($id));
+                                $relKeys = $cx->getAll($id,true);
                                 // get all pivot IDs
                                 $mmRes = $rel->find(array($fromConf['relField'].' IN ?', $relKeys));
                                 if (!$mmRes)
                                     $cx->setRelSet($key, NULL);
                                 else {
                                     foreach($mmRes as $model) {
-                                        $pivotRel[$model->{$fromConf['relField']}][] = $model->{$key};
-                                        $pivotKeys[] = $model->{$key};
+                                        $val = $model->get($key,true);
+                                        $pivotRel[ (string) $model->get($fromConf['relField'])][] = $val;
+                                        $pivotKeys[] = $val;
                                     }
                                     // cache pivot keys
                                     $cx->setRelSet($key.'_pivot', $pivotRel);
@@ -728,18 +744,18 @@ class Cortex extends Cursor {
                                 }
                             }
                             // fetch subset from preloaded rels using cached pivot keys
-                            $fkeys = $cx->getSubset($key.'_pivot', $this->mapper->{$id});
+                            $fkeys = $cx->getSubset($key.'_pivot', $this->get($id));
                             $this->fieldsCache[$key] = $fkeys ?
                                 $cx->getSubset($key, $fkeys[0]) : NULL;
                         } // no collection
                         else {
                             // find foreign keys
                             $results = $rel->find(
-                                array($fromConf['relField'].' = ?', $this->mapper->{$id}));
+                                array($fromConf['relField'].' = ?', $this->get($id,true)));
                             if(!$results)
                                 $this->fieldsCache[$key] = NULL;
                             else {
-                                $fkeys = $results->getAll($key);
+                                $fkeys = $results->getAll($key,true);
                                 // create foreign table mapper
                                 unset($rel);
                                 $rel = $this->getRelInstance($fromConf[0]);
@@ -807,7 +823,11 @@ class Cortex extends Cursor {
         }
         // fetch cached value, if existing
         $val = array_key_exists($key,$this->fieldsCache) ? $this->fieldsCache[$key]
-                : (($this->exists($key) || $key == $id) ? $this->mapper->{$key} : null);
+            : (($this->exists($key) || $key == $id) ? $this->mapper->{$key} : null);
+        if ($this->dbsType == 'mongo' && $val instanceof \MongoId) {
+            // conversion to string makes further processing in template, etc. much easier
+            $val = (string) $val;
+        }
         // custom getter
         return (method_exists($this, 'get_'.$key)) ? $this->{'get_'.$key}($val) : $val;
     }
@@ -834,21 +854,27 @@ class Cortex extends Cursor {
         // hydrated mapper as collection
         if (is_object($val)) {
             while (!$val->dry()) {
-                $nval[] = $val->get($rel_field);
+                $nval[] = $val->get($rel_field,true);
                 $val->next();
             }
             $val = $nval;
-        } elseif (is_array($val))
+        }
+        elseif (is_array($val)) {
             // array of single hydrated mappers, raw ID value or mixed
             foreach ($val as $index => &$item) {
-                if ($this->dbsType == 'mongo' && $rel_field == '_id' && is_string($item))
-                    $item = new \MongoId($item);
-                elseif (is_object($item) &&
+                if (is_object($item) &&
                     !($this->dbsType == 'mongo' && $item instanceof \MongoId))
                     if (!$item instanceof Cortex || $item->dry())
                         trigger_error(self::E_INVALID_RELATION_OBJECT);
-                    else $item = $item->get($rel_field);
+                    else $item = $item->get($rel_field,true);
+                unset($item);
             }
+            if ($this->dbsType == 'mongo'&& $rel_field == '_id')
+                foreach ($val as $index => &$item) {
+                    if (is_string($item))
+                        $item = new \MongoId($item);
+                }
+        }
         return $val;
     }
 
@@ -1099,8 +1125,10 @@ class CortexQueryParser extends \Prefab {
                 $parts = $this->splitLogical($where);
                 if (is_int(strpos($where, ':')))
                     list($parts, $args) = $this->convertNamedParams($parts, $args);
-                foreach ($parts as &$part)
+                foreach ($parts as &$part) {
                     $part = $this->_mongo_parse_relational_op($part, $args);
+                    unset($part);
+                }
                 $ncond = $this->_mongo_parse_logical_op($parts);
                 return $ncond;
             case 'sql':
@@ -1253,14 +1281,15 @@ class CortexQueryParser extends \Prefab {
                     $child[] = $part;
             } // add to parse array
             elseif ($b_offset > 0)
-                $child[] = $part; // condition type
+                $child[] = $part;
+            // condition type
             elseif (!is_array($part)) {
                 if (strtoupper($part) == 'AND')
                     $add = true;
                 elseif (strtoupper($part) == 'OR')
                     $or = true;
             } else // skip
-            $ncond[] = $part;
+                $ncond[] = $part;
         }
         if ($b_offset > 0)
             trigger_error(self::E_BRACKETS);
@@ -1279,21 +1308,30 @@ class CortexQueryParser extends \Prefab {
      */
     protected function _mongo_parse_relational_op($part, &$args)
     {
-        if (is_null($part)) return $part;
-        $ops = array('<=', '>=', '<>', '<', '>', '!=', '==', '=', 'like', 'in', 'not in');
-        foreach ($ops as &$op)
-            $op = preg_quote($op);
-        $op_quote = implode('|', $ops);
-        if (preg_match('/'.$op_quote.'/i', $part, $match)) {
+        if (is_null($part))
+            return $part;
+        if (preg_match('/\<\=|\>\=|\<\>|\<|\>|\!\=|\=\=|\=|like|in|not in/i', $part, $match)) {
             $var = is_int(strpos($part, '?')) ? array_shift($args) : null;
             $exp = explode($match[0], $part);
+            $key = trim($exp[0]);
             // unbound value
             if (is_numeric($exp[1]))
                 $var = $exp[1];
             // field comparison
             elseif (!is_int(strpos($exp[1], '?')))
-                return array('$where' => 'this.'.trim($exp[0]).' '.$match[0].' this.'.trim($exp[1]));
+                return array('$where' => 'this.'.$key.' '.$match[0].' this.'.trim($exp[1]));
             $upart = strtoupper($match[0]);
+            // MongoID shorthand
+            if ($key == '_id') {
+                if (is_array($var))
+                    foreach ($var as &$id) {
+                        if (!$id instanceof \MongoId)
+                            $id = new \MongoId($id);
+                        unset($id);
+                    }
+                elseif(!$var instanceof \MongoId)
+                    $var = new \MongoId($var);
+            }
             // find LIKE operator
             if ($upart == 'LIKE') {
                 $fC = substr($var, 0, 1);
@@ -1303,26 +1341,22 @@ class CortexQueryParser extends \Prefab {
                     $rgx = str_replace('%', '/', $var);
                 // var%  -> /^var/
                 elseif ($lC == '%')
-                    $rgx = '/^'.str_replace('%', '', $var).'/'; // %var  -> /var$/
+                    $rgx = '/^'.str_replace('%', '', $var).'/';
+                // %var  -> /var$/
                 elseif ($fC == '%')
                     $rgx = '/'.substr($var, 1).'$/';
                 $var = new \MongoRegex($rgx);
             } // find IN operator
             elseif (in_array($upart, array('IN','NOT IN'))) {
-                if (trim($exp[0])=='_id')
-                    foreach ($var as &$id)
-                        if (!$id instanceof \MongoId)
-                            $id = new \MongoId($id);
                 $var = array(($upart=='NOT IN')?'$nin':'$in' => $var);
             } // translate operators
             elseif (!in_array($match[0], array('==', '='))) {
                 $opr = str_replace(array('<>', '<', '>', '!', '='),
                     array('$ne', '$lt', '$gt', '$n', 'e'), $match[0]);
                 $var = array($opr => (strtolower($var) == 'null') ? null :
-                    (is_object($var) ? $var : $var + 0));
-            } elseif (trim($exp[0]) == '_id' && !$var instanceof \MongoId)
-                $var = new \MongoId($var);
-            return array(trim($exp[0]) => $var);
+                    (is_object($var) ? $var : (is_numeric($var) ? $var + 0 : $var)));
+            }
+            return array($key => $var);
         }
         return $part;
     }
@@ -1433,6 +1467,9 @@ class CortexCollection extends \ArrayIterator {
             $keys = \Base::instance()->split($keys);
         if (!$this->hasRelSet($prop) || !($relSet = $this->getRelSet($prop)))
             return null;
+        foreach ($keys as &$key)
+            if ($key instanceof \MongoId)
+                $key = (string) $key;
         return array_values(array_intersect_key($relSet, array_flip($keys)));
     }
 
