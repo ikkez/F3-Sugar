@@ -1046,8 +1046,11 @@ class Cortex extends Cursor {
         if(($this->dbsType == 'jig' || $this->dbsType == 'mongo')
             && !empty($this->fieldConf))
             foreach($this->fieldConf as $field_key => $field_conf)
-                if(array_key_exists('default',$field_conf))
-                    $this->{$field_key} = $field_conf['default'];
+                if(array_key_exists('default',$field_conf)) {
+                    $val = ($field_conf['default'] === \DB\SQL\Schema::DF_CURRENT_TIMESTAMP)
+                        ? date('Y-m-d H:i:s') : $field_conf['default'];
+                    $this->set($field_key, $val);
+                }
     }
 
     function exists($key) {
