@@ -36,10 +36,9 @@ class Cortex extends Cursor {
         $smartLoading,  // intelligent lazy eager loading, boolean
         $dbsType,       // mapper engine type [jig, sql, mongo]
         $fieldsCache,   // relation field cache
-        $saveCsd;       // mm rel save cascade
-
-    protected
-        $collectionID;
+        $saveCsd,       // mm rel save cascade
+        $collectionID,  // collection set identifier
+        $relFilter;     // filter for loading related models
 
     /** @var Cursor */
     protected $mapper;
@@ -117,6 +116,7 @@ class Cortex extends Cursor {
         }
         $this->queryParser = CortexQueryParser::instance();
         $this->reset();
+        $this->clearRelFilter();
         $f3 = \Base::instance();
         $this->smartLoading = $f3->exists('CORTEX.smartLoading') ?
             $f3->get('CORTEX.smartLoading') : TRUE;
@@ -433,6 +433,7 @@ class Cortex extends Cursor {
         }
         $cc = new \DB\CortexCollection();
         $cc->setModels($result);
+        $this->clearRelFilter();
         return $cc;
     }
 
@@ -449,6 +450,46 @@ class Cortex extends Cursor {
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $this->mapper->load($filter, $options);
         return $this;
+    }
+
+    /**
+     * add filter for loading related models
+     * @param string $key
+     * @param array $filter
+     * @return $this
+     */
+    public function addRelFilter($key,$filter)
+    {
+        $this->relFilter[$key] = $filter;
+        return $this;
+    }
+
+    /**
+     * removes one or all relation filter
+     * @param null|string $key
+     */
+    public function clearRelFilter($key = null)
+    {
+        if (!$key)
+            $this->relFilter = array();
+        elseif(isset($this->relFilter[$key]))
+            unset($this->relFilter[$key]);
+    }
+
+    /**
+     * merge the relation filter to the query criteria if it exists
+     * @param string $key
+     * @param array $crit
+     * @return array
+     */
+    protected function mergeWithRelFilter($key,$crit)
+    {
+        if (array_key_exists($key, $this->relFilter)) {
+            $filter = $this->relFilter[$key];
+            $crit[0] .= ' and '.array_shift($filter);
+            $crit = array_merge($crit, $filter);
+        }
+        return $crit;
     }
 
     /**
@@ -660,16 +701,19 @@ class Cortex extends Cursor {
                                 // build the cache, find all values of current key
                                 $relKeys = array_unique($cx->getAll($key,true));
                                 // find related models
-                                $relSet = $rel->find(array($relConf[1].' IN ?', $relKeys));
+                                $crit = array($relConf[1].' IN ?', $relKeys);
+                                $relSet = $rel->find($this->mergeWithRelFilter($key, $crit));
                                 // cache relSet, sorted by ID
                                 $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
                             }
                             // get a subset of the preloaded set
                             $result = $cx->getSubset($key,(string) $this->get($key,true));
                             $this->fieldsCache[$key] = $result ? $result[0] : NULL;
-                        } else
-                            $this->fieldsCache[$key] = $rel->findone(
-                                array($relConf[1].' = ?', $this->get($key,true)));
+                        } else {
+                            $crit = array($relConf[1].' = ?', $this->get($key, true));
+                            $crit = $this->mergeWithRelFilter($key, $crit);
+                            $this->fieldsCache[$key] = $rel->findone($crit);
+                        }
                     }
                 }
                 elseif (($type = isset($fields[$key]['has-one']))
@@ -694,7 +738,8 @@ class Cortex extends Cursor {
                             if(!$cx->hasRelSet($key)) {
                                 // emit eager loading
                                 $relKeys = $cx->getAll($toConf[1],true);
-                                $relSet = $rel->find(array($fromConf[1].' IN ?', $relKeys));
+                                $crit = array($fromConf[1].' IN ?', $relKeys);
+                                $relSet = $rel->find($this->mergeWithRelFilter($key,$crit));
                                 $cx->setRelSet($key, $relSet ? $relSet->getBy($fromConf[1],true) : NULL);
                             }
                             $result = $cx->getSubset($key, array($this->get($toConf[1])));
@@ -702,8 +747,9 @@ class Cortex extends Cursor {
                                 ? $result[0][0] : $result[0]) : NULL;
                         } else {
                             $crit = array($fromConf[1].' = ?', $this->get($toConf[1],true));
-                            $this->fieldsCache[$key] = (($type == 'has-one')
-                                ? $rel->findone($crit) : $rel->find($crit)) ?: NULL;
+                            $crit = $this->mergeWithRelFilter($key, $crit);
+                            $this->fieldsCache[$key] = (($type == 'has-one') ? $rel->findone($crit)
+                                : $rel->find($crit)) ?: NULL;
                         }
                     }
                     // many-to-many, bidirectional
@@ -738,7 +784,8 @@ class Cortex extends Cursor {
                                     // preload all rels
                                     $pivotKeys = array_unique($pivotKeys);
                                     $fRel = $this->getRelInstance($fromConf[0]);
-                                    $relSet = $fRel->find(array($id.' IN ?', $pivotKeys));
+                                    $crit = array($id.' IN ?', $pivotKeys);
+                                    $relSet = $fRel->find($this->mergeWithRelFilter($key, $crit));
                                     $cx->setRelSet($key, $relSet->getBy($id));
                                     unset($fRel);
                                 }
@@ -761,6 +808,7 @@ class Cortex extends Cursor {
                                 $rel = $this->getRelInstance($fromConf[0]);
                                 // load foreign models
                                 $filter = array($id.' IN ?', $fkeys);
+                                $filter = $this->mergeWithRelFilter($key, $filter);
                                 $this->fieldsCache[$key] = $rel->find($filter);
                             }
                         }
@@ -798,8 +846,8 @@ class Cortex extends Cursor {
                                 } else
                                     $relKeys = call_user_func_array('array_merge', $relKeys);
                                 // get related models
-                                $relSet = $rel->find(
-                                    array($relConf[1].' IN ?', array_unique($relKeys)));
+                                $crit = array($relConf[1].' IN ?', array_unique($relKeys));
+                                $relSet = $rel->find($this->mergeWithRelFilter($key, $crit));
                                 // cache relSet, sorted by ID
                                 $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
                             }
@@ -808,6 +856,7 @@ class Cortex extends Cursor {
                         } else {
                             // load foreign models
                             $filter = array($relConf[1].' IN ?', $fkeys);
+                            $filter = $this->mergeWithRelFilter($key, $filter);
                             $this->fieldsCache[$key] = $rel->find($filter);
                         }
                     }
