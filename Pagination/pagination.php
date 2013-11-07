@@ -11,7 +11,7 @@
     Copyright (c) 2012 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.3.3
+    @version 1.4.0
  **/
 
 class Pagination {
@@ -22,6 +22,7 @@ class Pagination {
     private $current_page;
     private $template = 'pagebrowser.html';
     private $routeKey;
+    private $routeKeyPrefix;
     private $linkPath;
 	private $fw;
 
@@ -38,7 +39,6 @@ class Pagination {
         $this->items_count = is_array($items)?count($items):$items;
         $this->routeKey = $routeKey;
         $this->setLimit($limit);
-        $this->setCurrent( $this->fw->exists('PARAMS.'.$routeKey) ? $this->fw->get('PARAMS.'.$routeKey) : 1);
     }
 
     /**
@@ -77,6 +77,8 @@ class Pagination {
      * @param $current int
      */
     public function setCurrent($current) {
+        if(!$this->routeKeyPrefix)
+            $current = str_replace($this->routeKeyPrefix,'',$current);
         if(!is_numeric($current)) return;
         if($current <= $this->getMax()) $this->current_page = $current;
         else $this->current_page = $this->getMax();
@@ -89,6 +91,10 @@ class Pagination {
     public function setLinkPath($linkPath) {
         $this->linkPath = (substr($linkPath,0,1) != '/') ? '/'.$linkPath:$linkPath;
         if(substr($this->linkPath,-1) != '/') $this->linkPath .= '/';
+    }
+
+    public function setRouteKeyPrefix($prefix) {
+        $this->routeKeyPrefix = $prefix;
     }
 
     /**
@@ -114,6 +120,7 @@ class Pagination {
     public function getMax() {
         return ceil($this->items_count / $this->items_per_page);
     }
+
 
     /**
      * get next page number
@@ -157,7 +164,8 @@ class Pagination {
      * @return array page numbers in range
      */
     public function getInRange($range = null) {
-        if(is_null($range)) $range = $this->range;
+        if(is_null($range))
+            $range = $this->range;
         $current_range = array( ($this->current_page-$range < 1 ? 1 : $this->current_page-$range),
             ($this->current_page+$range > $this->getMax() ? $this->getMax() : $this->current_page+$range));
         $rangeIDs = array();
@@ -183,10 +191,13 @@ class Pagination {
         if(is_null($this->linkPath)) {
             $route = $this->fw->get('PARAMS.0');
             if($this->fw->exists('PARAMS.'.$this->routeKey)) {
-                $route = str_replace($this->fw->get('PARAMS.'.$this->routeKey),'',$route);
+                $route = str_replace($this->routeKeyPrefix.
+                    $this->fw->get('PARAMS.'.$this->routeKey),'',$route);
             } else if(substr($route,-1) != '/') { $route.= '/'; }
         } else $route = $this->linkPath;
+
         $this->fw->set('pg.route',$route);
+        $this->fw->set('pg.prefix',$this->routeKeyPrefix);
         $this->fw->set('pg.currentPage',$this->current_page);
         $this->fw->set('pg.nextPage',$this->getNext());
         $this->fw->set('pg.prevPage',$this->getPrev());
@@ -218,6 +229,8 @@ class Pagination {
             $pn_code .= '$pn->setTemplate("'.$attr['src'].'");';
         if(array_key_exists('token',$attr))
             $pn_code .= '$pn->setRouteKey("'.$attr['token'].'");';
+        if(array_key_exists('token-prefix',$attr))
+            $pn_code .= '$pn->setRouteKeyPrefix("'.$attr['token-prefix'].'");';
         $pn_code .= 'echo $pn->serve();';
         return '<?php '.$pn_code.' ?>';
     }
