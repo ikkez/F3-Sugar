@@ -191,8 +191,8 @@ class Pagination {
         if(is_null($this->linkPath)) {
             $route = $this->fw->get('PARAMS.0');
             if($this->fw->exists('PARAMS.'.$this->routeKey)) {
-                $route = str_replace($this->routeKeyPrefix.
-                    $this->fw->get('PARAMS.'.$this->routeKey),'',$route);
+                $route = preg_replace("/".$this->routeKeyPrefix.
+                    $this->fw->get('PARAMS.'.$this->routeKey)."$/",'',$route);
             } else if(substr($route,-1) != '/') { $route.= '/'; }
         } else $route = $this->linkPath;
 
