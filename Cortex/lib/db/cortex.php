@@ -40,6 +40,8 @@ class Cortex extends Cursor {
         $collectionID,  // collection set identifier
         $relFilter;     // filter for loading related models
 
+	protected $standardiseID = true;	//return standard '_id' for SQL, not 'id'
+		
     /** @var Cursor */
     protected $mapper;
 
@@ -1008,7 +1010,7 @@ class Cortex extends Cursor {
                 }
                 if ($this->dbsType == 'mongo' && $key == '_id')
                     $val = (string) $val;
-                if ($this->dbsType == 'sql' && $key == 'id') {
+                if ($this->dbsType == 'sql' && $key == 'id' && $this->standardiseID) {
                     $fields['_id'] = $val;
                     unset($fields[$key]);
                 }
