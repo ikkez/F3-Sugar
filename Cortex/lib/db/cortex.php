@@ -29,19 +29,21 @@ use DB\SQL\Schema;
 class Cortex extends Cursor {
 
     protected
+        // config
         $db,            // DB object [ \DB\SQL, \DB\Jig, \DB\Mongo ]
         $table,         // selected table, string
         $fluid,         // fluid sql schema mode, boolean
         $fieldConf,     // field configuration, array
+        // behaviour
         $smartLoading,  // intelligent lazy eager loading, boolean
+        $standardiseID, // return standardized '_id' field for SQL when casting
+        // internals
         $dbsType,       // mapper engine type [jig, sql, mongo]
         $fieldsCache,   // relation field cache
         $saveCsd,       // mm rel save cascade
         $collectionID,  // collection set identifier
         $relFilter;     // filter for loading related models
 
-	protected $standardiseID = true;	//return standard '_id' for SQL, not 'id'
-		
     /** @var Cursor */
     protected $mapper;
 
@@ -122,6 +124,8 @@ class Cortex extends Cursor {
         $f3 = \Base::instance();
         $this->smartLoading = $f3->exists('CORTEX.smartLoading') ?
             $f3->get('CORTEX.smartLoading') : TRUE;
+        $this->standardiseID = $f3->exists('CORTEX.standardiseID') ?
+            $f3->get('CORTEX.standardiseID') : TRUE;
         if(!empty($this->fieldConf))
             foreach($this->fieldConf as $key=>&$conf)
                 $conf=static::resolveRelationConf($conf);
