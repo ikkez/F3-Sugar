@@ -22,7 +22,7 @@ With Cortex you can create generic apps, that work with any DB of the users choi
 
 ### System Requirements
 
-Cortex requires at least Fat-Free v3.0.7 and PHP 5.3.3. For all some features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
+Cortex requires at least Fat-Free v3.0.7 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
 
 ### Install
 
