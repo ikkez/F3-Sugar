@@ -11,7 +11,7 @@
     Copyright (c) 2012 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.4.0
+    @version 1.4.1
  **/
 
 class Pagination {
@@ -208,12 +208,12 @@ class Pagination {
     public function serve() {
         if(is_null($this->linkPath)) {
             $route = $this->fw->get('PARAMS.0');
-            if($this->fw->exists('PARAMS.'.$this->routeKey)) {
-                $route = preg_replace("/".
-                    $this->fw->get('PARAMS.'.$this->routeKey)."$/",'',$route);
-            } else if(substr($route,-1) != '/') { $route.= '/'; }
-        } else $route = $this->linkPath;
-
+            if($this->fw->exists('PARAMS.'.$this->routeKey))
+                $route = preg_replace("/".$this->fw->get('PARAMS.'.$this->routeKey)."$/",'',$route);
+            elseif(substr($route,-1) != '/')
+                $route.= '/';
+        } else
+            $route = $this->linkPath;
         $this->fw->set('pg.route',$route);
         $this->fw->set('pg.prefix',$this->routeKeyPrefix);
         $this->fw->set('pg.currentPage',$this->current_page);
@@ -247,6 +247,8 @@ class Pagination {
             $pn_code .= '$pn->setTemplate("'.$attr['src'].'");';
         if(array_key_exists('token',$attr))
             $pn_code .= '$pn->setRouteKey("'.$attr['token'].'");';
+        if(array_key_exists('link-path',$attr))
+            $pn_code .= '$pn->setLinkPath("'.$attr['link-path'].'");';
         if(array_key_exists('token-prefix',$attr))
             $pn_code .= '$pn->setRouteKeyPrefix("'.$attr['token-prefix'].'");';
         $pn_code .= 'echo $pn->serve();';
