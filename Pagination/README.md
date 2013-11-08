@@ -38,7 +38,7 @@ Within your controller you need to paginate over your records. The most easiest 
 $article = new \DB\SQL\Mapper($f3->get('DB'),'article');
 
 $limit = 10;
-$current_page = \Pagination::findCurrentPage();
+$page = \Pagination::findCurrentPage();
 $filter = array('active = ?',1);
 $option = array('order' => 'datetime DESC');
 
@@ -49,7 +49,17 @@ $f3->set('articleList', $subset);
 ```
 
 Now you got the subset of your records in the `articleList` f3 hive key. It's an array that contains information about the pagination state and the subset itself with all records as data mapper objects.
-Have a look at the [paginate](http://fatfreeframework.com/cursor#paginate) method for detailed description.
+Have a look at the [paginate](http://fatfreeframework.com/cursor#paginate) method for detailed description. 
+
+But basically, you can loop through the list by using this snippet:
+
+``` html
+<F3:repeat group="{{ @articleList.subset }}" value="{{ @article }}">
+  <h2>{{ @article.title }}</h2>
+  <p>{{ @article.text }}</p>
+</F3:repeat>
+```
+
 
 ### 4. Create the PageBrowser
 
