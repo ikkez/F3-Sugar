@@ -6,6 +6,12 @@ Requires [PHP Fat-Free Framework](https://github.com/bcosca/fatfree) 3.1.2.
 
 ***
 
+## Preview
+
+The pagebrowser ships with default [bootstrap](http://getbootstrap.com/components/#pagination) class usage, which can look like this:
+
+![pagebrowser](https://dl.dropboxusercontent.com/u/3077539/_linked/pagebrowser.jpg)
+
 ## Usage
 
 ### 1. Install
@@ -143,10 +149,3 @@ Of course you can set all of these options in the custom tag too. Just have a lo
 ```
 
 You can also pass template variables to all of those arguments, like `range="{{@range}}"`.
-
-
-### Styling
-
-The pagebrowser ships with default bootstrap class usage, which can look like this:
-
-![pagebrowser](https://dl.dropboxusercontent.com/u/3077539/_linked/pagebrowser.jpg)
