@@ -10,7 +10,7 @@
     Copyright (c) 2013 by ikkez
     Christian Knuth <mail@ikkez.de>
  
-        @version 0.5.0
+        @version 0.5.1
         @date: 24.04.13 
  **/
 
@@ -30,7 +30,7 @@ class Router extends Prefab {
             trigger_error('set multiple routes are not supported');
         $f3 = \Base::instance();
         $expl = explode(' ', $pattern, 2);
-        if ($expl[0] === 'MAP')
+        if ($expl[0] == 'MAP')
             $f3->map($expl[1], $handler, $ttl, $kbps);
         else
             $f3->route($pattern,$handler,$ttl,$kbps);
@@ -45,6 +45,7 @@ class Router extends Prefab {
      */
     public function getNamedRoute($name, $params = null)
     {
+        /** @var \Base $f3 */
         $f3 = \Base::instance();
         $routes = $f3->get('ROUTES');
         foreach($routes as $path=>$route)
@@ -60,7 +61,8 @@ class Router extends Prefab {
                 $token='@'.$token;
             $match = str_replace(array_values($params),array_keys($params),$match);
         }
-        return $match;
+        $base = $f3->exists('ROUTER.basePath') ? $f3->get('ROUTER.basePath') : '';
+        return $base.$match;
     }
 
     /**
