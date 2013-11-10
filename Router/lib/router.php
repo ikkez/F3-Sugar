@@ -75,12 +75,13 @@ class Router extends Prefab {
         $attrib = $node['@attrib'];
         $params = '';
         $queryString = '';
+        /** @var \Template $tmp */
+        $tmp = \Template::instance();
         if(array_key_exists('route', $attrib)) {
             if (array_key_exists('href', $attrib))
                 unset($attrib['href']);
             $r_params = array();
             // process tokens
-            $tmp = \Template::instance();
             $route_name = $attrib['route'];
             $absolute = 0;
             $addQueryString = false;
@@ -98,7 +99,7 @@ class Router extends Prefab {
                         $r_params[] = "'".substr($key, 6)."'=>$value";
                     } else {
                         if (preg_match('/{{(.+?)}}/s', $value))
-                            $value = "<?php echo ".$tmp->token($value).";?>";
+                            $value = $tmp->build($value);
                         $r_params[substr($key, 6)] = $value;
                     }
                     unset($attrib[$key]);
@@ -133,7 +134,7 @@ class Router extends Prefab {
                 }
                 elseif ($key == 'section') {
                     if (preg_match('/{{(.+?)}}/s', $value))
-                        $section = '<?php echo '.$tmp->token($value).';?>';
+                        $section = $tmp->build($value);
                     else
                         $section = htmlentities($value);
                     unset($attrib[$key]);
@@ -167,8 +168,14 @@ class Router extends Prefab {
                 $attrib['href'] .= '#'.$section;
             unset($attrib['route']);
         }
-        foreach ($attrib as $key => $value)
+        foreach ($attrib as $key => $value) {
+            // find dynamic tokens
+            if (preg_match('/{{(.+?)}}/s', $value))
+                $value = $tmp->build($value);
+            if (preg_match('/{{(.+?)}}/s', $key))
+                $key = $tmp->build($key);
             $params .= ' '.$key.'="'.$value.'"';
+        }
         return '<a'.$params.'>'.$node[0].'</a>';
     }
 
