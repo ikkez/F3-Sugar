@@ -1477,8 +1477,12 @@ class CortexCollection extends \ArrayIterator {
     }
 
     public function __destruct() {
+        // free embedded relation cache from memory
         \Registry::clear($this->cid);
     }
+
+    //! Prohibit cloning to ensure an existing relation cache
+    private function __clone() { }
 
     /**
      * set a collection of models
