@@ -792,7 +792,7 @@ class Cortex extends Cursor {
                                     $fRel = $this->getRelInstance($fromConf[0]);
                                     $crit = array($id.' IN ?', $pivotKeys);
                                     $relSet = $fRel->find($this->mergeWithRelFilter($key, $crit));
-                                    $cx->setRelSet($key, $relSet->getBy($id));
+                                    $cx->setRelSet($key, $relSet ? $relSet->getBy($id) : NULL);
                                     unset($fRel);
                                 }
                             }
