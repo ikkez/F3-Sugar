@@ -35,6 +35,12 @@ class Link_Routes extends Controller
         $template = \Template::instance();
         $test = new \Test;
 
+        $foo = $router->getNamedRoute('article-view', array('item' => 'narf'));
+        $test->expect(
+            $foo == 'article/view/narf',
+            'link from function'
+        );
+
         $result = $template->render('templates/link_routes.html');
         $lines = explode("\n", $result);
 
@@ -140,6 +146,11 @@ class Link_Routes extends Controller
         $test->expect(
             trim(array_shift($lines)) == '<a href="test4" disabled>link with value-less parameter</a>',
             'link with value-less parameter'
+        );
+
+        $test->expect(
+            trim(array_shift($lines)) == '<form action="article/view/narf"></form>',
+            'link from template function call'
         );
 
         $f3->set('results', $test->results());

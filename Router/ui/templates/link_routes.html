@@ -20,3 +20,4 @@
 <a route="home" {{@param|raw}}>5. route, inline token</a>
 <a route="home" {{@param|raw}} class="btn">6. route, inline token, params</a>
 <a href="test4" disabled>link with value-less parameter</a>
+<form action="{{ \Router::instance()->getNamedRoute('article-view',array('item'=>'narf')) }}"></form>
