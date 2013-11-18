@@ -10,8 +10,9 @@
     Copyright (c) 2013 by ikkez
     Christian Knuth <mail@ikkez.de>
  
-        @version 0.5.1
-        @date: 24.04.13 
+        @version 0.5.2
+        @since: 24.04.13
+        @date: 18.11.13
  **/
 
 class Router extends Prefab {
@@ -89,6 +90,8 @@ class Router extends Prefab {
             if (preg_match('/{{(.+?)}}/s', $route_name))
                 $dyn_route_name = $tmp->token($route_name);
             foreach ($attrib as $key => $value) {
+                if (is_numeric($key))
+                    continue;
                 // fetch route token parameters
                 if (is_int(strpos($key, 'param-'))) {
                     if (isset($dyn_route_name)) {
@@ -107,8 +110,9 @@ class Router extends Prefab {
                 // fetch query string
                 elseif ($key == 'query') {
                     if (preg_match('/{{(.+?)}}/s', $value))
-                        $queryString .= '<?php $qvar = '.$tmp->token($value).'; '.
-                            'echo (is_array($qvar)?htmlentities(http_build_query($qvar)):$qvar);?>';
+                        $queryString .= '<?php echo (is_array('.$tmp->token($value).')?'.
+                            'htmlentities(http_build_query('.$tmp->token($value).')):'.
+                            $tmp->token($value).');?>';
                     else
                         $queryString .= htmlentities($value);
                     unset($attrib[$key]);
@@ -174,7 +178,14 @@ class Router extends Prefab {
                 $value = $tmp->build($value);
             if (preg_match('/{{(.+?)}}/s', $key))
                 $key = $tmp->build($key);
-            $params .= ' '.$key.'="'.$value.'"';
+            if (is_numeric($key))
+                // inline token
+                $params .= ' '.$value;
+            elseif($value==NULL)
+                // value-less parameter
+                $params .= ' '.$key;
+            else
+                $params .= ' '.$key.'="'.$value.'"';
         }
         return '<a'.$params.'>'.$node[0].'</a>';
     }
