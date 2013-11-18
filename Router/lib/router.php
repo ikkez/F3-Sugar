@@ -56,12 +56,9 @@ class Router extends Prefab {
             }
         if (!isset($match))
             return false;
-        if(!empty($params)) {
-            $params = array_flip($params);
-            foreach($params as $val=>&$token)
-                $token='@'.$token;
-            $match = str_replace(array_values($params),array_keys($params),$match);
-        }
+        if(!empty($params))
+            foreach($params as $token=>$val)
+                $match = preg_replace('/@\b'.$token.'\b/', $val, $match);
         $base = $f3->exists('ROUTER.basePath') ? $f3->get('ROUTER.basePath') : '';
         return $base.$match;
     }
