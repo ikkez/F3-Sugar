@@ -1,15 +1,22 @@
-<a href="test1">simple route</a><br/>
-<a route="article-view" param-item="foo2">route with param</a><br/>
-<a route="home">simple route</a><br/>
-<a route="article-view" param-item="{{@t1}}">vars by token</a><br/>
-<a route="{{@rr}}" param-item="{{@t1}}" param-action="edit">multiple params</a><br/>
-<a route="article-view" param-item="$blah">inject test</a><br/>
-<a route="class">map test</a><br/>
-<a route="home" query="foo=bar&baz=narf">query string test</a><br/>
-<a route="home" query="{{@querystring}}">query string from string token</a><br/>
-<a route="home" query="{{@querystringArray}}">query string from array token</a><br/>
-<a route="home" absolute="true">absolute path</a><br/>
-<a route="home" absolute="full">full absolute path with host and base</a><br/>
-<a route="home" addQueryString="true">add existing query string to link</a><br/>
-<a route="home" section="anchor-1">link with anchor section</a><br/>
-<a route="home" section="{{@section}}">link anchor from token</a><br/>
+<a href="test1">simple link</a>
+<a route="article-view" param-item="foo2">route with param</a>
+<a route="home">simple route</a>
+<a route="article-view" param-item="{{@t1}}">vars by token</a>
+<a route="{{@rr}}" param-item="{{@t1}}" param-action="edit">multiple params</a>
+<a route="article-view" param-item="$blah">inject test</a>
+<a route="class">map test</a>
+<a route="home" query="foo=bar&baz=narf">query string test</a>
+<a route="home" query="{{@querystring}}">query string from string token</a>
+<a route="home" query="{{@querystringArray}}">query string from array token</a>
+<a route="home" absolute="true">absolute path</a>
+<a route="home" absolute="full">full absolute path with host and base</a>
+<a route="home" addQueryString="true">add existing query string to link</a>
+<a route="home" section="anchor-1">link with anchor section</a>
+<a route="home" section="{{@section}}">link anchor from token</a>
+<a href="test1" class="{{ @class | esc }}">1. simple link with token</a>
+<a href="test2" {{@param|raw}}>2. link with inline token</a>
+<a href="test3" {{@param|raw}} class="btn">3. link, inline token, params</a>
+<a route="home" class="{{@class}}">4. route with parameter token</a>
+<a route="home" {{@param|raw}}>5. route, inline token</a>
+<a route="home" {{@param|raw}} class="btn">6. route, inline token, params</a>
+<a href="test4" disabled>link with value-less parameter</a>
