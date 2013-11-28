@@ -33,18 +33,19 @@ With Cortex you can create generic apps, that work with any DB of the users choi
   1. [Setup the linkage](#setup-the-linkage)
   2. [Working with Relations](#working-with-relations)
   3. [Additional notes](#additional-notes)
-5. [Filter Query Syntax](#filter-query-syntax)
-6. [Known Bugs](#known-bugs)
-7. [Roadmap](#roadmap)
-8. [Final Words](#final-words)
-9. [License](#license)
+5. [Collections](#collections)  
+6. [Filter Query Syntax](#filter-query-syntax)
+7. [Known Bugs](#known-bugs)
+8. [Roadmap](#roadmap)
+9. [Final Words](#final-words)
+10. [License](#license)
     
 
 ## Quick Start
 
 ### System Requirements
 
-Cortex requires at least Fat-Free v3.0.7 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
+Cortex requires at least Fat-Free v3.1.2 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
 
 ### Install
 
@@ -536,18 +537,20 @@ Well basically the `$filter` syntax for writing cortex queries is simple SQL. Bu
 ### Operators
 
 These common filter operators are supported: 
-- comparison operators: `<`, `>`, `<=`, `>=`, `==`, `=`, `!=`, `<>`, `==`, `!=`
+- relational operators: `<`, `>`, `<=`, `>=`, `==`, `=`, `!=`, `<>`, `==`, `!=`
 - search operators: `LIKE`, `IN`, `NOT IN` (not case-sensitive)
+- logical operators: `(`, `)`, `AND`, `OR`, `&&`, `||`
 
-When using comparison operators, you can compare your table fields against simple values like `array(foo = 1)` or other fields like `array('foo < bar')`. Therefore you can also use placeholders with positional bind-parameters like `array('foo = ?',1)` or named parameters `array('foo = :bar',':bar'=>1)`. You may also mix them together in one query.
+When using comparison operators, you can compare your table fields against simple values like `array('foo = 1')` or other fields like `array('foo < bar')`. Therefore you can also use placeholders with positional bind-parameters like `array('foo = ?',1)` or named parameters `array('foo = :bar',':bar'=>1)`. You may also mix them together in one query.
 
 The `LIKE` operator works the same way like the [F3 SQL search syntax](http://www.fatfreeframework.com/sql-mapper#search). The search wildcard (`%`) belongs into the bind value, not the query string.
 
 The `IN` operator usually needs multiple placeholders in raw PDO (like `foo IN (?,?,?)`). In Cortex queries you simply use an array for this: `array('foo IN ?',array(1,2,3))`, the QueryParser does the rest.
 
+
 ### Options
 
-The `$options` array for load operations contains respects the following keys:
+The `$options` array for load operations respects the following keys:
 
 - order
 - limit
@@ -555,6 +558,9 @@ The `$options` array for load operations contains respects the following keys:
 
 Use `DESC` and `ASC` flags for sorting fields, just like in SQL. Additional `group` settings might be handled in a future version.
 
+## Collections
+
+Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). You can also transpose the results by a defined key using `getBy()` or fetch all values of a certain key using `getAll()`. More about that later in the API docs.
 
 ## Known Bugs
 
@@ -571,6 +577,7 @@ This plugin is still in an early stage of development. So at this point it may h
 - search and filters for relations
 - logging
 
+
 ## Final Words
 
 Cortex may try to bind them all, but at least it's not the one ring from Mordor!
@@ -580,6 +587,7 @@ Anyways, i hope you find this useful. If you like this plugin, why not make a do
 
 [![buy me a Beer](https://dl.dropboxusercontent.com/u/3077539/Beer/bdb_small_single.png)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=44UHPNUCVP7QG)
 
+If you like to see Cortex in action, have a look at [fabulog](https://github.com/ikkez/fabulog "the new fabulous blog-ware").
 
 License
 -
