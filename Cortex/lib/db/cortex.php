@@ -20,7 +20,7 @@
         @package DB
         @version 1.0.0-beta
         @since 24.04.2012
-        @date 01.10.2013
+        @date 28.11.2013
  **/
 
 namespace DB;
@@ -127,7 +127,7 @@ class Cortex extends Cursor {
         $this->standardiseID = $f3->exists('CORTEX.standardiseID') ?
             $f3->get('CORTEX.standardiseID') : TRUE;
         if(!empty($this->fieldConf))
-            foreach($this->fieldConf as $key=>&$conf)
+            foreach($this->fieldConf as &$conf)
                 $conf=static::resolveRelationConf($conf);
     }
 
@@ -203,6 +203,7 @@ class Cortex extends Cursor {
      */
     static public function setup($db=null, $table=null, $fields=null)
     {
+        /** @var Cortex $self */
         $self = get_called_class();
         if (is_null($db) || is_null($table) || is_null($fields))
             $df = $self::resolveConfiguration();
@@ -549,6 +550,11 @@ class Cortex extends Cursor {
         return $result;
     }
 
+    /**
+     * Count records that match criteria
+     * @param null $filter
+     * @return mixed
+     */
     public function count($filter = NULL)
     {
         $filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
@@ -908,6 +914,7 @@ class Cortex extends Cursor {
             trigger_error(sprintf(self::E_MM_REL_VALUE, $key));
         // hydrated mapper as collection
         if (is_object($val)) {
+            $nval = array();
             while (!$val->dry()) {
                 $nval[] = $val->get($rel_field,true);
                 $val->next();
@@ -916,19 +923,18 @@ class Cortex extends Cursor {
         }
         elseif (is_array($val)) {
             // array of single hydrated mappers, raw ID value or mixed
-            foreach ($val as $index => &$item) {
+            $isMongo = ($this->dbsType == 'mongo');
+            foreach ($val as &$item) {
                 if (is_object($item) &&
-                    !($this->dbsType == 'mongo' && $item instanceof \MongoId))
+                    !($isMongo && $item instanceof \MongoId)) {
                     if (!$item instanceof Cortex || $item->dry())
                         trigger_error(self::E_INVALID_RELATION_OBJECT);
                     else $item = $item->get($rel_field,true);
+                }
+                if ($isMongo && $rel_field == '_id' && is_string($item))
+                    $item = new \MongoId($item);
                 unset($item);
             }
-            if ($this->dbsType == 'mongo'&& $rel_field == '_id')
-                foreach ($val as $index => &$item) {
-                    if (is_string($item))
-                        $item = new \MongoId($item);
-                }
         }
         return $val;
     }
@@ -1274,17 +1280,7 @@ class CortexQueryParser extends \Prefab {
                 preg_match('/(@\w+)/i', $part, $match);
                 // find like operator
                 if (is_int(strpos($upart = strtoupper($part), ' @LIKE '))) {
-                    $fC = substr($val, 0, 1);
-                    $lC = substr($val, -1, 1);
-                    // %var% -> /var/
-                    if ($fC == '%' && $lC == '%')
-                        $val = str_replace('%', '/', $val);
-                    // var%  -> /^var/
-                    elseif ($lC == '%')
-                        $val = '/^'.str_replace('%', '', $val).'/';
-                    // %var  -> /var$/
-                    elseif ($fC == '%')
-                        $val = '/'.substr($val, 1).'$/';
+                    $val = $this->_likeValueToRegEx($val);
                     $part = 'preg_match(?,'.$match[0].')';
                 } // find IN operator
                 else if (is_int($pos = strpos($upart, ' @IN '))) {
@@ -1392,17 +1388,7 @@ class CortexQueryParser extends \Prefab {
             }
             // find LIKE operator
             if ($upart == 'LIKE') {
-                $fC = substr($var, 0, 1);
-                $lC = substr($var, -1, 1);
-                // %var% -> /var/
-                if ($fC == '%' && $lC == '%')
-                    $rgx = str_replace('%', '/', $var);
-                // var%  -> /^var/
-                elseif ($lC == '%')
-                    $rgx = '/^'.str_replace('%', '', $var).'/';
-                // %var  -> /var$/
-                elseif ($fC == '%')
-                    $rgx = '/'.substr($var, 1).'$/';
+                $rgx = $this->_likeValueToRegEx($var);
                 $var = new \MongoRegex($rgx);
             } // find IN operator
             elseif (in_array($upart, array('IN','NOT IN'))) {
@@ -1417,6 +1403,25 @@ class CortexQueryParser extends \Prefab {
             return array($key => $var);
         }
         return $part;
+    }
+
+    /**
+     * @param string $var
+     * @return string
+     */
+    protected function _likeValueToRegEx($var)
+    {
+        $lC = substr($var, -1, 1);
+        // %var% -> /var/
+        if ($var[0] == '%' && $lC == '%')
+            $var = '/'.substr($var, 1, -1).'/';
+        // var%  -> /^var/
+        elseif ($lC == '%')
+            $var = '/^'.substr($var, 0, -1).'/';
+        // %var  -> /var$/
+        elseif ($var[0] == '%')
+            $var = '/'.substr($var, 1).'$/';
+        return $var;
     }
 
     /**
