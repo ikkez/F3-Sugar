@@ -18,6 +18,28 @@ Cortex is a multi-engine ActiveRecord ORM / ODM that offers easy object persiste
 
 With Cortex you can create generic apps, that work with any DB of the users choice, no matter if it's Postgre, MongoDB or even none. You can also mash-up multiple engines, use them simultaneous or link models of different DB engines together.
 
+---
+
+## Table of Contents
+
+1. [Quick Start](#quick-start)
+2. [SQL Fluid Mode](#sql-fluid-mode)
+3. [Cortex Models](#cortex-models)
+  1. [Configuration](#configuration)
+  2. [Setup](#setup)
+  3. [Setdown](#setdown)
+  4. [Custom Field PreProcessors](#custom-field-preprocessors)
+4. [Relations](#relations)
+  1. [Setup the linkage](#setup-the-linkage)
+  2. [Working with Relations](#working-with-relations)
+  3. [Additional notes](#additional-notes)
+5. [Filter Query Syntax](#filter-query-syntax)
+6. [Known Bugs](#known-bugs)
+7. [Roadmap](#roadmap)
+8. [Final Words](#final-words)
+9. [License](#license)
+    
+
 ## Quick Start
 
 ### System Requirements
@@ -501,9 +523,37 @@ echo $news->tags[1]->title; // Responsive
 
 * All relations are lazy loaded to save performance. That mean, they won't be loaded until you access them by the linked property or casting the whole parent model.
 
-* the a the id you any record use `$user->_id;`
+* lazy loading within a result collection will **automatically** invoke the eager loading of that property to the whole set. This method is called _smart loading_ and is used to get around the [1+N query problem](http://www.phabricator.com/docs/phabricator/article/Performance_N+1_Query_Problem.html).
+
+* to get the id of any record use `$user->_id;`
 
 * To find any record by its id use the field `_id` in your filter array like `array('_id = ?',123)`.
+
+## Filter Query Syntax
+
+Well basically the `$filter` syntax for writing cortex queries is simple SQL. But there are some slightly modifications you should have read in these additional notes.
+
+### Operators
+
+These common filter operators are supported: 
+- comparison operators: `<`, `>`, `<=`, `>=`, `==`, `=`, `!=`, `<>`, `==`, `!=`
+- search operators: `LIKE`, `IN`, `NOT IN` (not case-sensitive)
+
+When using comparison operators, you can compare your table fields against simple values like `array(foo = 1)` or other fields like `array('foo < bar')`. Therefore you can also use placeholders with positional bind-parameters like `array('foo = ?',1)` or named parameters `array('foo = :bar',':bar'=>1)`. You may also mix them together in one query.
+
+The `LIKE` operator works the same way like the [F3 SQL search syntax](http://www.fatfreeframework.com/sql-mapper#search). The search wildcard (`%`) belongs into the bind value, not the query string.
+
+The `IN` operator usually needs multiple placeholders in raw PDO (like `foo IN (?,?,?)`). In Cortex queries you simply use an array for this: `array('foo IN ?',array(1,2,3))`, the QueryParser does the rest.
+
+### Options
+
+The `$options` array for load operations contains respects the following keys:
+
+- order
+- limit
+- offset
+
+Use `DESC` and `ASC` flags for sorting fields, just like in SQL. Additional `group` settings might be handled in a future version.
 
 
 ## Known Bugs
@@ -512,9 +562,8 @@ This plugin is still in an early stage of development. So at this point it may h
 
 ## Roadmap
 
-- fix all occurring bugs
 - some more caching features
-- eager loading / preloading relations for find()
+- ~~eager loading / preloading relations for find()~~
 - polymorphic relations
 - handle aggregational fields like SUM(), MAX(), AVG()
 - handle creation of indexies
