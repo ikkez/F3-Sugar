@@ -560,7 +560,7 @@ Use `DESC` and `ASC` flags for sorting fields, just like in SQL. Additional `gro
 
 ## Collections
 
-Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). You can also transpose the results by a defined key using `getBy()` or fetch all values of a certain key using `getAll()`. More about that later in the API docs.
+Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). You can also transpose the results by a defined key using `getBy()` or fetch all values of a certain key using `getAll()`. More about that later in the API docs. The CortexCollection implements the `ArrayIterator` interface, so it is accessable like a usual array.
 
 ## Known Bugs
 
