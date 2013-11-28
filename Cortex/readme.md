@@ -537,7 +537,7 @@ Well basically the `$filter` syntax for writing cortex queries is simple SQL. Bu
 ### Operators
 
 These common filter operators are supported: 
-- relational operators: `<`, `>`, `<=`, `>=`, `==`, `=`, `!=`, `<>`, `==`, `!=`
+- relational operators: `<`, `>`, `<=`, `>=`, `==`, `=`, `!=`, `<>`
 - search operators: `LIKE`, `IN`, `NOT IN` (not case-sensitive)
 - logical operators: `(`, `)`, `AND`, `OR`, `&&`, `||`
 
