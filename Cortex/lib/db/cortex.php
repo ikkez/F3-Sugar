@@ -18,9 +18,9 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.0.0-beta
+        @version 1.0.0
         @since 24.04.2012
-        @date 28.11.2013
+        @date 29.11.2013
  **/
 
 namespace DB;
@@ -1156,7 +1156,11 @@ class CortexQueryParser extends \Prefab {
     const
         E_BRACKETS = 'Invalid query: unbalanced brackets found',
         E_INBINDVALUE = 'Bind value for IN operator must be an array',
+        E_ENGINEERROR = 'Engine not supported',
         E_MISSINGBINDKEY = 'Named bind parameter `%s` does not exist in filter arguments';
+
+    protected
+        $queryCache = array();
 
     /**
      * converts the given filter array to fit the used DBS
@@ -1177,6 +1181,21 @@ class CortexQueryParser extends \Prefab {
         if (is_null($cond)) return $cond;
         if (is_string($cond))
             $cond = array($cond);
+        $f3 = \Base::instance();
+        $cacheHash = $f3->hash($f3->stringify($cond)).'.'.$engine;
+        if (isset($this->queryCache[$cacheHash]))
+            // load from memory
+            return $this->queryCache[$cacheHash];
+        elseif ($f3->exists('CORTEX.queryParserCache')
+            && ($ttl = (int) $f3->get('CORTEX.queryParserCache'))) {
+            $cache = \Cache::instance();
+            // load from cache
+            if ($f3->get('CACHE') && $ttl && ($cached = $cache->exists($cacheHash,$ncond))
+                && $cached[0] + $ttl > microtime(TRUE)) {
+                $this->queryCache[$cacheHash] = $ncond;
+                return $ncond;
+            }
+        }
         $where = array_shift($cond);
         $args = $cond;
         $where = str_replace(array('&&', '||'), array('AND', 'OR'), $where);
@@ -1184,7 +1203,8 @@ class CortexQueryParser extends \Prefab {
         $where = preg_replace('/\bIN\b\s*\(\s*(\?|:\w+)?\s*\)/i', 'IN $1', $where);
         switch ($engine) {
             case 'jig':
-                return $this->_jig_parse_filter($where, $args);
+                $ncond = $this->_jig_parse_filter($where, $args);
+                break;
             case 'mongo':
                 $parts = $this->splitLogical($where);
                 if (is_int(strpos($where, ':')))
@@ -1194,7 +1214,7 @@ class CortexQueryParser extends \Prefab {
                     unset($part);
                 }
                 $ncond = $this->_mongo_parse_logical_op($parts);
-                return $ncond;
+                break;
             case 'sql':
                 // preserve identifier
                 $where = preg_replace('/(?!\B)_id/', 'id', $where);
@@ -1218,8 +1238,17 @@ class CortexQueryParser extends \Prefab {
                     }
                 }
                 array_unshift($ncond, implode(' ', $parts));
-                return $ncond;
+                break;
+            default:
+                trigger_error(self::E_ENGINEERROR);
         }
+        $this->queryCache[$cacheHash] = $ncond;
+        if(isset($ttl) && $f3->get('CACHE')) {
+            // save to cache
+            $cache = \Cache::instance();
+            $cache->set($cacheHash,$ncond,$ttl);
+        }
+        return $ncond;
     }
 
     /**
