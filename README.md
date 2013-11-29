@@ -1,10 +1,17 @@
 ## F3 Sugar
 some custom helpers and plugins for the PHP Fat-Free Framework
 
+### Cortex
+
+It's a multi-engine ORM / ODM based on F3's data mapper and comes with support for relations and more.
+
+***
 
 ### Currency
 
 It's a currency rate plugin, that offers a conversion tool and some more stuff.
+
+***
 
 ### FAL
 
@@ -12,13 +19,11 @@ A File Abstraction Layer across multiple filesystem adapters, with meta data sup
 
 ***
 
-
 ### FileUnit
 
-A Plugin which offers some more file system functionality.
+A Plugin which offers some file system functionality. *(deprecated - will completly move into FAL FileSystem Adapter)*
 
 ***
-
 
 ### Pagination
 
@@ -26,6 +31,11 @@ A little class that helps you to build a pagebrowser for your template and setup
 
 ***
 
+### Router
+
+This plugin is useful to create named routes and access them easily from template.
+
+***
 
 ### SchemaBuilder
 
@@ -37,7 +47,7 @@ A SQL database extension for managing database table structures.
 
 #### License
 
-Copyright (C) 2012 Christian Knuth
+Copyright (C) 2012-2013 Christian Knuth
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -51,3 +61,5 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/ikkez/f3-sugar/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
