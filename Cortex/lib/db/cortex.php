@@ -20,7 +20,7 @@
         @package DB
         @version 1.0.0
         @since 24.04.2012
-        @date 29.11.2013
+        @date 30.11.2013
  **/
 
 namespace DB;
@@ -110,7 +110,7 @@ class Cortex extends Cursor {
                 $this->mapper = new Jig\Mapper($this->db, $this->table);
                 break;
             case 'sql':
-                $this->mapper = new SQL\Mapper($this->db, $this->table);
+                $this->mapper = new SQL\Mapper($this->db, $this->table,($this->fluid)?0:60);
                 break;
             case 'mongo':
                 $this->mapper = new Mongo\Mapper($this->db, $this->table);
@@ -233,7 +233,8 @@ class Cortex extends Cursor {
                             continue;
                         $rel = $relConf[0]::resolveConfiguration();
                         // check if foreign conf matches m:m
-                        if (array_key_exists($relConf[1],$rel['fieldConf']) && !is_null($relConf[1])
+                        if (array_key_exists($relConf[1],$rel['fieldConf'])
+                            && !is_null($rel['fieldConf'][$relConf[1]])
                             && key($rel['fieldConf'][$relConf[1]]) == 'has-many') {
                             // compute mm table name
                             $fConf = $rel['fieldConf'][$relConf[1]]['has-many'];
