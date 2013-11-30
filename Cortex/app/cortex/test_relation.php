@@ -24,7 +24,7 @@ class Test_Relation {
         return $out;
     }
 
-    function run($f3,$type)
+    function run($db,$type)
     {
         $test = new \Test();
 
@@ -295,7 +295,6 @@ class Test_Relation {
                 $type.': id becomes string in casted model'
             );
         }
-
 
         ///////////////////////////////////
         return $test->results();
