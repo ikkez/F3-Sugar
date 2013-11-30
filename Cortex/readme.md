@@ -6,14 +6,14 @@
 
 Cortex is a multi-engine ActiveRecord ORM / ODM that offers easy object persistence. Some of its main features are:
 
-  - It handles SQL, Jig and MongoDB database engine
+  - It handles SQL, Jig and MongoDB database engines
   - Write queries in well-known SQL Syntax, they can be translated to Jig and Mongo
-  - Make SQL schema-less with a fluid SQL mode
+  - Make SQL schema-less with the fluid SQL mode and let missing table columns be created automatically
   - Support for model objects
   - Relationships: link multiple models together to one-to-one, one-to-many and many-to-many associations
-  - lazy loading of related models
-  - setup model configurations to auto create DB tables from installer scripts
-  - custom setter and getter PreProcessors for all fields
+  - smart-loading of related models (intelligent lazy and eager-loading without configuration)
+  - setup model configurations to auto create DB tables from installer or migrate scripts
+  - custom setter and getter preprocessors for all fields
   - default values and nullable fields for NoSQL
 
 With Cortex you can create generic apps, that work with any DB of the users choice, no matter if it's Postgre, MongoDB or even none. You can also mash-up multiple engines, use them simultaneous or link models of different DB engines together.
@@ -568,7 +568,7 @@ This plugin is still in an early stage of development. So at this point it may h
 
 ## Roadmap
 
-- some more caching features
+- ~~some more caching features~~
 - ~~eager loading / preloading relations for find()~~
 - polymorphic relations
 - handle aggregational fields like SUM(), MAX(), AVG()
