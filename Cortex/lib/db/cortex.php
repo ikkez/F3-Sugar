@@ -675,211 +675,196 @@ class Cortex extends Cursor {
         $id = ($this->dbsType == 'sql')?'id':'_id';
         if ($key == '_id' && $this->dbsType == 'sql')
             $key = $id;
-        if ($raw) {
-            $out = $this->exists($key) ? $this->mapper->{$key} : NULL;
-            // ensure to return a MongoID object
-            // TODO: just for compatibility, test for dropping this part
-            if ($this->dbsType == 'mongo' && isset($this->fieldConf[$key])) {
-                if (is_string($out) &&
-                    (isset($this->fieldConf[$key]['belongs-to-one'])
-                        || isset($this->fieldConf[$key]['belongs-to-many'])
-                        || isset($this->fieldConf[$key]['has-one'])
-                        || isset($this->fieldConf[$key]['has-many']))) {
-                    $out = new \MongoId($out);
+        if ($raw)
+            return $this->exists($key) ? $this->mapper->{$key} : NULL;
+        if (!empty($fields) && isset($fields[$key]) && is_array($fields[$key])
+            && !array_key_exists($key,$this->fieldsCache)) {
+            // load relations
+            if (isset($fields[$key]['belongs-to-one'])) {
+                // one-to-X, bidirectional, direct way
+                if (!$this->exists($key) || is_null($this->mapper->{$key}))
+                    $this->fieldsCache[$key] = null;
+                else {
+                    // get config for this field
+                    $relConf = $fields[$key]['belongs-to-one'];
+                    if (!is_array($relConf))
+                        $relConf = array($relConf, $id);
+                    // fetch related model
+                    $rel = $this->getRelInstance($relConf[0]);
+                    // am i part of a result collection?
+                    if ($this->collectionID && $this->smartLoading) {
+                        $cx = CortexCollection::instance($this->collectionID);
+                        // does the collection has cached results for this key?
+                        if (!$cx->hasRelSet($key)) {
+                            // build the cache, find all values of current key
+                            $relKeys = array_unique($cx->getAll($key,true));
+                            // find related models
+                            $crit = array($relConf[1].' IN ?', $relKeys);
+                            $relSet = $rel->find($this->mergeWithRelFilter($key, $crit));
+                            // cache relSet, sorted by ID
+                            $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
+                        }
+                        // get a subset of the preloaded set
+                        $result = $cx->getSubset($key,(string) $this->get($key,true));
+                        $this->fieldsCache[$key] = $result ? $result[0] : NULL;
+                    } else {
+                        $crit = array($relConf[1].' = ?', $this->get($key, true));
+                        $crit = $this->mergeWithRelFilter($key, $crit);
+                        $this->fieldsCache[$key] = $rel->findone($crit);
+                    }
                 }
             }
-            return $out;
-        }
-        if(!empty($fields) && isset($fields[$key]) && is_array($fields[$key])) {
-            // check field cache
-            if(!array_key_exists($key,$this->fieldsCache) && is_array($fields[$key])) {
-                // load relations
-                if (isset($fields[$key]['belongs-to-one'])) {
-                    // one-to-X, bidirectional, direct way
-                    if (!$this->exists($key) || is_null($this->mapper->{$key}))
+            elseif (($type = isset($fields[$key]['has-one']))
+                || isset($fields[$key]['has-many'])) {
+                $type = $type ? 'has-one' : 'has-many';
+                $fromConf = $fields[$key][$type];
+                if (!is_array($fromConf))
+                    trigger_error(sprintf(self::E_REL_CONF_INC, $key));
+                $rel = $this->getRelInstance($fromConf[0]);
+                $relFieldConf = $rel->getFieldConfiguration();
+                // one-to-*, bidirectional, inverse way
+                if (key($relFieldConf[$fromConf[1]]) == 'belongs-to-one') {
+                    $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
+                    if(!is_array($toConf))
+                        $toConf = array($toConf, $id);
+                    if ($toConf[1] != $id && (!$this->exists($toConf[1])
+                        || is_null($this->mapper->{$toConf[1]})))
                         $this->fieldsCache[$key] = null;
-                    else {
-                        // get config for this field
-                        $relConf = $fields[$key]['belongs-to-one'];
-                        if (!is_array($relConf))
-                            $relConf = array($relConf, $id);
-                        // fetch related model
-                        $rel = $this->getRelInstance($relConf[0]);
-                        // am i part of a result collection?
-                        if ($this->collectionID && $this->smartLoading) {
-                            $cx = CortexCollection::instance($this->collectionID);
-                            // does the collection has cached results for this key?
-                            if (!$cx->hasRelSet($key)) {
-                                // build the cache, find all values of current key
-                                $relKeys = array_unique($cx->getAll($key,true));
-                                // find related models
-                                $crit = array($relConf[1].' IN ?', $relKeys);
-                                $relSet = $rel->find($this->mergeWithRelFilter($key, $crit));
-                                // cache relSet, sorted by ID
-                                $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
-                            }
-                            // get a subset of the preloaded set
-                            $result = $cx->getSubset($key,(string) $this->get($key,true));
-                            $this->fieldsCache[$key] = $result ? $result[0] : NULL;
-                        } else {
-                            $crit = array($relConf[1].' = ?', $this->get($key, true));
-                            $crit = $this->mergeWithRelFilter($key, $crit);
-                            $this->fieldsCache[$key] = $rel->findone($crit);
+                    elseif($this->collectionID && $this->smartLoading) {
+                        // part of a result set
+                        $cx = CortexCollection::instance($this->collectionID);
+                        if(!$cx->hasRelSet($key)) {
+                            // emit eager loading
+                            $relKeys = $cx->getAll($toConf[1],true);
+                            $crit = array($fromConf[1].' IN ?', $relKeys);
+                            $relSet = $rel->find($this->mergeWithRelFilter($key,$crit));
+                            $cx->setRelSet($key, $relSet ? $relSet->getBy($fromConf[1],true) : NULL);
                         }
+                        $result = $cx->getSubset($key, array($this->get($toConf[1])));
+                        $this->fieldsCache[$key] = $result ? (($type == 'has-one')
+                            ? $result[0][0] : $result[0]) : NULL;
+                    } else {
+                        $crit = array($fromConf[1].' = ?', $this->get($toConf[1],true));
+                        $crit = $this->mergeWithRelFilter($key, $crit);
+                        $this->fieldsCache[$key] = (($type == 'has-one') ? $rel->findone($crit)
+                            : $rel->find($crit)) ?: NULL;
                     }
                 }
-                elseif (($type = isset($fields[$key]['has-one']))
-                    || isset($fields[$key]['has-many'])) {
-                    $type = $type ? 'has-one' : 'has-many';
-                    $fromConf = $fields[$key][$type];
-                    if (!is_array($fromConf))
-                        trigger_error(sprintf(self::E_REL_CONF_INC, $key));
-                    $rel = $this->getRelInstance($fromConf[0]);
-                    $relFieldConf = $rel->getFieldConfiguration();
-                    // one-to-*, bidirectional, inverse way
-                    if (key($relFieldConf[$fromConf[1]]) == 'belongs-to-one') {
-                        $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
-                        if(!is_array($toConf))
-                            $toConf = array($toConf, $id);
-                        if ($toConf[1] != $id && (!$this->exists($toConf[1])
-                            || is_null($this->mapper->{$toConf[1]})))
-                            $this->fieldsCache[$key] = null;
-                        elseif($this->collectionID && $this->smartLoading) {
-                            // part of a result set
-                            $cx = CortexCollection::instance($this->collectionID);
-                            if(!$cx->hasRelSet($key)) {
-                                // emit eager loading
-                                $relKeys = $cx->getAll($toConf[1],true);
-                                $crit = array($fromConf[1].' IN ?', $relKeys);
-                                $relSet = $rel->find($this->mergeWithRelFilter($key,$crit));
-                                $cx->setRelSet($key, $relSet ? $relSet->getBy($fromConf[1],true) : NULL);
-                            }
-                            $result = $cx->getSubset($key, array($this->get($toConf[1])));
-                            $this->fieldsCache[$key] = $result ? (($type == 'has-one')
-                                ? $result[0][0] : $result[0]) : NULL;
-                        } else {
-                            $crit = array($fromConf[1].' = ?', $this->get($toConf[1],true));
-                            $crit = $this->mergeWithRelFilter($key, $crit);
-                            $this->fieldsCache[$key] = (($type == 'has-one') ? $rel->findone($crit)
-                                : $rel->find($crit)) ?: NULL;
-                        }
-                    }
-                    // many-to-many, bidirectional
-                    elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
-                        if (!array_key_exists('refTable', $fromConf)) {
-                            // compute mm table name
-                            $toConf = $relFieldConf[$fromConf[1]]['has-many'];
-                            $mmTable = static::getMMTableName($fromConf['relTable'],
-                                $fromConf['relField'], $this->getTable(), $key, $toConf);
-                            $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
-                        } else
-                            $mmTable = $fromConf['refTable'];
-                        // create mm table mapper
-                        $rel = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
-                        if ($this->collectionID && $this->smartLoading) {
-                            $cx = CortexCollection::instance($this->collectionID);
-                            if (!$cx->hasRelSet($key)) {
-                                // get IDs of all results
-                                $relKeys = $cx->getAll($id,true);
-                                // get all pivot IDs
-                                $mmRes = $rel->find(array($fromConf['relField'].' IN ?', $relKeys));
-                                if (!$mmRes)
-                                    $cx->setRelSet($key, NULL);
-                                else {
-                                    foreach($mmRes as $model) {
-                                        $val = $model->get($key,true);
-                                        $pivotRel[ (string) $model->get($fromConf['relField'])][] = $val;
-                                        $pivotKeys[] = $val;
-                                    }
-                                    // cache pivot keys
-                                    $cx->setRelSet($key.'_pivot', $pivotRel);
-                                    // preload all rels
-                                    $pivotKeys = array_unique($pivotKeys);
-                                    $fRel = $this->getRelInstance($fromConf[0]);
-                                    $crit = array($id.' IN ?', $pivotKeys);
-                                    $relSet = $fRel->find($this->mergeWithRelFilter($key, $crit));
-                                    $cx->setRelSet($key, $relSet ? $relSet->getBy($id) : NULL);
-                                    unset($fRel);
-                                }
-                            }
-                            // fetch subset from preloaded rels using cached pivot keys
-                            $fkeys = $cx->getSubset($key.'_pivot', $this->get($id));
-                            $this->fieldsCache[$key] = $fkeys ?
-                                $cx->getSubset($key, $fkeys[0]) : NULL;
-                        } // no collection
-                        else {
-                            // find foreign keys
-                            $results = $rel->find(
-                                array($fromConf['relField'].' = ?', $this->get($id,true)));
-                            if(!$results)
-                                $this->fieldsCache[$key] = NULL;
+                // many-to-many, bidirectional
+                elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
+                    if (!array_key_exists('refTable', $fromConf)) {
+                        // compute mm table name
+                        $toConf = $relFieldConf[$fromConf[1]]['has-many'];
+                        $mmTable = static::getMMTableName($fromConf['relTable'],
+                            $fromConf['relField'], $this->getTable(), $key, $toConf);
+                        $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
+                    } else
+                        $mmTable = $fromConf['refTable'];
+                    // create mm table mapper
+                    $rel = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
+                    if ($this->collectionID && $this->smartLoading) {
+                        $cx = CortexCollection::instance($this->collectionID);
+                        if (!$cx->hasRelSet($key)) {
+                            // get IDs of all results
+                            $relKeys = $cx->getAll($id,true);
+                            // get all pivot IDs
+                            $mmRes = $rel->find(array($fromConf['relField'].' IN ?', $relKeys));
+                            if (!$mmRes)
+                                $cx->setRelSet($key, NULL);
                             else {
-                                $fkeys = $results->getAll($key,true);
-                                // create foreign table mapper
-                                unset($rel);
-                                $rel = $this->getRelInstance($fromConf[0]);
-                                // load foreign models
-                                $filter = array($id.' IN ?', $fkeys);
-                                $filter = $this->mergeWithRelFilter($key, $filter);
-                                $this->fieldsCache[$key] = $rel->find($filter);
+                                foreach($mmRes as $model) {
+                                    $val = $model->get($key,true);
+                                    $pivotRel[ (string) $model->get($fromConf['relField'])][] = $val;
+                                    $pivotKeys[] = $val;
+                                }
+                                // cache pivot keys
+                                $cx->setRelSet($key.'_pivot', $pivotRel);
+                                // preload all rels
+                                $pivotKeys = array_unique($pivotKeys);
+                                $fRel = $this->getRelInstance($fromConf[0]);
+                                $crit = array($id.' IN ?', $pivotKeys);
+                                $relSet = $fRel->find($this->mergeWithRelFilter($key, $crit));
+                                $cx->setRelSet($key, $relSet ? $relSet->getBy($id) : NULL);
+                                unset($fRel);
                             }
                         }
-                    }
-                }
-                elseif (isset($fields[$key]['belongs-to-many'])) {
-                    // many-to-many, unidirectional
-                    $fields[$key]['type'] = self::DT_JSON;
-                    $result = !$this->exists($key) ? null :$this->mapper->get($key);
-                    if ($this->dbsType == 'sql')
-                        $result = json_decode($result, true);
-                    if (!is_array($result))
-                        $this->fieldsCache[$key] = $result;
+                        // fetch subset from preloaded rels using cached pivot keys
+                        $fkeys = $cx->getSubset($key.'_pivot', $this->get($id));
+                        $this->fieldsCache[$key] = $fkeys ?
+                            $cx->getSubset($key, $fkeys[0]) : NULL;
+                    } // no collection
                     else {
-                        // create foreign table mapper
-                        $relConf = $fields[$key]['belongs-to-many'];
-                        if (!is_array($relConf))
-                            $relConf = array($relConf, $id);
-                        $rel = $this->getRelInstance($relConf[0]);
-                        $fkeys = array();
-                        foreach ($result as $el)
-                            $fkeys[] = (string) $el;
-                        // if part of a result set
-                        if ($this->collectionID && $this->smartLoading) {
-                            $cx = CortexCollection::instance($this->collectionID);
-                            if (!$cx->hasRelSet($key)) {
-                                // find all keys
-                                $relKeys = ($cx->getAll($key,true));
-                                if ($this->dbsType == 'sql'){
-                                    foreach ($relKeys as &$val) {
-                                        $val = substr($val, 1, -1);
-                                        unset($val);
-                                    }
-                                    $relKeys = json_decode('['.implode(',',$relKeys).']');
-                                } else
-                                    $relKeys = call_user_func_array('array_merge', $relKeys);
-                                // get related models
-                                $crit = array($relConf[1].' IN ?', array_unique($relKeys));
-                                $relSet = $rel->find($this->mergeWithRelFilter($key, $crit));
-                                // cache relSet, sorted by ID
-                                $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
-                            }
-                            // get a subset of the preloaded set
-                            $this->fieldsCache[$key] = $cx->getSubset($key, $fkeys);
-                        } else {
+                        // find foreign keys
+                        $results = $rel->find(
+                            array($fromConf['relField'].' = ?', $this->get($id,true)));
+                        if(!$results)
+                            $this->fieldsCache[$key] = NULL;
+                        else {
+                            $fkeys = $results->getAll($key,true);
+                            // create foreign table mapper
+                            unset($rel);
+                            $rel = $this->getRelInstance($fromConf[0]);
                             // load foreign models
-                            $filter = array($relConf[1].' IN ?', $fkeys);
+                            $filter = array($id.' IN ?', $fkeys);
                             $filter = $this->mergeWithRelFilter($key, $filter);
                             $this->fieldsCache[$key] = $rel->find($filter);
                         }
                     }
                 }
-                // resolve array fields
-                elseif ($this->dbsType == 'sql' && isset($fields[$key]['type'])) {
-                    if ($fields[$key]['type'] == self::DT_SERIALIZED)
-                        $this->fieldsCache[$key] = unserialize($this->mapper->{$key});
-                    elseif ($fields[$key]['type'] == self::DT_JSON)
-                        $this->fieldsCache[$key] = json_decode($this->mapper->{$key},true);
+            }
+            elseif (isset($fields[$key]['belongs-to-many'])) {
+                // many-to-many, unidirectional
+                $fields[$key]['type'] = self::DT_JSON;
+                $result = !$this->exists($key) ? null :$this->mapper->get($key);
+                if ($this->dbsType == 'sql')
+                    $result = json_decode($result, true);
+                if (!is_array($result))
+                    $this->fieldsCache[$key] = $result;
+                else {
+                    // create foreign table mapper
+                    $relConf = $fields[$key]['belongs-to-many'];
+                    if (!is_array($relConf))
+                        $relConf = array($relConf, $id);
+                    $rel = $this->getRelInstance($relConf[0]);
+                    $fkeys = array();
+                    foreach ($result as $el)
+                        $fkeys[] = (string) $el;
+                    // if part of a result set
+                    if ($this->collectionID && $this->smartLoading) {
+                        $cx = CortexCollection::instance($this->collectionID);
+                        if (!$cx->hasRelSet($key)) {
+                            // find all keys
+                            $relKeys = ($cx->getAll($key,true));
+                            if ($this->dbsType == 'sql'){
+                                foreach ($relKeys as &$val) {
+                                    $val = substr($val, 1, -1);
+                                    unset($val);
+                                }
+                                $relKeys = json_decode('['.implode(',',$relKeys).']');
+                            } else
+                                $relKeys = call_user_func_array('array_merge', $relKeys);
+                            // get related models
+                            $crit = array($relConf[1].' IN ?', array_unique($relKeys));
+                            $relSet = $rel->find($this->mergeWithRelFilter($key, $crit));
+                            // cache relSet, sorted by ID
+                            $cx->setRelSet($key, $relSet ? $relSet->getBy($relConf[1]) : NULL);
+                        }
+                        // get a subset of the preloaded set
+                        $this->fieldsCache[$key] = $cx->getSubset($key, $fkeys);
+                    } else {
+                        // load foreign models
+                        $filter = array($relConf[1].' IN ?', $fkeys);
+                        $filter = $this->mergeWithRelFilter($key, $filter);
+                        $this->fieldsCache[$key] = $rel->find($filter);
+                    }
                 }
+            }
+            // resolve array fields
+            elseif ($this->dbsType == 'sql' && isset($fields[$key]['type'])) {
+                if ($fields[$key]['type'] == self::DT_SERIALIZED)
+                    $this->fieldsCache[$key] = unserialize($this->mapper->{$key});
+                elseif ($fields[$key]['type'] == self::DT_JSON)
+                    $this->fieldsCache[$key] = json_decode($this->mapper->{$key},true);
             }
         }
         // fetch cached value, if existing
@@ -990,14 +975,10 @@ class Cortex extends Cursor {
                                 $relType = $type;
                                 break;
                             }
-                        // cast relations
                         if (isset($relType)) {
                             // cast relations
-                            if (($relType == 'belongs-to-one' || $relType == 'belongs-to-many')
-                                && !$mp->exists($key))
-                                $val = null;
-                            else
-                                $val = $mp->get($key);
+                            $val = (($relType == 'belongs-to-one' || $relType == 'belongs-to-many')
+                                && !$mp->exists($key)) ? NULL : $mp->get($key);
                             if (is_array($val) || is_object($val)) {
                                 if ($relType == 'belongs-to-one' || $relType == 'has-one')
                                     // single object
@@ -1190,7 +1171,7 @@ class CortexQueryParser extends \Prefab {
             && ($ttl = (int) $f3->get('CORTEX.queryParserCache'))) {
             $cache = \Cache::instance();
             // load from cache
-            if ($f3->get('CACHE') && $ttl && ($cached = $cache->exists($cacheHash,$ncond))
+            if ($f3->get('CACHE') && $ttl && ($cached = $cache->exists($cacheHash, $ncond))
                 && $cached[0] + $ttl > microtime(TRUE)) {
                 $this->queryCache[$cacheHash] = $ncond;
                 return $ncond;
@@ -1466,31 +1447,28 @@ class CortexQueryParser extends \Prefab {
      */
     public function prepareOptions($options, $engine)
     {
-        if (!empty($options) && is_array($options)) {
-            switch ($engine) {
-                case 'jig':
-                    if (array_key_exists('order', $options))
-                        $options['order'] = str_replace(array('asc', 'desc'),
-                            array('SORT_ASC', 'SORT_DESC'), strtolower($options['order']));
-                    break;
-            }
-            switch ($engine) {
-                case 'mongo':
-                    if (array_key_exists('order', $options)) {
-                        $sorts = explode(',', $options['order']);
-                        $sorting = array();
-                        foreach ($sorts as $sort) {
-                            $sp = explode(' ', trim($sort));
-                            $sorting[$sp[0]] = (array_key_exists(1, $sp) &&
-                                strtoupper($sp[1]) == 'DESC') ? -1 : 1;
-                        }
-                        $options['order'] = $sorting;
-                    }
-                    break;
-            }
-            return $options;
-        } else
+        if (empty($options) || !is_array($options))
             return null;
+        switch ($engine) {
+            case 'jig':
+                if (array_key_exists('order', $options))
+                    $options['order'] = str_replace(array('asc', 'desc'),
+                        array('SORT_ASC', 'SORT_DESC'), strtolower($options['order']));
+                break;
+            case 'mongo':
+                if (array_key_exists('order', $options)) {
+                    $sorts = explode(',', $options['order']);
+                    $sorting = array();
+                    foreach ($sorts as $sort) {
+                        $sp = explode(' ', trim($sort));
+                        $sorting[$sp[0]] = (array_key_exists(1, $sp) &&
+                            strtoupper($sp[1]) == 'DESC') ? -1 : 1;
+                    }
+                    $options['order'] = $sorting;
+                }
+                break;
+        }
+        return $options;
     }
 }
 
@@ -1555,11 +1533,11 @@ class CortexCollection extends \ArrayIterator {
     /**
      * get an intersection from a cached relation-set, based on given keys
      * @param string $prop
-     * @param array $keys
+     * @param array|string $keys
      * @return array
      */
     public function getSubset($prop,$keys) {
-        if (!is_array($keys))
+        if (is_string($keys))
             $keys = \Base::instance()->split($keys);
         if (!$this->hasRelSet($prop) || !($relSet = $this->getRelSet($prop)))
             return null;
