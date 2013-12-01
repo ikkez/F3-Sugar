@@ -1299,10 +1299,12 @@ class CortexQueryParser extends \Prefab {
                         $pos = $npos;
                     $part = ($not ? '!' : '').'in_array('.substr($part, 0, $pos).
                         ',array(\''.implode('\',\'', $val).'\'))';
+                    unset($val);
                 }
                 // add existence check
                 $part = '(isset('.$match[0].') && '.$part.')';
-                $ncond[] = $val;
+                if (isset($val))
+                    $ncond[] = $val;
             } elseif ($count >= 1) {
                 // field comparison
                 preg_match_all('/(@\w+)/i', $part, $matches);
