@@ -387,12 +387,15 @@ class Cortex extends Cursor {
                 $field['type'] = $fc['fieldConf'][$relConf[1]]['type'];
             }
             $field['nullable'] = true;
+            $field['relType'] = 'belongs-to-one';
         }
         elseif (array_key_exists('belongs-to-many', $field)){
             $field['type'] = self::DT_JSON;
             $field['nullable'] = true;
+            $field['relType'] = 'belongs-to-many';
         }
         elseif (array_key_exists('has-many', $field)){
+            $field['relType'] = 'has-many';
             $relConf = $field['has-many'];
             if(!is_array($relConf))
                 return $field;
@@ -404,7 +407,8 @@ class Cortex extends Cursor {
             } else {
                 $field['has-many']['rel'] = 'belongs-to-one';
             }
-        }
+        } elseif(array_key_exists('has-one', $field))
+            $field['relType'] = 'has-one';
         return $field;
     }
 
