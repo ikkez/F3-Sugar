@@ -1,0 +1,10 @@
+CHANGELOG - Cortex ORM
+
+1.1.0
+*	move castAll into CortexCollection
+*	add castField function
+*   add inverse has-one relations
+*	Bug fix: Jig filter bind value
+
+1.0.0 (30. November 2013)
+*	init commit
