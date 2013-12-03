@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.0.0
+        @version 1.1.0
         @since 24.04.2012
         @date 30.11.2013
  **/
@@ -421,8 +421,7 @@ class Cortex extends Cursor {
      */
     public function afind($filter = NULL, array $options = NULL, $ttl = 0)
     {
-        $result = $this->find($filter, $options, $ttl);
-        return $this->castAll($result,1);
+        return $this->find($filter, $options, $ttl)->castAll();
     }
 
     /**
@@ -1035,16 +1034,17 @@ class Cortex extends Cursor {
     }
 
     /**
-     * cast an array of mappers
-     * @param string|array $mapper_arr  array of mapper objects, or field name
-     * @param int          $rel_depths  depths to resolve relations
+     * cast a related collection of mappers
+     * @param string|array $key  array of mapper objects, or field name
+     * @param int $rel_depths  depths to resolve relations
      * @return array    array of associative arrays
      */
-    function castAll($mapper_arr, $rel_depths=0)
+    function castField($key, $rel_depths=0)
     {
-        if (is_string($mapper_arr))
-            $mapper_arr = $this->get($mapper_arr);
-        if (!$mapper_arr)
+        if (!$key)
+            return NULL;
+        $mapper_arr = $this->get($key);
+        if(!$mapper_arr)
             return NULL;
         $out = array();
         foreach ($mapper_arr as $mp)
@@ -1588,6 +1588,18 @@ class CortexCollection extends \ArrayIterator {
                 if (!empty($val))
                     $out[] = $val;
             }
+        return $out;
+    }
+
+    /**
+     * cast all contained mappers to a nested array
+     * @param int $rel_depths depths to resolve relations
+     * @return array
+     */
+    public function castAll($rel_depths=1) {
+        $out = array();
+        foreach ($this->getArrayCopy() as $model)
+            $out[] = $model->cast(null,$rel_depths);
         return $out;
     }
 
