@@ -526,30 +526,34 @@ class Cortex extends Cursor {
         if (!empty($this->saveCsd)) {
             $fields = $this->fieldConf;
             foreach($this->saveCsd as $key => $val) {
-                $relConf = $fields[$key]['has-many'];
-                if (!isset($relConf['refTable'])) {
-                    // compute mm table name
-                    $mmTable = static::getMMTableName($relConf['relTable'],
-                        $relConf['relField'], $this->getTable(), $key);
-                    $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
-                } else
-                    $mmTable = $relConf['refTable'];
-                $rel = $this->getRelInstance(null, array('db'=>$this->db, 'table'=>$mmTable));
-                // delete all refs
-                if (is_null($val))
-                    $rel->erase(array($relConf['relField'].' = ?', $this->get('_id',true)));
-                // update refs
-                elseif (is_array($val)) {
-                    $id = $this->get('_id',true);
-                    $rel->erase(array($relConf['relField'].' = ?', $id));
-                    foreach($val as $v) {
-                        $rel->set($key,$v);
-                        $rel->set($relConf['relField'],$id);
-                        $rel->save();
-                        $rel->reset();
+                if($fields[$key]['relType'] == 'has-many') {
+                    $relConf = $fields[$key]['has-many'];
+                    if (!isset($relConf['refTable'])) {
+                        // compute mm table name
+                        $mmTable = static::getMMTableName($relConf['relTable'],
+                            $relConf['relField'], $this->getTable(), $key);
+                        $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
+                    } else
+                        $mmTable = $relConf['refTable'];
+                    $rel = $this->getRelInstance(null, array('db'=>$this->db, 'table'=>$mmTable));
+                    // delete all refs
+                    if (is_null($val))
+                        $rel->erase(array($relConf['relField'].' = ?', $this->get('_id',true)));
+                    // update refs
+                    elseif (is_array($val)) {
+                        $id = $this->get('_id',true);
+                        $rel->erase(array($relConf['relField'].' = ?', $id));
+                        foreach($val as $v) {
+                            $rel->set($key,$v);
+                            $rel->set($relConf['relField'],$id);
+                            $rel->save();
+                            $rel->reset();
+                        }
                     }
+                    unset($rel);
+                } elseif($fields[$key]['relType'] == 'has-one') {
+                    $val->save();
                 }
-                unset($rel);
             }
         }
         return $result;
@@ -595,6 +599,21 @@ class Cortex extends Cursor {
                     }
                 } elseif ($this->dbsType == 'mongo' && !$val instanceof \MongoId)
                     $val = new \MongoId($val);
+            } elseif (isset($fields[$key]['has-one'])){
+                $relConf = $fields[$key]['has-one'];
+                if (is_null($val)) {
+                    $val = $this->get($key);
+                    $val->set($relConf[1],NULL);
+                } else {
+                    if (!$val instanceof Cortex) {
+                        $rel = $this->getRelInstance($relConf[0]);
+                        $rel->load(array('_id = ?', $val));
+                        $val = $rel;
+                    }
+                    $val->set($relConf[1], $this->_id);
+                }
+                $this->saveCsd[$key] = $val;
+                return $val;
             } elseif (isset($fields[$key]['belongs-to-many'])) {
                 // many-to-many, unidirectional
                 $fields[$key]['type'] = self::DT_JSON;
