@@ -421,7 +421,8 @@ class Cortex extends Cursor {
      */
     public function afind($filter = NULL, array $options = NULL, $ttl = 0)
     {
-        return $this->find($filter, $options, $ttl)->castAll();
+        $result = $this->find($filter, $options, $ttl);
+        return $result ? $result->castAll(): NULL;
     }
 
     /**
