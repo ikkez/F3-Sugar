@@ -1540,14 +1540,29 @@ class CortexCollection extends \ArrayIterator {
         $this->append($model);
     }
 
+    /**
+     * get a related collection
+     * @param $key
+     * @return null
+     */
     public function getRelSet($key) {
         return (isset($this->relSets[$key])) ? $this->relSets[$key] : null;
     }
 
+    /**
+     * set a related collection for caching it for the lifetime of this collection
+     * @param $key
+     * @param $set
+     */
     public function setRelSet($key,$set) {
         $this->relSets[$key] = $set;
     }
 
+    /**
+     * check if a related collection exists in runtime cache
+     * @param $key
+     * @return bool
+     */
     public function hasRelSet($key) {
         return array_key_exists($key,$this->relSets);
     }
