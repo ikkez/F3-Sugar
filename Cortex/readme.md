@@ -295,7 +295,7 @@ class User extends \DB\Cortex {
     }
     
     // hash a password before saving
-    public function set_passwort($value) {        
+    public function set_password($value) {        
         return \Bcrypt::instance()->hash($value);
     }
 }
@@ -304,7 +304,7 @@ class User extends \DB\Cortex {
 So setting these fields in your Model, like:
 
 ``` php
-$user->passwort = 'secret';
+$user->password = 'secret';
 $user->mail = 'foo@bar.com';
 ```
 
