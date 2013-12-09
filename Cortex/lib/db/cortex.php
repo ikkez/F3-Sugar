@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.1.0
+        @version 1.1.0-dev
         @since 24.04.2012
         @date 30.11.2013
  **/
@@ -1029,7 +1029,14 @@ class Cortex extends Cursor {
                     $fields['_id'] = $val;
                     unset($fields[$key]);
                 }
+                unset($val);
             }
+        }
+        // custom getter
+        foreach($fields as $key => &$val) {
+            if(method_exists($this, 'get_'.$key))
+                $val = $this->{'get_'.$key}($val);
+            unset($val);
         }
         return $fields;
     }
