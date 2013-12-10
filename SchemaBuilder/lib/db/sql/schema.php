@@ -688,7 +688,7 @@ class TableModifier extends TableBuilder {
     public function getCols($types = false)
     {
         $columns = array();
-        $schema = $this->db->schema($this->name, 0);
+        $schema = $this->db->schema($this->name, null, 0);
         if (!$types)
             return array_keys($schema);
         else
