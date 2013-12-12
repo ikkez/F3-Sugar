@@ -110,7 +110,7 @@ class Cortex extends Cursor {
                 $this->mapper = new Jig\Mapper($this->db, $this->table);
                 break;
             case 'sql':
-                $this->mapper = new SQL\Mapper($this->db, $this->table,($this->fluid)?0:60);
+                $this->mapper = new SQL\Mapper($this->db, $this->table, null,($this->fluid)?0:60);
                 break;
             case 'mongo':
                 $this->mapper = new Mongo\Mapper($this->db, $this->table);
