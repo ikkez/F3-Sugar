@@ -813,7 +813,7 @@ class Cortex extends Cursor {
                             }
                         }
                         // fetch subset from preloaded rels using cached pivot keys
-                        $fkeys = $cx->getSubset($key.'_pivot', $this->get($id));
+                        $fkeys = $cx->getSubset($key.'_pivot', array($this->get($id)));
                         $this->fieldsCache[$key] = $fkeys ?
                             $cx->getSubset($key, $fkeys[0]) : NULL;
                     } // no collection
@@ -1514,7 +1514,8 @@ class CortexCollection extends \ArrayIterator {
         $cid;
 
     const
-        E_UnknownCID = 'This Collection does not exist: %s';
+        E_UnknownCID = 'This Collection does not exist: %s',
+        E_SubsetKeysValue = '$keys must be an array or split-able string, but %s was given.';
 
     public function __construct() {
         $this->cid = uniqid('cortex_collection_');
@@ -1588,6 +1589,8 @@ class CortexCollection extends \ArrayIterator {
     public function getSubset($prop,$keys) {
         if (is_string($keys))
             $keys = \Base::instance()->split($keys);
+        if (!is_array($keys))
+            trigger_error(sprintf(self::E_SubsetKeysValue,gettype($keys)));
         if (!$this->hasRelSet($prop) || !($relSet = $this->getRelSet($prop)))
             return null;
         foreach ($keys as &$key)
