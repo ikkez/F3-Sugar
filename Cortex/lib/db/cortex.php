@@ -942,6 +942,8 @@ class Cortex extends Cursor {
                 }
                 if ($isMongo && $rel_field == '_id' && is_string($item))
                     $item = new \MongoId($item);
+                if (is_numeric($item))
+                    $item = (int) $item;
                 unset($item);
             }
         }
