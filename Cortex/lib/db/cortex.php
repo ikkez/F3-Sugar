@@ -415,15 +415,16 @@ class Cortex extends Cursor {
 
     /**
      * Return an array of result arrays matching criteria
-     * @param null  $filter
+     * @param null $filter
      * @param array $options
-     * @param int   $ttl
+     * @param int $ttl
+     * @param int $rel_depths
      * @return array
      */
-    public function afind($filter = NULL, array $options = NULL, $ttl = 0)
+    public function afind($filter = NULL, array $options = NULL, $ttl = 0, $rel_depths = 1)
     {
         $result = $this->find($filter, $options, $ttl);
-        return $result ? $result->castAll(): NULL;
+        return $result ? $result->castAll($rel_depths): NULL;
     }
 
     /**
@@ -1196,6 +1197,11 @@ class Cortex extends Cursor {
         return $this;
     }
 
+    /**
+     * reset and re-initialize the mapper
+     * @param bool $mapper
+     * @return NULL|void
+     */
     public function reset($mapper = true)
     {
         if ($mapper)
@@ -1213,12 +1219,27 @@ class Cortex extends Cursor {
                 }
     }
 
-    function exists($key) {
+    /**
+     * check if a certain field exists in the mapper or
+     * or is a virtual relation field
+     * @param string $key
+     * @param bool $relField
+     * @return bool
+     */
+    function exists($key, $relField = false) {
         if ($key == '_id') return true;
-        return $this->mapper->exists($key);
+        return $this->mapper->exists($key) || ($relField && isset($this->fieldConf[$key]['relType']));
     }
 
+    /**
+     * clear any mapper field or relation
+     * @param string $key
+     * @return NULL|void
+     */
     function clear($key) {
+        unset($this->fieldsCache[$key]);
+        if (isset($this->fieldConf[$key]['relType']))
+            $this->set($key,null);
         $this->mapper->clear($key);
     }
 
@@ -1695,7 +1716,7 @@ class CortexCollection extends \ArrayIterator {
     {
         $out = array();
         foreach ($this->getArrayCopy() as $model)
-            if ($model->exists($prop)) {
+            if ($model->exists($prop,true)) {
                 $val = $model->get($prop, $raw);
                 if (!empty($val))
                     $out[] = $val;
