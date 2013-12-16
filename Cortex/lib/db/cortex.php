@@ -401,11 +401,11 @@ class Cortex extends Cursor {
                 return $field;
             $rel = $relConf[0]::resolveConfiguration();
             if(array_key_exists('has-many',$rel['fieldConf'][$relConf[1]])) {
-                $field['has-many']['rel'] = 'has-many';
+                $field['has-many']['hasRel'] = 'has-many';
                 $field['has-many']['relTable'] = $rel['table'];
                 $field['has-many']['relField'] = $relConf[1];
             } else {
-                $field['has-many']['rel'] = 'belongs-to-one';
+                $field['has-many']['hasRel'] = 'belongs-to-one';
             }
         } elseif(array_key_exists('has-one', $field))
             $field['relType'] = 'has-one';
@@ -624,14 +624,14 @@ class Cortex extends Cursor {
             elseif (isset($fields[$key]['has-many'])) {
                 // many-to-many, bidirectional
                 $relConf = $fields[$key]['has-many'];
-                if ($relConf['rel'] == 'has-many') {
+                if ($relConf['hasRel'] == 'has-many') {
                     // custom setter
                     if (method_exists($this, 'set_'.$key))
                         $val = $this->{'set_'.$key}($val);
                     $val = $this->getForeignKeysArray($val,'_id',$key);
                     $this->saveCsd[$key] = $val; // array of keys
                     return $val;
-                } elseif ($relConf['rel'] == 'belongs-to-one') {
+                } elseif ($relConf['hasRel'] == 'belongs-to-one') {
                     // TODO: many-to-one, bidirectional, inverse way
                     trigger_error("not implemented");
                 }
@@ -746,8 +746,9 @@ class Cortex extends Cursor {
                     trigger_error(sprintf(self::E_REL_CONF_INC, $key));
                 $rel = $this->getRelInstance($fromConf[0]);
                 $relFieldConf = $rel->getFieldConfiguration();
+                $relType = key($relFieldConf[$fromConf[1]]);
                 // one-to-*, bidirectional, inverse way
-                if (key($relFieldConf[$fromConf[1]]) == 'belongs-to-one') {
+                if ($relType == 'belongs-to-one') {
                     $toConf = $relFieldConf[$fromConf[1]]['belongs-to-one'];
                     if(!is_array($toConf))
                         $toConf = array($toConf, $id);
@@ -775,7 +776,7 @@ class Cortex extends Cursor {
                     }
                 }
                 // many-to-many, bidirectional
-                elseif (key($relFieldConf[$fromConf[1]]) == 'has-many') {
+                elseif ($relType == 'has-many') {
                     if (!array_key_exists('refTable', $fromConf)) {
                         // compute mm table name
                         $toConf = $relFieldConf[$fromConf[1]]['has-many'];
@@ -1035,8 +1036,8 @@ class Cortex extends Cursor {
             }
         }
         // custom getter
-        foreach($fields as $key => &$val) {
-            if(method_exists($this, 'get_'.$key))
+        foreach ($fields as $key => &$val) {
+            if (method_exists($this, 'get_'.$key))
                 $val = $this->{'get_'.$key}($val);
             unset($val);
         }
