@@ -73,7 +73,8 @@ class Cortex extends Cursor {
         E_MM_REL_CLASS = 'Mismatching m:m relation config from class `%s` to `%s`.',
         E_MM_REL_FIELD = 'Mismatching m:m relation keys from `%s` to `%s`.',
         E_REL_CONF_INC = 'Incomplete relation config for `%s`. Linked key is missing.',
-        E_MISSING_REL_CONF = 'Cannot create related model. Specify a model name or relConf array.';
+        E_MISSING_REL_CONF = 'Cannot create related model. Specify a model name or relConf array.',
+        E_HAS_COND = 'Cannot use a "has"-filter on a non-bidirectional relation field';
 
     /**
      * init the ORM, based on given DBS
@@ -236,7 +237,7 @@ class Cortex extends Cursor {
                         // check if foreign conf matches m:m
                         if (array_key_exists($relConf[1],$rel['fieldConf'])
                             && !is_null($rel['fieldConf'][$relConf[1]])
-                            && key($rel['fieldConf'][$relConf[1]]) == 'has-many') {
+                            && $relConf['hasRel'] == 'has-many') {
                             // compute mm table name
                             $fConf = $rel['fieldConf'][$relConf[1]]['has-many'];
                             $mmTable = static::getMMTableName(
@@ -490,10 +491,13 @@ class Cortex extends Cursor {
     public function has($key, $filter, $options = null) {
         if (!isset($this->fieldConf[$key]))
             trigger_error(sprintf(self::E_UNKNOWN_FIELD,$key,get_called_class()));
-        if (isset($this->fieldConf[$key]['relType'])) {
-            $type = $this->fieldConf[$key]['relType'];
-            $fromConf = $this->fieldConf[$key][$type];
-            if ($type == 'has-one'||$type == 'has-many') {
+        if (!isset($this->fieldConf[$key]['relType']))
+            trigger_error(self::E_HAS_COND);
+        $type = $this->fieldConf[$key]['relType'];
+        $fromConf = $this->fieldConf[$key][$type];
+        switch($type) {
+            case 'has-one':
+            case 'has-many':
                 if (!is_array($fromConf))
                     trigger_error(sprintf(self::E_REL_CONF_INC, $key));
                 $rel = $this->getRelInstance($fromConf[0]);
@@ -501,6 +505,7 @@ class Cortex extends Cursor {
                 if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
                     /** @var CortexCollection $hasSet */
                     $hasSet = $this->xref($rel,$filter,$options);
+                    $this->hasCond[$key] = null;
                     if ($hasSet) {
                         $hasIDs = $hasSet->getAll('_id',true);
                         if (!array_key_exists('refTable', $fromConf)) {
@@ -512,28 +517,25 @@ class Cortex extends Cursor {
                             $mmTable = $fromConf['refTable'];
                         $pivot = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
                         $pivotSet = $pivot->find(array($key.' IN ?',$hasIDs));
-                        if($pivotSet) {
+                        if ($pivotSet) {
                             $pivotIDs = array_unique($pivotSet->getAll($fromConf['relField'],true));
                             $this->hasCond[$key] = array('_id IN ?',$pivotIDs);
-                        } else {
-                            $this->hasCond[$key] = null;
                         }
-                    } else {
-                        $this->hasCond[$key] = null;
                     }
                 } else {
                     // many-to-one
                     /** @var CortexCollection $hasSet */
                     $hasSet = $this->xref($rel,$filter,$options);
-                    if (!$hasSet) {
+                    if (!$hasSet)
                         $this->hasCond[$key] = null;
-                    } else {
+                    else {
                         $hasSetByRelId = array_unique($hasSet->getAll($fromConf[1], true));
                         $this->hasCond[$key] = empty($hasSetByRelId) ? null :
                             array('_id IN ?', $hasSetByRelId);
                     }
                 }
-            } elseif($type=='belongs-to-one') {
+                break;
+            case 'belongs-to-one':
                 // one-to-many
                 if (!is_array($fromConf))
                     $fromConf = array($fromConf,'_id');
@@ -541,9 +543,9 @@ class Cortex extends Cursor {
                 $hasSet = $this->xref($rel,$filter,$options);
                 $this->hasCond[$key] = !$hasSet ? null :
                     array($key.' IN ?',array_unique($hasSet->getAll($fromConf[1],true)));
-            } elseif ($type == 'belongs-to-many') {
-                trigger_error('unable to use "has"-conditions to "belongs-to-many" array fields');
-            }
+                break;
+            default:
+                trigger_error(self::E_HAS_COND);
         }
         return $this;
     }
