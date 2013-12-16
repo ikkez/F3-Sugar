@@ -42,7 +42,8 @@ class Cortex extends Cursor {
         $fieldsCache,   // relation field cache
         $saveCsd,       // mm rel save cascade
         $collectionID,  // collection set identifier
-        $relFilter;     // filter for loading related models
+        $relFilter,     // filter for loading related models
+        $hasCond;       // IDs of records the next find should have
 
     /** @var Cursor */
     protected $mapper;
@@ -434,6 +435,20 @@ class Cortex extends Cursor {
      */
     public function find($filter = NULL, array $options = NULL, $ttl = 0)
     {
+        if ($this->hasCond) {
+            if(!$filter)
+                $filter = array('');
+            foreach($this->hasCond as $key => $has) {
+                if (!$has)
+                    // no IDs found to match with
+                    return false;
+                if (!empty($filter[0]))
+                    $filter[0] .= ' and ';
+                $filter[0] .= array_shift($has);
+                $filter = array_merge($filter, $has);
+            }
+            $this->hasCond = null;
+        }
         $filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $result = $this->mapper->find($filter, $options, $ttl);
@@ -461,6 +476,74 @@ class Cortex extends Cursor {
         $filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
         $this->mapper->load($filter, $options);
+        return $this;
+    }
+
+    /**
+     * add has-conditional filter to next find call
+     * @param $key
+     * @param $filter
+     * @param null $options
+     * @return $this
+     */
+    public function has($key, $filter, $options = null) {
+        if (!isset($this->fieldConf[$key]))
+            trigger_error(sprintf(self::E_UNKNOWN_FIELD,$key,get_called_class()));
+        if (isset($this->fieldConf[$key]['relType'])) {
+            $type = $this->fieldConf[$key]['relType'];
+            $fromConf = $this->fieldConf[$key][$type];
+            if ($type == 'has-one'||$type == 'has-many') {
+                if (!is_array($fromConf))
+                    trigger_error(sprintf(self::E_REL_CONF_INC, $key));
+                $rel = $this->getRelInstance($fromConf[0]);
+                // many-to-many
+                if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
+                    /** @var CortexCollection $hasSet */
+                    $hasSet = $this->xref($rel,$filter,$options);
+                    if ($hasSet) {
+                        $hasIDs = $hasSet->getAll('_id',true);
+                        if (!array_key_exists('refTable', $fromConf)) {
+                            // compute mm table name
+                            $mmTable = static::getMMTableName($fromConf['relTable'],
+                                $fromConf['relField'], $this->getTable(), $key);
+                            $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
+                        } else
+                            $mmTable = $fromConf['refTable'];
+                        $pivot = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
+                        $pivotSet = $pivot->find(array($key.' IN ?',$hasIDs));
+                        if($pivotSet) {
+                            $pivotIDs = array_unique($pivotSet->getAll($fromConf['relField'],true));
+                            $this->hasCond[$key] = array('_id IN ?',$pivotIDs);
+                        } else {
+                            $this->hasCond[$key] = null;
+                        }
+                    } else {
+                        $this->hasCond[$key] = null;
+                    }
+                } else {
+                    // many-to-one
+                    /** @var CortexCollection $hasSet */
+                    $hasSet = $this->xref($rel,$filter,$options);
+                    if (!$hasSet) {
+                        $this->hasCond[$key] = null;
+                    } else {
+                        $hasSetByRelId = array_unique($hasSet->getAll($fromConf[1], true));
+                        $this->hasCond[$key] = empty($hasSetByRelId) ? null :
+                            array('_id IN ?', $hasSetByRelId);
+                    }
+                }
+            } elseif($type=='belongs-to-one') {
+                // one-to-many
+                if (!is_array($fromConf))
+                    $fromConf = array($fromConf,'_id');
+                $rel = $this->getRelInstance($fromConf[0]);
+                $hasSet = $this->xref($rel,$filter,$options);
+                $this->hasCond[$key] = !$hasSet ? null :
+                    array($key.' IN ?',array_unique($hasSet->getAll($fromConf[1],true)));
+            } elseif ($type == 'belongs-to-many') {
+                trigger_error('unable to use "has"-conditions to "belongs-to-many" array fields');
+            }
+        }
         return $this;
     }
 
