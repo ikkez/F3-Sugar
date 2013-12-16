@@ -58,7 +58,7 @@ class Test_Relation {
         $author_id[] = $author->_id;
         $author->reset();
 
-        $allauthors = $author->castAll($author->find());
+        $allauthors = $author->find()->castAll();
         $allauthors = $this->getResult($allauthors);
 
         $test->expect(
@@ -232,8 +232,24 @@ class Test_Relation {
         $test->expect(
             $author->profile->message == 'Hello World' &&
             $profile->author->name == "Johnny English",
-            $type.': has-one inverse relation'
+            $type.': has-one: relation assigned'
         );
+
+        $profile->reset();
+        $profile->message = 'I\'m feeling lucky';
+        $profile->image = 'lolcat.jpg';
+        $author->reset();
+        $author->load(array('_id = ?',$author_id[1]));
+        $author->profile = $profile;
+        $author->save();
+        $profile->reset();
+        $author->reset();
+        $author->load(array('_id = ?', $author_id[1]));
+        $test->expect(
+            $author->profile->message == 'I\'m feeling lucky',
+            $type.': has-one: inverse relation'
+        );
+
 
         // has-many relation
         ///////////////////////////////////

@@ -31,6 +31,13 @@ class Cortex extends Controller
             $results = array_merge((array) $results, (array) $test->run($db, $type));
         }
 
+        // Test Filter
+        foreach ($dbs as $type => $db) {
+            $f3->set('DB',$db);
+            $test = new \Test_Filter();
+            $results = array_merge((array) $results, (array) $test->run($db, $type));
+        }
+
         $f3->set('results', $results);
     }
 

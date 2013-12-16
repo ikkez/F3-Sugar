@@ -1,9 +1,11 @@
 CHANGELOG - Cortex ORM
 
 1.1.0
+*	Feature: has-filter
 *	move castAll into CortexCollection
 *	add castField function
-*   add inverse has-one relations
+*	add inverse has-one relations
+*	Bug fix: casting many-many relations
 *	Bug fix: Jig filter bind value
 
 1.0.0 (30. November 2013)
