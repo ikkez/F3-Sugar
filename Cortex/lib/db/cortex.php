@@ -439,9 +439,9 @@ class Cortex extends Cursor {
     {
         if ($this->hasCond) {
             $hasJoin = array();
-            foreach($this->hasCond as $key => $has) {
+            foreach($this->hasCond as $key => $hasCond) {
                 $addToFilter = null;
-                list($has_filter,$has_options) = $has;
+                list($has_filter,$has_options) = $hasCond;
                 $type = $this->fieldConf[$key]['relType'];
                 $fromConf = $this->fieldConf[$key][$type];
                 switch($type) {
@@ -450,28 +450,23 @@ class Cortex extends Cursor {
                         if (!is_array($fromConf))
                             trigger_error(sprintf(self::E_REL_CONF_INC, $key));
                         if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
-                            if ($this->dbsType == 'sql')
-                                $hasJoin += $this->_hasRefsInMM_sql($key,$has, $filter,$options);
-                            else {
-                                $result = $this->_hasRefsInMM($key,$has_filter,$has_options,$ttl);
-                                if ($result)
-                                    $addToFilter = array('_id IN ?', $result);
-                            }
-                        } else {
-                            $result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl);
-                            if($result)
+                            if ($this->dbsType == 'sql' && !isset($has_options['limit']))
+                                $hasJoin += $this->_hasRefsInMM_sql($key,$hasCond, $filter,$options);
+                            elseif ($result = $this->_hasRefsInMM($key,$has_filter,$has_options,$ttl))
                                 $addToFilter = array('_id IN ?', $result);
-                        }
+                        } elseif ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
+                            $addToFilter = array('_id IN ?', $result);
                     break;
                     case 'belongs-to-one':
-                        $result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl);
-                        if($result)
+                        if ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
                             $addToFilter = array($key.' IN ?', $result);
                         break;
                     default:
                         trigger_error(self::E_HAS_COND);
                 }
-                if(isset($addToFilter)) {
+                if (isset($result) && !isset($addToFilter))
+                    return false;
+                elseif (isset($addToFilter)) {
                     if (!$filter)
                         $filter = array('');
                     if (!empty($filter[0]))
@@ -559,7 +554,7 @@ class Cortex extends Cursor {
      * @param array  $filter  condition for foreign records
      * @param array  $options filter options for foreign records
      * @param int    $ttl
-     * @return array|null
+     * @return array|false
      */
     protected function _hasRefsIn($key, $filter, $options, $ttl = 0)
     {
@@ -571,9 +566,9 @@ class Cortex extends Cursor {
         $rel = $this->getRelInstance($fieldConf[0]);
         $hasSet = $rel->find($filter, $options, $ttl);
         if (!$hasSet)
-            return null;
+            return false;
         $hasSetByRelId = array_unique($hasSet->getAll($fieldConf[1], true));
-        return empty($hasSetByRelId) ? null : $hasSetByRelId;
+        return empty($hasSetByRelId) ? false : $hasSetByRelId;
     }
 
     /**
@@ -582,14 +577,14 @@ class Cortex extends Cursor {
      * @param array $filter
      * @param array $options
      * @param int $ttl
-     * @return array|null
+     * @return array|false
      */
     protected function _hasRefsInMM($key, $filter, $options, $ttl=0)
     {
         $fieldConf = $this->fieldConf[$key]['has-many'];
         $rel = $this->getRelInstance($fieldConf[0]);
         $hasSet = $rel->find($filter,$options,$ttl);
-        $result = null;
+        $result = false;
         if ($hasSet) {
             $hasIDs = $hasSet->getAll('_id',true);
             if (!array_key_exists('refTable', $fieldConf)) {
@@ -647,6 +642,10 @@ class Cortex extends Cursor {
         else
             $options['group'] = '';
         $options['group'] .= $this->db->quotekey($this->getTable().'.id');
+        if ($hasCond[1] && isset($hasCond[1]['group'])) {
+            $hasGroup = preg_replace('/(\w+)/i', $dTable.'.$1', $hasCond[1]['group']);
+            $options['group'] .= ','.$hasGroup;
+        }
         return $hasJoin;
     }
 
