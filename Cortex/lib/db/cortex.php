@@ -633,10 +633,11 @@ class Cortex extends Cursor {
             if (!empty($filter[0]))
                 $filter[0] .= ' and ';
             $whereClause = '('.array_shift($hasCond[0]).')';
-            $whereClause = preg_replace_callback('/\w+/i',function($match) use($dTable) {
+            $db = $this->db;
+            $whereClause = preg_replace_callback('/\w+/i',function($match) use($dTable,$db) {
                 if (preg_match('/\b(AND|OR|IN|LIKE|NOT)\b/i',$match[0]))
                     return $match[0];
-                return $dTable.'.'.$this->db->quotekey($match[0]);
+                return $dTable.'.'.$db->quotekey($match[0]);
             }, $whereClause);
             $filter[0] .= $whereClause;
             $filter = array_merge($filter, $hasCond[0]);
