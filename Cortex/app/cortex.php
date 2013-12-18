@@ -12,6 +12,8 @@ class Cortex extends Controller
 
         $dbs = array(
             'sql' => new \DB\SQL('mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''),
+//            'sql-sqlite' => new \DB\SQL('sqlite:data/sqlite.db'),
+//            'sql-pgsql' => new \DB\SQL('pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'),
             'jig' => new \DB\Jig('data/'),
             'mongo' => new \DB\Mongo('mongodb://localhost:27017', 'testdb')
         );

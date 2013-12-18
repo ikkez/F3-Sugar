@@ -129,6 +129,44 @@ class Test_Filter {
             $type.': has filter on many-to-many field, inverse'
         );
 
+        // add another tag
+        $news->load(array('title = ?', 'Touchable Interfaces'));
+        $news->tags2 = array($tagIDs[1]);
+        $news->save();
+        $news->reset();
+
+        $tag->has('news',array('text LIKE ? and title LIKE ?', '%Lorem%', '%Interface%'));
+        $result = $tag->find();
+        $test->expect(
+            count($result) == 1 &&
+            $result[0]['title'] == 'Responsive',
+            $type.': has filter with multiple conditions'
+        );
+
+        $news->has('tags2', array('title = ? OR title = ?', 'Usability', 'Web Design'));
+        $result = $news->afind(array('text = ?', 'Lorem Ipsun'));
+        $test->expect(
+            count($result) == 1 &&
+            $result[0]['title'] == 'Responsive Images',
+            $type.': find with condition and has filter'
+        );
+
+        $news->load(array('title = ?', 'Responsive Images'));
+        $news->author = $authorIDs[1];
+        $news->save();
+        $news->reset();
+
+
+        $news->has('tags2', array('title = ? OR title = ?', 'Usability', 'Web Design'));
+        $news->has('author', array('name = ?', 'Ridley Scott'));
+        $result = $news->afind();
+        $test->expect(
+            count($result) == 1 &&
+            $result[0]['title'] == 'Responsive Images',
+            $type.': find with multiple has filters on different relations'
+        );
+
+
         ///////////////////////////////////
         return $test->results();
     }

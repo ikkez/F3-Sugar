@@ -60,7 +60,6 @@ class Test_Relation {
 
         $allauthors = $author->find()->castAll();
         $allauthors = $this->getResult($allauthors);
-
         $test->expect(
             json_encode($allauthors) ==
             '[{"name":"Johnny English"},{"name":"Ridley Scott"},{"name":"James T. Kirk"}]',
@@ -108,6 +107,7 @@ class Test_Relation {
         $news_id[] = $news->_id;
         $news->reset();
         $news->title = 'Touchable Interfaces';
+        $news->text = 'Lorem Foo';
         $news->save();
         $news_id[] = $news->_id;
         $news->reset();
@@ -115,7 +115,7 @@ class Test_Relation {
         $allnews = $this->getResult($news->find());
         $test->expect(
             json_encode($allnews) ==
-            '[{"title":"Responsive Images","text":"Lorem Ipsun"},{"title":"CSS3 Showcase","text":"News Text 2"},{"title":"Touchable Interfaces"}]',
+            '[{"title":"Responsive Images","text":"Lorem Ipsun"},{"title":"CSS3 Showcase","text":"News Text 2"},{"title":"Touchable Interfaces","text":"Lorem Foo"}]',
             $type.': all NewsModel items created'
         );
 
