@@ -438,18 +438,74 @@ class Cortex extends Cursor {
     public function find($filter = NULL, array $options = NULL, $ttl = 0)
     {
         if ($this->hasCond) {
-            if(!$filter)
-                $filter = array('');
+            $hasJoin = array();
             foreach($this->hasCond as $key => $has) {
-                if (!$has)
-                    // no IDs found to match with
-                    return false;
-                if (!empty($filter[0]))
-                    $filter[0] .= ' and ';
-                $filter[0] .= array_shift($has);
-                $filter = array_merge($filter, $has);
+                $addToFilter = null;
+                list($has_filter,$has_options) = $has;
+                $type = $this->fieldConf[$key]['relType'];
+                $fromConf = $this->fieldConf[$key][$type];
+                switch($type) {
+                    case 'has-one':
+                    case 'has-many':
+                        if (!is_array($fromConf))
+                            trigger_error(sprintf(self::E_REL_CONF_INC, $key));
+                        if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
+                            if ($this->dbsType == 'sql')
+                                $hasJoin += $this->_hasRefsInMM_sql($key,$has, $filter,$options);
+                            else {
+                                $result = $this->_hasRefsInMM($key,$has_filter,$has_options,$ttl);
+                                if ($result)
+                                    $addToFilter = array('_id IN ?', $result);
+                            }
+                        } else {
+                            $result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl);
+                            if($result)
+                                $addToFilter = array('_id IN ?', $result);
+                        }
+                    break;
+                    case 'belongs-to-one':
+                        $result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl);
+                        if($result)
+                            $addToFilter = array($key.' IN ?', $result);
+                        break;
+                    default:
+                        trigger_error(self::E_HAS_COND);
+                }
+                if(isset($addToFilter)) {
+                    if (!$filter)
+                        $filter = array('');
+                    if (!empty($filter[0]))
+                        $filter[0] .= ' and ';
+                    $filter[0] .= '('.array_shift($addToFilter).')';
+                    $filter = array_merge($filter, $addToFilter);
+                }
             }
             $this->hasCond = null;
+            if (!empty($hasJoin)) {
+                // assemble full query
+                $filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
+                $qtable = $this->db->quotekey($this->table);
+                $sql = 'SELECT '.$qtable.'.* FROM '.$qtable;
+                foreach ($hasJoin as $q)
+                    $sql .= ' '.$q;
+                $sql .= ' WHERE '.$filter[0];
+                if (isset($options['group']))
+                    $sql .= ' GROUP BY '.$options['group'];
+                unset($filter[0]);
+                $result = $this->db->exec($sql, $filter, $ttl);
+                $cc = new \DB\CortexCollection();
+                // wrap results into new mappers
+                foreach ($result as $record) {
+                    $mapper = clone($this->mapper);
+                    $mapper->reset();
+                    $cx = $this->factory($mapper);
+                    $cx->copyfrom($record);
+                    $cc->add($cx);
+                    unset($cx);
+                }
+                $this->clearRelFilter();
+                return $cc;
+            }
         }
         $filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
@@ -493,61 +549,104 @@ class Cortex extends Cursor {
             trigger_error(sprintf(self::E_UNKNOWN_FIELD,$key,get_called_class()));
         if (!isset($this->fieldConf[$key]['relType']))
             trigger_error(self::E_HAS_COND);
-        $type = $this->fieldConf[$key]['relType'];
-        $fromConf = $this->fieldConf[$key][$type];
-        switch($type) {
-            case 'has-one':
-            case 'has-many':
-                if (!is_array($fromConf))
-                    trigger_error(sprintf(self::E_REL_CONF_INC, $key));
-                $rel = $this->getRelInstance($fromConf[0]);
-                // many-to-many
-                if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
-                    /** @var CortexCollection $hasSet */
-                    $hasSet = $this->xref($rel,$filter,$options);
-                    $this->hasCond[$key] = null;
-                    if ($hasSet) {
-                        $hasIDs = $hasSet->getAll('_id',true);
-                        if (!array_key_exists('refTable', $fromConf)) {
-                            // compute mm table name
-                            $mmTable = static::getMMTableName($fromConf['relTable'],
-                                $fromConf['relField'], $this->getTable(), $key);
-                            $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
-                        } else
-                            $mmTable = $fromConf['refTable'];
-                        $pivot = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
-                        $pivotSet = $pivot->find(array($key.' IN ?',$hasIDs));
-                        if ($pivotSet) {
-                            $pivotIDs = array_unique($pivotSet->getAll($fromConf['relField'],true));
-                            $this->hasCond[$key] = array('_id IN ?',$pivotIDs);
-                        }
-                    }
-                } else {
-                    // many-to-one
-                    /** @var CortexCollection $hasSet */
-                    $hasSet = $this->xref($rel,$filter,$options);
-                    if (!$hasSet)
-                        $this->hasCond[$key] = null;
-                    else {
-                        $hasSetByRelId = array_unique($hasSet->getAll($fromConf[1], true));
-                        $this->hasCond[$key] = empty($hasSetByRelId) ? null :
-                            array('_id IN ?', $hasSetByRelId);
-                    }
-                }
-                break;
-            case 'belongs-to-one':
-                // one-to-many
-                if (!is_array($fromConf))
-                    $fromConf = array($fromConf,'_id');
-                $rel = $this->getRelInstance($fromConf[0]);
-                $hasSet = $this->xref($rel,$filter,$options);
-                $this->hasCond[$key] = !$hasSet ? null :
-                    array($key.' IN ?',array_unique($hasSet->getAll($fromConf[1],true)));
-                break;
-            default:
-                trigger_error(self::E_HAS_COND);
-        }
+        $this->hasCond[$key] = array($filter,$options);
         return $this;
+    }
+
+    /**
+     * return IDs of records that has a linkage to this mapper
+     * @param string $key     relation field
+     * @param array  $filter  condition for foreign records
+     * @param array  $options filter options for foreign records
+     * @param int    $ttl
+     * @return array|null
+     */
+    protected function _hasRefsIn($key, $filter, $options, $ttl = 0)
+    {
+        $type = $this->fieldConf[$key]['relType'];
+        $fieldConf = $this->fieldConf[$key][$type];
+        if (!is_array($fieldConf))
+            // one-to-many shortcut
+            $fieldConf = array($fieldConf, '_id');
+        $rel = $this->getRelInstance($fieldConf[0]);
+        $hasSet = $rel->find($filter, $options, $ttl);
+        if (!$hasSet)
+            return null;
+        $hasSetByRelId = array_unique($hasSet->getAll($fieldConf[1], true));
+        return empty($hasSetByRelId) ? null : $hasSetByRelId;
+    }
+
+    /**
+     * return IDs of own mappers that match the given relation filter on pivot tables
+     * @param string $key
+     * @param array $filter
+     * @param array $options
+     * @param int $ttl
+     * @return array|null
+     */
+    protected function _hasRefsInMM($key, $filter, $options, $ttl=0)
+    {
+        $fieldConf = $this->fieldConf[$key]['has-many'];
+        $rel = $this->getRelInstance($fieldConf[0]);
+        $hasSet = $rel->find($filter,$options,$ttl);
+        $result = null;
+        if ($hasSet) {
+            $hasIDs = $hasSet->getAll('_id',true);
+            if (!array_key_exists('refTable', $fieldConf)) {
+                $mmTable = static::getMMTableName($fieldConf['relTable'],
+                    $fieldConf['relField'], $this->getTable(), $key);
+                $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
+            } else
+                $mmTable = $fieldConf['refTable'];
+            $pivot = $this->getRelInstance(null,array('db'=>$this->db,'table'=>$mmTable));
+            $pivotSet = $pivot->find(array($key.' IN ?',$hasIDs),null,$ttl);
+            if ($pivotSet)
+                $result = array_unique($pivotSet->getAll($fieldConf['relField'],true));
+        }
+        return $result;
+    }
+
+    /**
+     * returns SQL specific query parts for pivot table join
+     */
+    protected function _hasRefsInMM_sql($key, $hasCond, &$filter, &$options)
+    {
+        $fieldConf = $this->fieldConf[$key]['has-many'];
+        $hasJoin = array();
+        $qtable = $this->db->quotekey($this->table);
+        if (!array_key_exists('refTable', $fieldConf)) {
+            // compute mm table name
+            $mmTable = static::getMMTableName($fieldConf['relTable'],
+                $fieldConf['relField'], $this->getTable(), $key);
+            $this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
+        } else
+            $mmTable = $fieldConf['refTable'];
+        $ltable = $this->db->quotekey($mmTable);
+        $rField = $this->db->quotekey($fieldConf['relField']);
+        $hasJoin[] = 'LEFT JOIN '.$ltable.' ON '.$qtable.'.id = '.$ltable.'.'.$rField;
+        $dTable = $this->db->quotekey($fieldConf['relTable']);
+        $rField = $this->db->quotekey($key);
+        $hasJoin[] = 'LEFT JOIN '.$dTable.' ON '.$ltable.'.'.$rField.' = '.$dTable.'.id';
+        if (!empty($hasCond[0])) {
+            if (!$filter)
+                $filter = array('');
+            if (!empty($filter[0]))
+                $filter[0] .= ' and ';
+            $whereClause = '('.array_shift($hasCond[0]).')';
+            $whereClause = preg_replace_callback('/\w+/i',function($match) use($dTable) {
+                if (preg_match('/\b(AND|OR|IN|LIKE|NOT)\b/i',$match[0]))
+                    return $match[0];
+                return $dTable.'.'.$this->db->quotekey($match[0]);
+            }, $whereClause);
+            $filter[0] .= $whereClause;
+            $filter = array_merge($filter, $hasCond[0]);
+        }
+        if (isset($options['group']))
+            $options['group'] .= ',';
+        else
+            $options['group'] = '';
+        $options['group'] .= $this->db->quotekey($this->getTable().'.id');
+        return $hasJoin;
     }
 
     /**
@@ -1166,9 +1265,14 @@ class Cortex extends Cursor {
         return $this->mapper->dry();
     }
 
+    /**
+     * hydrate the mapper from hive key or given array
+     * @param string|array $key
+     * @param bool $fieldConfOnly
+     */
     public function copyfrom($key,$fieldConfOnly=false)
     {
-        $fields = \Base::instance()->get($key);
+        $fields = is_array($key) ? $key : \Base::instance()->get($key);
         if ($fieldConfOnly)
             $fields = array_intersect_key($fields,$this->fieldConf);
         foreach($fields as $key=>$val)
