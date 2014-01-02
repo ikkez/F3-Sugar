@@ -44,7 +44,8 @@ class Cortex extends Cursor {
 		$saveCsd,       // mm rel save cascade
 		$collectionID,  // collection set identifier
 		$relFilter,     // filter for loading related models
-		$hasCond;       // IDs of records the next find should have
+		$hasCond,       // IDs of records the next find should have
+		$mFuncs;        // magic functions cache
 
 	/** @var Cursor */
 	protected $mapper;
@@ -126,6 +127,7 @@ class Cortex extends Cursor {
 			default:
 				trigger_error(sprintf(self::E_UNKNOWN_DB_ENGINE,$this->dbsType));
 		}
+		$this->mFuncs = array();
 		$this->queryParser = CortexQueryParser::instance();
 		$this->reset();
 		$this->clearFilter();
@@ -853,8 +855,7 @@ class Cortex extends Cursor {
 				$relConf = $fields[$key]['has-many'];
 				if ($relConf['hasRel'] == 'has-many') {
 					// custom setter
-					if (method_exists($this, 'set_'.$key))
-						$val = $this->{'set_'.$key}($val);
+					$val = $this->emit('set', $key, $val);
 					$val = $this->getForeignKeysArray($val,'_id',$key);
 					$this->saveCsd[$key] = $val; // array of keys
 					return $val;
@@ -909,9 +910,22 @@ class Cortex extends Cursor {
 			}
 		}
 		// custom setter
-		if (method_exists($this, 'set_'.$key))
-			$val = $this->{'set_'.$key}($val);
-		return $this->mapper->{$key} = $val;
+		$val = $this->emit('set', $key, $val);
+		return $this->mapper->set($key, $val);
+	}
+
+	protected function emit($type, $key, $val)
+	{
+		if ($type == 'set' || $type == 'get') {
+			$event = $type.'_'.$key;
+			if (in_array($event, $this->mFuncs))
+				$val = call_user_func(array($this,$event),$val);
+			elseif (method_exists($this,$event)) {
+				$this->mFuncs[] = $event;
+				$val = call_user_func(array($this,$event),$val);
+			}
+		}
+		return $val;
 	}
 
 	/**
@@ -1127,7 +1141,7 @@ class Cortex extends Cursor {
 			$val = (string) $val;
 		}
 		// custom getter
-		return (method_exists($this, 'get_'.$key)) ? $this->{'get_'.$key}($val) : $val;
+		return $this->emit('get', $key, $val);
 	}
 
 	/**
@@ -1264,8 +1278,7 @@ class Cortex extends Cursor {
 		}
 		// custom getter
 		foreach ($fields as $key => &$val) {
-			if (method_exists($this, 'get_'.$key))
-				$val = $this->{'get_'.$key}($val);
+			$val = $this->emit('get', $key, $val);
 			unset($val);
 		}
 		return $fields;
