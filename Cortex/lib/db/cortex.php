@@ -128,7 +128,7 @@ class Cortex extends Cursor {
 		}
 		$this->queryParser = CortexQueryParser::instance();
 		$this->reset();
-		$this->clearRelFilter();
+		$this->clearFilter();
 		$f3 = \Base::instance();
 		$this->smartLoading = $f3->exists('CORTEX.smartLoading') ?
 			$f3->get('CORTEX.smartLoading') : TRUE;
@@ -509,7 +509,7 @@ class Cortex extends Cursor {
 					$cc->add($cx);
 					unset($cx);
 				}
-				$this->clearRelFilter();
+				$this->clearFilter();
 				return $cc;
 			}
 		}
@@ -524,7 +524,7 @@ class Cortex extends Cursor {
 		}
 		$cc = new \DB\CortexCollection();
 		$cc->setModels($result);
-		$this->clearRelFilter();
+		$this->clearFilter();
 		return $cc;
 	}
 
@@ -697,7 +697,7 @@ class Cortex extends Cursor {
 	 * @param array $filter
 	 * @return $this
 	 */
-	public function addRelFilter($key,$filter)
+	public function filter($key,$filter)
 	{
 		$this->relFilter[$key] = $filter;
 		return $this;
@@ -707,7 +707,7 @@ class Cortex extends Cursor {
 	 * removes one or all relation filter
 	 * @param null|string $key
 	 */
-	public function clearRelFilter($key = null)
+	public function clearFilter($key = null)
 	{
 		if (!$key)
 			$this->relFilter = array();

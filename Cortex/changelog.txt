@@ -2,6 +2,7 @@ CHANGELOG - Cortex ORM
 
 1.1.0
 *	Feature: has-filter
+*	addRelFilter renamed to filter
 *	enhanced copyfrom
 *	compatibility fixes for F3 v3.2.1
 *	move castAll into CortexCollection
