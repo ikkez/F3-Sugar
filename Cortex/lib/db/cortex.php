@@ -1275,15 +1275,23 @@ class Cortex extends Cursor {
 	/**
 	 * hydrate the mapper from hive key or given array
 	 * @param string|array $key
-	 * @param bool $fieldConfOnly
+	 * @param callback|array|string $fields
+	 * @internal param bool $fieldConfOnly
 	 */
-	public function copyfrom($key,$fieldConfOnly=false)
+	public function copyfrom($key, $fields = null)
 	{
-		$fields = is_array($key) ? $key : \Base::instance()->get($key);
-		if ($fieldConfOnly)
-			$fields = array_intersect_key($fields,$this->fieldConf);
-		foreach($fields as $key=>$val)
-			$this->set($key,$val);
+		$f3 = \Base::instance();
+		$srcfields = is_array($key) ? $key : $f3->get($key);
+		if ($fields)
+			if (is_callable($fields))
+				$srcfields = $fields($srcfields);
+			else {
+				if (is_string($fields))
+					$fields = $f3->split($fields);
+				$srcfields = array_intersect_key($srcfields, array_flip($fields));
+			}
+		foreach ($srcfields as $key => $val)
+			$this->set($key, $val);
 	}
 
 	public function copyto($key) {
