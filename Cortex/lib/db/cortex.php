@@ -456,16 +456,21 @@ class Cortex extends Cursor {
 						if (!is_array($fromConf))
 							trigger_error(sprintf(self::E_REL_CONF_INC, $key));
 						if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
-							if ($this->dbsType == 'sql' && !isset($has_options['limit']))
-								$hasJoin += $this->_hasRefsInMM_sql($key,$hasCond, $filter,$options);
+							if ($this->dbsType == 'sql'
+								&& !isset($has_options['limit']) && !isset($has_options['offset']))
+								$hasJoin = array_merge($hasJoin, $this->_hasJoinMM_sql($key,$hasCond,$filter,$options));
 							elseif ($result = $this->_hasRefsInMM($key,$has_filter,$has_options,$ttl))
 								$addToFilter = array('_id IN ?', $result);
 						} elseif ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
 							$addToFilter = array('_id IN ?', $result);
 						break;
 					case 'belongs-to-one':
-						if ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
-							$addToFilter = array($key.' IN ?', $result);
+						if ($this->dbsType == 'sql'
+							&& !isset($has_options['limit']) && !isset($has_options['offset'])) {
+							$rel = $fromConf::resolveConfiguration();
+							$hasJoin[] = $this->_hasJoin_sql($key,$rel['table'],$hasCond,$filter,$options);
+						} elseif ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
+								$addToFilter = array($key.' IN ?', $result);
 						break;
 					default:
 						trigger_error(self::E_HAS_COND);
@@ -609,13 +614,12 @@ class Cortex extends Cursor {
 	}
 
 	/**
-	 * returns SQL specific query parts for pivot table join
+	 * build query for SQL pivot table join and merge conditions
 	 */
-	protected function _hasRefsInMM_sql($key, $hasCond, &$filter, &$options)
+	protected function _hasJoinMM_sql($key, $hasCond, &$filter, &$options)
 	{
 		$fieldConf = $this->fieldConf[$key]['has-many'];
 		$hasJoin = array();
-		$qtable = $this->db->quotekey($this->table);
 		if (!array_key_exists('refTable', $fieldConf)) {
 			// compute mm table name
 			$mmTable = static::getMMTableName($fieldConf['relTable'],
@@ -623,37 +627,68 @@ class Cortex extends Cursor {
 			$this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
 		} else
 			$mmTable = $fieldConf['refTable'];
-		$ltable = $this->db->quotekey($mmTable);
-		$rField = $this->db->quotekey($fieldConf['relField']);
-		$hasJoin[] = 'LEFT JOIN '.$ltable.' ON '.$qtable.'.id = '.$ltable.'.'.$rField;
-		$dTable = $this->db->quotekey($fieldConf['relTable']);
-		$rField = $this->db->quotekey($key);
-		$hasJoin[] = 'LEFT JOIN '.$dTable.' ON '.$ltable.'.'.$rField.' = '.$dTable.'.id';
-		if (!empty($hasCond[0])) {
+		$hasJoin[] = $this->_sql_left_join('id',$this->table,$fieldConf['relField'],$mmTable);
+		$hasJoin[] = $this->_sql_left_join($key,$mmTable,'id',$fieldConf['relTable']);
+		$this->mergeRelCondition($hasCond,$fieldConf['relTable'],$filter,$options);
+		return $hasJoin;
+	}
+
+	/**
+	 * build query for single SQL table join and merge conditions
+	 */
+	protected function _hasJoin_sql($key, $table, $cond, &$filter, &$options)
+	{
+		$query = $this->_sql_left_join($key,$this->table,'id',$table);
+		$this->mergeRelCondition($cond,$table,$filter,$options);
+		return $query;
+	}
+
+	/**
+	 * assemble SQL join query string
+	 */
+	protected function _sql_left_join($skey,$sTable,$fkey,$fTable)
+	{
+		$skey = $this->db->quotekey($skey);
+		$sTable = $this->db->quotekey($sTable);
+		$fkey = $this->db->quotekey($fkey);
+		$fTable = $this->db->quotekey($fTable);
+		return 'LEFT JOIN '.$fTable.' ON '.$sTable.'.'.$skey.' = '.$fTable.'.'.$fkey;
+	}
+
+	/**
+	 * merge condition of relation with current condition
+	 * @param $cond		condition of related model
+	 * @param $table	table of related model
+	 * @param $filter	current filter to merge with
+	 * @param $options	current options to merge with
+	 */
+	protected function mergeRelCondition($cond, $table, &$filter, &$options)
+	{
+		$table = $this->db->quotekey($table);
+		if (!empty($cond[0])) {
 			if (!$filter)
 				$filter = array('');
 			if (!empty($filter[0]))
 				$filter[0] .= ' and ';
-			$whereClause = '('.array_shift($hasCond[0]).')';
+			$whereClause = '('.array_shift($cond[0]).')';
 			$db = $this->db;
-			$whereClause = preg_replace_callback('/\w+/i',function($match) use($dTable,$db) {
+			$whereClause = preg_replace_callback('/\w+/i',function($match) use($table,$db) {
 				if (preg_match('/\b(AND|OR|IN|LIKE|NOT)\b/i',$match[0]))
 					return $match[0];
-				return $dTable.'.'.$db->quotekey($match[0]);
+				return $table.'.'.$db->quotekey($match[0]);
 			}, $whereClause);
 			$filter[0] .= $whereClause;
-			$filter = array_merge($filter, $hasCond[0]);
+			$filter = array_merge($filter, $cond[0]);
 		}
 		if (isset($options['group']))
 			$options['group'] .= ',';
 		else
 			$options['group'] = '';
 		$options['group'] .= $this->db->quotekey($this->getTable().'.id');
-		if ($hasCond[1] && isset($hasCond[1]['group'])) {
-			$hasGroup = preg_replace('/(\w+)/i', $dTable.'.$1', $hasCond[1]['group']);
+		if ($cond[1] && isset($cond[1]['group'])) {
+			$hasGroup = preg_replace('/(\w+)/i', $table.'.$1', $cond[1]['group']);
 			$options['group'] .= ','.$hasGroup;
 		}
-		return $hasJoin;
 	}
 
 	/**
