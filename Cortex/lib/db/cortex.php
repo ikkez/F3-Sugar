@@ -94,7 +94,9 @@ class Cortex extends Cursor {
             $this->dbsType = 'sql';
         elseif ($this->db instanceof Mongo)
             $this->dbsType = 'mongo';
-        if (strlen($this->table=strtolower($table?:$this->table))==0&&!$this->fluid)
+        if ($table)
+            $this->table = $table;
+        if (!$this->table && !$this->fluid)
             trigger_error(self::E_NO_TABLE);
         if (static::$init == TRUE) return;
         if ($this->fluid)
@@ -211,7 +213,7 @@ class Cortex extends Cursor {
             $df = $self::resolveConfiguration();
         if (!is_object($db=(is_string($db=($db?:$df['db']))?\Base::instance()->get($db):$db)))
             trigger_error(self::E_CONNECTION);
-        if (strlen($table=strtolower($table?:$df['table']))==0)
+        if (strlen($table=$table?:$df['table'])==0)
             trigger_error(self::E_NO_TABLE);
         if (is_null($fields))
             if (!empty($df['fieldConf']))
