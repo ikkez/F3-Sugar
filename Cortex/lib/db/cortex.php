@@ -34,6 +34,7 @@ class Cortex extends Cursor {
         $table,         // selected table, string
         $fluid,         // fluid sql schema mode, boolean
         $fieldConf,     // field configuration, array
+        $ttl,           // default mapper ttl
         // behaviour
         $smartLoading,  // intelligent lazy eager loading, boolean
         $standardiseID, // return standardized '_id' field for SQL when casting
@@ -79,16 +80,17 @@ class Cortex extends Cursor {
     /**
      * init the ORM, based on given DBS
      * @param null|object $db
-     * @param string $table
-     * @param null|bool $fluid
+     * @param string      $table
+     * @param null|bool   $fluid
+     * @param int         $ttl
      */
-    public function __construct($db = NULL, $table = NULL, $fluid = NULL)
+    public function __construct($db = NULL, $table = NULL, $fluid = NULL, $ttl = 0)
     {
         if (!is_null($fluid))
             $this->fluid = $fluid;
         if (!is_object($this->db=(is_string($db=($db?:$this->db))?\Base::instance()->get($db):$db)))
             trigger_error(self::E_CONNECTION);
-        if($this->db instanceof Jig)
+        if ($this->db instanceof Jig)
             $this->dbsType = 'jig';
         elseif ($this->db instanceof SQL)
             $this->dbsType = 'sql';
@@ -98,6 +100,7 @@ class Cortex extends Cursor {
             $this->table = $table;
         if (!$this->table && !$this->fluid)
             trigger_error(self::E_NO_TABLE);
+        $this->ttl = $ttl ?: 60;
         if (static::$init == TRUE) return;
         if ($this->fluid)
             static::setup($this->db,$this->getTable(),($fluid?array():null));
@@ -114,7 +117,7 @@ class Cortex extends Cursor {
                 $this->mapper = new Jig\Mapper($this->db, $this->table);
                 break;
             case 'sql':
-                $this->mapper = new SQL\Mapper($this->db, $this->table, null,($this->fluid)?0:60);
+                $this->mapper = new SQL\Mapper($this->db, $this->table, null,($this->fluid)?0:$this->ttl);
                 break;
             case 'mongo':
                 $this->mapper = new Mongo\Mapper($this->db, $this->table);
@@ -523,14 +526,15 @@ class Cortex extends Cursor {
      * Retrieve first object that satisfies criteria
      * @param null  $filter
      * @param array $options
+     * @param int   $ttl
      * @return Cortex
      */
-    public function load($filter = NULL, array $options = NULL)
+    public function load($filter = NULL, array $options = NULL, $ttl = 0)
     {
         $this->reset();
         $filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
         $options = $this->queryParser->prepareOptions($options, $this->dbsType);
-        $this->mapper->load($filter, $options);
+        $this->mapper->load($filter, $options, $ttl);
         return $this;
     }
 
