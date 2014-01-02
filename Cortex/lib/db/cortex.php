@@ -1290,8 +1290,15 @@ class Cortex extends Cursor {
 					$fields = $f3->split($fields);
 				$srcfields = array_intersect_key($srcfields, array_flip($fields));
 			}
-		foreach ($srcfields as $key => $val)
+		foreach ($srcfields as $key => $val) {
+			if (isset($this->fieldConf[$key])) {
+				if ($this->fieldConf[$key]['type'] == self::DT_JSON && is_string($val))
+					$val = json_decode($val);
+				elseif ($this->fieldConf[$key]['type'] == self::DT_SERIALIZED && is_string($val))
+					$val = unserialize($val);
+			}
 			$this->set($key, $val);
+		}
 	}
 
 	public function copyto($key) {
