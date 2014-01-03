@@ -13,7 +13,7 @@
                 |  |    < |    <|  -__|-- __|
                 |__|__|__||__|__|_____|_____|
 
-    Copyright (c) 2013 by ikkez
+    Copyright (c) 2014 by ikkez
     Christian Knuth <ikkez0n3@gmail.com>
     https://github.com/ikkez/F3-Sugar/
 
@@ -104,7 +104,7 @@ class Cortex extends Cursor {
 		$this->ttl = $ttl ?: 60;
 		if (static::$init == TRUE) return;
 		if ($this->fluid)
-			static::setup($this->db,$this->getTable(),($fluid?array():null));
+			static::setup($this->db,$this->getTable(),array());
 		$this->initMapper();
 	}
 
@@ -894,7 +894,7 @@ class Cortex extends Cursor {
 				elseif (is_bool($val)) $type = $schema::DT_BOOLEAN;
 				elseif (date('Y-m-d H:i:s', strtotime($val)) == $val) $type = $schema::DT_DATETIME;
 				elseif (date('Y-m-d', strtotime($val)) == $val) $type = $schema::DT_DATE;
-				elseif (strlen($val)<256) $type = $schema::DT_VARCHAR256;
+				elseif (\UTF::instance()->strlen($val)<=255) $type = $schema::DT_VARCHAR256;
 				else $type = $schema::DT_TEXT;
 				$table->addColumn($key)->type($type);
 				$table->build();
