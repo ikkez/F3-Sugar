@@ -12,7 +12,7 @@ Cortex is a multi-engine ActiveRecord ORM / ODM that offers easy object persiste
   - Support for model objects
   - Relationships: link multiple models together to one-to-one, one-to-many and many-to-many associations
   - smart-loading of related models (intelligent lazy and eager-loading without configuration)
-  - setup model configurations to auto create DB tables frominstance installer or migrate scripts
+  - setup model configurations to auto create DB tables, for instance from installer or migrate scripts
   - custom setter and getter preprocessors for all fields
   - default values and nullable fields for NoSQL
 
