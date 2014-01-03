@@ -1,7 +1,7 @@
 # SQL Schema Builder
 ### An extension for creating and managing SQL database tables.
 
-This Plugin provides a SQL table schema builder for the **PHP Fat-Free Framework**. It might be useful for installation scripts, dynamic applications or CMS enviroments.
+This Plugin provides a SQL table schema builder for the **PHP Fat-Free Framework**. It might be useful for installation scripts, dynamic applications or CMS environments.
 
 Currently MySQL, SQLite & PostgreSQL are supported and fully tested. Further support for SQL Server, MSSQL/Sybase, Access and DB2 are already included, but experimental. Handle with care and test your application. No warranty at all.
 
@@ -10,7 +10,7 @@ This Plugin is made for F3 version 3.x
 ***
 ## Installation
 
-Just copy schema.php into F3's `lib/db/sql` Folder. Done.
+Just copy schema.php into F3's `lib/db/sql` folder. Done.
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ $table->addColumn('description')->type($schema::DT_TEXT);
 $table->build();
 ```
 
-The `createTable()` method returns a new table object (*instance of TableCreator*) for creation purpose. You may add new columns, indexes and change the primary key with it. New tables will always contain an auto-incremented, primary-key field named `id`, which is required for further SQL\Mapper usage. All actions on a table object that affects its schema, are collected first and needs an additional `build()` command to be executed to really take effect on the database. If you're unsure of the result, you can run a simulation of that build method and have a look at the generated queries, the Schema Builder would have executed, with the following call:
+The `createTable()` method returns a new table object (*instance of TableCreator*) for creation purpose. You may add new columns, indexes and change the primary key with it. New tables will always contain an auto-incremented, primary-key field named `id`, which is required for further SQL\Mapper usage. All actions on a table object that affects its schema, are collected first and needs an additional `build()` command to be executed to really take effect on the database. If you're unsure of the result, you can run a simulation of that build method and have a look at the generated queries the Schema Builder would have executed, with the following call:
 ``` php
 $generated_queries = $table->build(false);
 print_r($generated_queries);
@@ -57,11 +57,11 @@ Here is a list of possible configuration methods:
   
 * **->defaults( $value )**
 
-  Adds a default value for records. 
+  Add a default value for records. 
 
 * **->after( $name )**
 
-  Trys to place the new column behind an existing one.
+  Try to place the new column behind an existing one.
   
 * **->index([ bool $unique = false ])**
 
@@ -80,7 +80,7 @@ $table->renameColumn('title','name');
 $table->build();
 ```
 
-As you can see, `$schema->alterTable()` returns a new table object (*instance of TableModifier*) for altering purpose, which provides all methods of the TableCreator plus some more actions like removing or renaming columns. Here is a list of method you can use:
+As you can see, `$schema->alterTable()` returns a new table object (*instance of TableModifier*) for altering purpose, which provides all methods of the TableCreator plus some more actions like removing or renaming columns. Here is a list of methods you can use:
 
 -   **renameColumn( string $name, string $new_name );**
 -   **updateColumn( string $name, string $datatype );**
@@ -91,7 +91,7 @@ As you can see, `$schema->alterTable()` returns a new table object (*instance of
 -   **getCols([ bool $types = false ]);**
 
 
-The SchemaBuilder will quote all your table and column identifiers and should be resistent against preserved word errors.
+The SchemaBuilder will quote all your table and column identifiers and should be resistant against preserved word errors.
 
 ---
 
@@ -141,7 +141,7 @@ The Schema class prodives you the following simple methods for:
 
 ### TableCreator Class
 
-This class is ment for creating new tables. It can be created by using `$schema->createTable($name)`.
+This class is meant for creating new tables. It can be created by using `$schema->createTable($name)`.
 
 -   **$table->addColumn($key,$args = null); Column**
 
@@ -214,11 +214,11 @@ This class is ment for creating new tables. It can be created by using `$schema-
 
 -   **$table->dropColumn( string $name );**
 
-    Trys to removes a column from the table, if it exists.
+    Tries to removes a column from the table, if it exists.
 
 -   **$table->addIndex( string | array $columns, [ bool $unique = false ]);**
 
-    Creates a index or unique index for one or multiple columns on the table.
+    Creates an index or unique index for one or multiple columns on the table.
 
 -   **$table->dropIndex( string | array $columns );**
 
@@ -230,7 +230,7 @@ This class is ment for creating new tables. It can be created by using `$schema-
 
 -   **$table->primary( string | array $pkeys);**
 
-    Creates a new primary or compositve key on the table.
+    Creates a new primary or composite key on the table.
 
 -   **$table->getCols([ bool $types = false ]);**
 
@@ -418,7 +418,7 @@ The method `$table->addColumn($columnName);` adds a further column field to the 
 
 * **->after( string $name )**
 
-  Trys to place the new column behind an existing one. (*only works for SQLite and MySQL*)
+  Tries to place the new column behind an existing one. (*only works for SQLite and MySQL*)
 
 * **->index([ bool $unique = false ])**
 

@@ -4,7 +4,7 @@
 This
 F3-Plugin aims to give you an easy mapper for files, that allows you to attach some meta information to them. It comes with some filesystem adapters, to provide you a unified access to your files, which takes apart the need of changing code, when you'll change the files location / filesystem.
 
-This way you don't have to worry about where and how the files will be stored. You can easiely load, save and move files between the given filesystems. Currently availabe adapters are: **Local Filesystem**, **FTP** and **DropBox** (expect more to come).
+This way you don't have to worry about where and how the files will be stored. You can easily load, save and move files between the given filesystems. Currently available adapters are: **Local Filesystem**, **FTP** and **DropBox** (expect more to come).
 
 `This Plugin requires F3 version 3.0.5 or higher.`
 
@@ -48,7 +48,7 @@ $dropbox = new \FAL\Dropbox($appKey,$appSecret);
 $authTokens = $dropbox->login();
 ```
 
-If the login was successful, `$authTokens` will contain an array of `oauth_token` and `oauth_token_secret`. Save them beside your user data and set them with `$dropbox->setAuthToken($token, $secret);` the next time, to reuse that token-pair. Overwise you'll need to login on every request again. (Currently, the token-pair is also cached and reused from the browser SESSION. This may change in progress of development.)
+If the login was successful, `$authTokens` will contain an array of `oauth_token` and `oauth_token_secret`. Save them beside your user data and set them with `$dropbox->setAuthToken($token, $secret);` the next time, to reuse that token-pair. Otherwise you'll need to login on every request again. (Currently, the token-pair is also cached and reused from the browser SESSION. This may change during the progress of the development.)
 
 
 #### Working with filesystems
@@ -117,14 +117,14 @@ $meta = new \FAL\MetaFileStorage($localFS, '.meta_%s');
 // create fal using both above
 $fal = new \FAL($localFS,$meta);
 ```
-Now your meta files would look like _.meta_monalisa.jpg_ and would be hidden due to the leading dot(.) in filename (except on windows). But be careful, with hidden files. I.e. when using the FTP adapter, you might need to change the FTP server settings. If you run _Proftpd_, your default settings wont allow clients to view hidden files, so FAL can not find them. You can change that behaviour by editing `/etc/proftpd/proftpd.conf` and add this:
+Now your meta files would look like _.meta_monalisa.jpg_ and would be hidden due to the leading dot(.) in filename (except on windows). But be careful, with hidden files. I.e. when using the FTP adapter, you might need to change the FTP server settings. If you run _Proftpd_, your default settings won't allow clients to view hidden files, so FAL can not find them. You can change that behaviour by editing `/etc/proftpd/proftpd.conf` and add this:
 ```
 ListOptions  "-la"
 ```
 
 #### File Streams
 
-Sometimes you may consider to work with files. Therefor FAL creates a StreamWrapper and loads the file into it. You can now use this file stream to run all other common operations that requires a valid file path.
+Sometimes you may consider to work with files. Therefore FAL creates a StreamWrapper and loads the file into it. You can now use this file stream to run all other common operations that requires a valid file path.
 ``` php
 $fal->load('data/categories.xml');
 $xmlFile = $fal->getFileStream(); // fal://data/categories.xml
