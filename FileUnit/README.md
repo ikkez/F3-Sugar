@@ -1,7 +1,7 @@
 ## F3 FileUnit
 
 This F3-Plugin offers a bunch of file system methods, helping you getting things done faster.
-It's uses the Standard PHP Libary with DirectoryIterators and file SPL objects to fit most common tasks and modifications.
+It's uses the Standard PHP Library with DirectoryIterators and file SPL objects to fit most common tasks and modifications.
 
 ***
 
