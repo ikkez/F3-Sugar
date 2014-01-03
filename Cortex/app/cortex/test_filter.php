@@ -4,26 +4,6 @@ use App\Controller;
 
 class Test_Filter {
 
-    /**
-     * unify results for better comparison
-     */
-    private function getResult($result)
-    {
-        $out = array();
-        foreach ($result as $row) {
-            if(is_object($row))
-                $row = $row->cast();
-            unset($row['_id']);
-            unset($row['id']);
-            foreach ($row as $col => $val) {
-                if (empty($val) || is_null($val))
-                    unset($row[$col]);
-            }
-            $out[] = $row;
-        }
-        return $out;
-    }
-
     function run($db,$type)
     {
         $test = new \Test();
