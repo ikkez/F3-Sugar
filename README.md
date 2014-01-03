@@ -21,7 +21,7 @@ A File Abstraction Layer across multiple filesystem adapters, with meta data sup
 
 ### FileUnit
 
-A Plugin which offers some file system functionality. *(deprecated - will completly move into FAL FileSystem Adapter)*
+A Plugin which offers some file system functionality. *(deprecated - will completely move into FAL FileSystem Adapter)*
 
 ***
 
@@ -47,7 +47,7 @@ A SQL database extension for managing database table structures.
 
 #### License
 
-Copyright (C) 2012-2013 Christian Knuth
+Copyright (C) 2012-2014 Christian Knuth
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
