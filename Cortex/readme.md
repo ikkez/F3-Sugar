@@ -140,7 +140,7 @@ $user->active = true;            // boolean|tinyint
 $user->lastlogin = '2013-08-28'; // date
 ```
 
-This way it also creates datatypes of datetime, float, text (when strlen > 265) and double.
+This way it also creates datatypes of datetime, float, text (when strlen > 255) and double.
 
 ## Cortex Models
 
