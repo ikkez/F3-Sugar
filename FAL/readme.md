@@ -4,7 +4,7 @@
 This
 F3-Plugin aims to give you an easy mapper for files, that allows you to attach some meta information to them. It comes with some filesystem adapters, to provide you a unified access to your files, which takes apart the need of changing code, when you'll change the files location / filesystem.
 
-This way you don't have to worry about where and how the files will be stored. You can easiely load, save and move files between the given filesystems. Currently availabe adapters are: **Local Filesystem**, **FTP** and **DropBox** (expect more to come).
+This way you don't have to worry about where and how the files will be stored. You can easily load, save and move files between the given filesystems. Currently available adapters are: **Local Filesystem**, **FTP** and **DropBox** (expect more to come).
 
 `This Plugin requires F3 version 3.0.5 or higher.`
 
