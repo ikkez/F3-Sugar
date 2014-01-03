@@ -1,7 +1,7 @@
 # SQL Schema Builder
 ### An extension for creating and managing SQL database tables.
 
-This Plugin provides a SQL table schema builder for the **PHP Fat-Free Framework**. It might be useful for installation scripts, dynamic applications or CMS enviroments.
+This Plugin provides a SQL table schema builder for the **PHP Fat-Free Framework**. It might be useful for installation scripts, dynamic applications or CMS environments.
 
 Currently MySQL, SQLite & PostgreSQL are supported and fully tested. Further support for SQL Server, MSSQL/Sybase, Access and DB2 are already included, but experimental. Handle with care and test your application. No warranty at all.
 
@@ -10,7 +10,7 @@ This Plugin is made for F3 version 3.x
 ***
 ## Installation
 
-Just copy schema.php into F3's `lib/db/sql` Folder. Done.
+Just copy schema.php into F3's `lib/db/sql` folder. Done.
 
 ## Quick Start
 
@@ -91,7 +91,7 @@ As you can see, `$schema->alterTable()` returns a new table object (*instance of
 -   **getCols([ bool $types = false ]);**
 
 
-The SchemaBuilder will quote all your table and column identifiers and should be resistent against preserved word errors.
+The SchemaBuilder will quote all your table and column identifiers and should be resistant against preserved word errors.
 
 ---
 
@@ -100,7 +100,7 @@ The SchemaBuilder will quote all your table and column identifiers and should be
 
 ### Schema Class
 
-The Schema class prodives you the following simple methods for:
+The Schema class provides you the following simple methods for:
 
 #### managing databases
 
@@ -141,7 +141,7 @@ The Schema class prodives you the following simple methods for:
 
 ### TableCreator Class
 
-This class is ment for creating new tables. It can be created by using `$schema->createTable($name)`.
+This class is meant for creating new tables. It can be created by using `$schema->createTable($name)`.
 
 -   **$table->addColumn($key,$args = null); Column**
 
@@ -214,7 +214,7 @@ This class is ment for creating new tables. It can be created by using `$schema-
 
 -   **$table->dropColumn( string $name );**
 
-    Trys to removes a column from the table, if it exists.
+    Tries to removes a column from the table, if it exists.
 
 -   **$table->addIndex( string | array $columns, [ bool $unique = false ]);**
 
@@ -230,7 +230,7 @@ This class is ment for creating new tables. It can be created by using `$schema-
 
 -   **$table->primary( string | array $pkeys);**
 
-    Creates a new primary or compositve key on the table.
+    Creates a new primary or composite key on the table.
 
 -   **$table->getCols([ bool $types = false ]);**
 
@@ -418,7 +418,7 @@ The method `$table->addColumn($columnName);` adds a further column field to the 
 
 * **->after( string $name )**
 
-  Trys to place the new column behind an existing one. (*only works for SQLite and MySQL*)
+  Trie to place the new column behind an existing one. (*only works for SQLite and MySQL*)
 
 * **->index([ bool $unique = false ])**
 
