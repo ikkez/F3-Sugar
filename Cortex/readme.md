@@ -90,7 +90,7 @@ As you can see, the syntax for the filter array stays pure SQL logic, but works 
 $user->load(array('name like ? AND (deleted = 0 OR rights > ?)','Jack%',3));
 ```
 
-No need for complex criteria objects or confusing mongo where-array constructions. It's just as simple as you're used to. Using a Jig DB will automatically translate that query into:
+No need for complex criteria objects or confusing Mongo where-array constructions. It's just as simple as you're used to. Using a Jig DB will automatically translate that query into:
 
 ``` php
 Array (
@@ -140,7 +140,7 @@ $user->active = true;            // boolean|tinyint
 $user->lastlogin = '2013-08-28'; // date
 ```
 
-This way it also creates datatypes of datetime, float, text ( if strlen > 265) and double.
+This way it also creates datatypes of datetime, float, text (when strlen > 265) and double.
 
 ## Cortex Models
 
@@ -197,7 +197,7 @@ You can set datatypes, nullable flags and default values for your columns. Doing
 
 Because column datatypes are currently only needed for setting up the tables in SQL, it follows that [SQL DataTypes Table](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder#column-class) from the [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/blob/master-v3/SchemaBuilder/lib/db/sql/schema.php). If you don't need that feature and your tables are already existing, then you can just skip the configuration for those fields, because the underlaying SQL Mapper exposes the existing table schema.
 
-The datatype values are defined constants from the Schema Plugin. If you like to use some autocompletion in your IDE to find the right values, type in the longer path to the constants:
+The datatype values are defined constants from the Schema Plugin. If you'd like to use some autocompletion in your IDE to find the right values, type in the longer path to the constants:
 
 ``` php
 'type' => \DB\SQL\Schema::DT_VARCHAR256,
@@ -262,7 +262,7 @@ $fields = array(
 
 ### Setdown
 
-This method completly removes the specified table from the used database. So handle with care. 
+This method completely removes the specified table from the used database. So handle with care. 
 
 ``` php
 // With Model class
@@ -274,7 +274,7 @@ This method completly removes the specified table from the used database. So han
 
 ### Custom Field PreProcessors
 
-You can define some custom functions that are called when you set or get attributes from your models. These are extremly useful for validation  directly in your Model, or some extended save or load cascades.
+You can define some custom functions that are called when you set or get attributes from your models. These are extremely useful for validation  directly in your Model, or some extended save or load cascades.
 
 #### Setter
 
@@ -286,7 +286,7 @@ class User extends \DB\Cortex {
     
     // validate email address
     public function set_mail($value) {
-        if (\Audit::instace()->email($value) == false) {
+        if (\Audit::instance()->email($value) == false) {
             // no valid email address
             // throw exception or set an error var and display a flash message
             $value = null;
@@ -453,14 +453,14 @@ $author->load(array('_id = ?', 42));
 $author->news; // is now an array of NewsModel objects
 
 // if you like to cast them all you can use
-$allNewsByAuthorX = $author->castAll('news'); // it now a multi-dimensional array
+$allNewsByAuthorX = $author->castAll('news'); // is now a multi-dimensional array
 ```
 
 #### many-to-many, bidirectional
 
 When both models of a relation has a `has-many` configuration on their linkage fields, Cortex create a new reference table in setup, where the foreign keys of both models are linked together. This way you can query model A for related models of B and vice versa.
 
-To save many collections to a model you've got serveral ways:
+To save many collections to a model you've got several ways:
 
 ``` php
 $news->load(array('_id = ?',1));
@@ -501,7 +501,7 @@ $tags->news[0]->title; // '10 Responsive Images Plugins'
 
 You can use a `belongs-to-many` field config to define a one-way m:m relation.
 This is a special type for many-to-many as it will not use a 3rd table for reference and just puts a list of IDs into the table field, as commonly practiced in NoSQL solutions.
-This is an unidirectional binding, because the counterpart wont know anything about its relation and it's harder to query the reserve way, but it's still a lightweigh and useful solution in some use cases.
+This is an unidirectional binding, because the counterpart wont know anything about its relation and it's harder to query the reserve way, but it's still a lightweight and useful solution in some use cases.
 
 Saving works the same way like the other m:m type describes above
 
@@ -560,7 +560,7 @@ Use `DESC` and `ASC` flags for sorting fields, just like in SQL. Additional `gro
 
 ## Collections
 
-Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). You can also transpose the results by a defined key using `getBy()` or fetch all values of a certain key using `getAll()`. More about that later in the API docs. The CortexCollection implements the `ArrayIterator` interface, so it is accessable like a usual array.
+Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). You can also transpose the results by a defined key using `getBy()` or fetch all values of a certain key using `getAll()`. More about that later in the API docs. The CortexCollection implements the `ArrayIterator` interface, so it is accessible like an usual array.
 
 ## Known Bugs
 
@@ -572,7 +572,7 @@ This plugin is still in an early stage of development. So at this point it may h
 - ~~eager loading / preloading relations for find()~~
 - polymorphic relations
 - handle aggregational fields like SUM(), MAX(), AVG()
-- handle creation of indexies
+- handle creation of indexes
 - extended date functions
 - search and filters for relations
 - logging
