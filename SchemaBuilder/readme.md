@@ -230,7 +230,7 @@ This class is ment for creating new tables. It can be created by using `$schema-
 
 -   **$table->primary( string | array $pkeys);**
 
-    Creates a new primary or compositve key on the table.
+    Creates a new primary or composite key on the table.
 
 -   **$table->getCols([ bool $types = false ]);**
 
