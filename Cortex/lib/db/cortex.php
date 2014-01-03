@@ -1339,7 +1339,7 @@ class Cortex extends Cursor {
 				$srcfields = array_intersect_key($srcfields, array_flip($fields));
 			}
 		foreach ($srcfields as $key => $val) {
-			if (isset($this->fieldConf[$key])) {
+			if (isset($this->fieldConf[$key]) && isset($this->fieldConf[$key]['type'])) {
 				if ($this->fieldConf[$key]['type'] == self::DT_JSON && is_string($val))
 					$val = json_decode($val);
 				elseif ($this->fieldConf[$key]['type'] == self::DT_SERIALIZED && is_string($val))
