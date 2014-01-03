@@ -41,7 +41,7 @@ $router->register('news-map', 'MAP /news', '\App\NewsController');
 
 #### Access Routes from Template
 
-To use these named routes easiely, i've added a little template extension that will parse all your `<A>`-tags, so you just need to write:
+To use these named routes easily, i've added a little template extension that will parse all your `<A>`-tags, so you just need to write:
 
 ``` html
 <a route="newsletter-signin-page">subscribe to the newsletter</a>
@@ -117,7 +117,7 @@ You can also use dynamic template tokens in most of the available arguments.
     <tr>
         <td>absolute</td>
         <td>false, true or full</td>
-        <td>When set to <b>TRUE</b>, the link is going to prepended by a leading <code>/</code>, which makes the link absolute.
+        <td>When set to <b>TRUE</b>, the link is going to be prepended by a leading <code>/</code>, which makes the link absolute.
         If set to <b>FULL</b> the link becomes a full absolute path including the <code>http://mydomain.com/appdir/</code> part.</td>
         <td>[ ]</td>
     </tr>
