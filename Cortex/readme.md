@@ -12,7 +12,7 @@ Cortex is a multi-engine ActiveRecord ORM / ODM that offers easy object persiste
   - Support for model objects
   - Relationships: link multiple models together to one-to-one, one-to-many and many-to-many associations
   - smart-loading of related models (intelligent lazy and eager-loading without configuration)
-  - setup model configurations to auto create DB tables from installer or migrate scripts
+  - setup model schemes to auto create DB tables from installer or migrate scripts
   - custom setter and getter preprocessors for all fields
   - default values and nullable fields for NoSQL
 
@@ -53,7 +53,7 @@ To install Cortex, just copy the `/lib/db/cortex.php` file into your libs.
 
 ### Setup a DB
 
-Create a DB object of your choice. You can choose [SQL](http://fatfreeframework.com/sql), [Jig](http://fatfreeframework.com/jig) or [MongoDB](http://fatfreeframework.com/mongo). Here are some examples:
+Create a DB object of your choice. You can choose between [SQL](http://fatfreeframework.com/sql), [Jig](http://fatfreeframework.com/jig) or [MongoDB](http://fatfreeframework.com/mongo). Here are some examples:
 
 ```php
 // SQL - MySQL
@@ -68,7 +68,7 @@ $db = new \DB\Mongo('mongodb://localhost:27017','testdb');
 
 ### Let's get it rolling
 
-If you are familar with F3's own Data-Mappers, you already know all about the basic CRUD operations you can also do with Cortex, as it implements the ActiveRecord [Cursor Class](http://fatfreeframework.com/cursor) with all its methods. So it's that easy:
+If you are familiar with F3's own Data-Mappers, you already know all about the basic CRUD operations you can also do with Cortex too. It implements the ActiveRecord [Cursor Class](http://fatfreeframework.com/cursor) with all its methods. So it's that easy:
 
 ```php
 $user = new \DB\Cortex($db, 'users');
@@ -77,14 +77,14 @@ $user->mail = 'jacky@email.com';
 $user->save();
 ```
 
-Okay, not very impressive, Ay? But now let's find this guy again:
+Okay, not very impressive, Ay? But let's find this guy again now:
 
 ``` php
 $user->load(array('mail = ?','jacky@email.com'));
 echo $user->name; // shouts out: Jack Ripper
 ```
 
-As you can see, the syntax for the filter array stays pure SQL logic, but works in all DB engines. This also works for pretty complex where criterias:
+As you can see, the syntax for the filter array stays pure SQL logic, but works in all DB engines. This also works for pretty complex where criteria:
 
 ```php
 $user->load(array('name like ? AND (deleted = 0 OR rights > ?)','Jack%',3));
@@ -94,7 +94,7 @@ No need for complex criteria objects or confusing Mongo where-array construction
 
 ``` php
 Array (
-    [0] => (isset(@name) && preg_match(?,@name)) AND ( @deleted = 0 OR (isset(@rights) && @rights > ?) )
+    [0] => (isset(@name) && preg_match(?,@name)) AND ( (isset(@deleted) && (@deleted = 0)) OR (isset(@rights) && @rights > ?) )
     [1] => /^Jack/
     [2] => 3
 )
