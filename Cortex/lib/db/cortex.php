@@ -540,9 +540,15 @@ class Cortex extends Cursor {
 	public function load($filter = NULL, array $options = NULL, $ttl = 0)
 	{
 		$this->reset();
-		$filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
-		$options = $this->queryParser->prepareOptions($options, $this->dbsType);
-		$this->mapper->load($filter, $options, $ttl);
+		$res = $this->find($filter, $options, $ttl);
+		if ($res) {
+			$query = array();
+			foreach ($res as $cx)
+				$query[] = $cx->mapper;
+			$this->mapper->query = $query;
+			$this->first();
+		} else
+			$this->mapper->reset();
 		return $this;
 	}
 
@@ -1353,10 +1359,13 @@ class Cortex extends Cursor {
 		\Base::instance()->set($key, $this->cast(null,0));
 	}
 
-	public function skip($ofs = 1) {
+	public function skip($ofs = 1)
+	{
 		$this->reset(false);
-		$this->mapper->skip($ofs);
-		return $this;
+		if($this->mapper->skip($ofs))
+			return $this;
+		else
+			$this->reset(false);
 	}
 
 	public function first()
