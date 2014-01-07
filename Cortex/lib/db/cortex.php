@@ -797,12 +797,13 @@ class Cortex extends Cursor {
 	/**
 	 * Count records that match criteria
 	 * @param null $filter
+	 * @param int $ttl
 	 * @return mixed
 	 */
-	public function count($filter = NULL)
+	public function count($filter = NULL, $ttl = 0)
 	{
 		$filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
-		return $this->mapper->count($filter);
+		return $this->mapper->count($filter, $ttl);
 	}
 
 	/**
