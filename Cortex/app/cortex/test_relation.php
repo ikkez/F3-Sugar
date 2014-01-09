@@ -58,9 +58,8 @@ class Test_Relation {
         $author_id[] = $author->_id;
         $author->reset();
 
-        $allauthors = $author->castAll($author->find());
+        $allauthors = $author->find()->castAll();
         $allauthors = $this->getResult($allauthors);
-
         $test->expect(
             json_encode($allauthors) ==
             '[{"name":"Johnny English"},{"name":"Ridley Scott"},{"name":"James T. Kirk"}]',
@@ -108,6 +107,7 @@ class Test_Relation {
         $news_id[] = $news->_id;
         $news->reset();
         $news->title = 'Touchable Interfaces';
+        $news->text = 'Lorem Foo';
         $news->save();
         $news_id[] = $news->_id;
         $news->reset();
@@ -115,7 +115,7 @@ class Test_Relation {
         $allnews = $this->getResult($news->find());
         $test->expect(
             json_encode($allnews) ==
-            '[{"title":"Responsive Images","text":"Lorem Ipsun"},{"title":"CSS3 Showcase","text":"News Text 2"},{"title":"Touchable Interfaces"}]',
+            '[{"title":"Responsive Images","text":"Lorem Ipsun"},{"title":"CSS3 Showcase","text":"News Text 2"},{"title":"Touchable Interfaces","text":"Lorem Foo"}]',
             $type.': all NewsModel items created'
         );
 
@@ -189,7 +189,6 @@ class Test_Relation {
 
         $tag->reset();
         $news->load(array('_id = ?', $news_id[1]));
-
         $news->tags = $tag->load(array('_id != ?',$tag_id[0]));
         $news->save();
         $news->reset();
@@ -232,8 +231,24 @@ class Test_Relation {
         $test->expect(
             $author->profile->message == 'Hello World' &&
             $profile->author->name == "Johnny English",
-            $type.': has-one inverse relation'
+            $type.': has-one: relation assigned'
         );
+
+        $profile->reset();
+        $profile->message = 'I\'m feeling lucky';
+        $profile->image = 'lolcat.jpg';
+        $author->reset();
+        $author->load(array('_id = ?',$author_id[1]));
+        $author->profile = $profile;
+        $author->save();
+        $profile->reset();
+        $author->reset();
+        $author->load(array('_id = ?', $author_id[1]));
+        $test->expect(
+            $author->profile->message == 'I\'m feeling lucky',
+            $type.': has-one: inverse relation'
+        );
+
 
         // has-many relation
         ///////////////////////////////////

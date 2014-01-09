@@ -12,11 +12,14 @@ Cortex is a multi-engine ActiveRecord ORM / ODM that offers easy object persiste
   - Support for model objects
   - Relationships: link multiple models together to one-to-one, one-to-many and many-to-many associations
   - smart-loading of related models (intelligent lazy and eager-loading without configuration)
-  - setup model configurations to auto create DB tables, for instance from installer or migrate scripts
+  - setup model schemes to auto create DB tables from installer or migrate scripts
   - custom setter and getter preprocessors for all fields
   - default values and nullable fields for NoSQL
 
-With Cortex you can create generic apps, that work with any DB of the users choice, no matter if it's Postgre, MongoDB or even none. You can also mash-up multiple engines, use them simultaneous or link models of different DB engines together.
+With Cortex you can create generic apps, that work with any DB of the users choice, no matter if it's Postgre, MongoDB or even none.
+You can also mash-up multiple engines, use them simultaneous or link models of different DB engines together.
+
+It's great for fast and easy data abstraction and offers a bunch of useful filter possibilities.
 
 ---
 
@@ -35,17 +38,18 @@ With Cortex you can create generic apps, that work with any DB of the users choi
   3. [Additional notes](#additional-notes)
 5. [Collections](#collections)  
 6. [Filter Query Syntax](#filter-query-syntax)
-7. [Known Bugs](#known-bugs)
-8. [Roadmap](#roadmap)
-9. [Final Words](#final-words)
-10. [License](#license)
+7. [Advanced Filter Techniques](#advanced-filter-techniques)
+8. [Known Bugs](#known-bugs)
+9. [Roadmap](#roadmap)
+10. [Final Words](#final-words)
+11. [License](#license)
     
 
 ## Quick Start
 
 ### System Requirements
 
-Cortex requires at least Fat-Free v3.1.2 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
+Cortex requires at least Fat-Free v3.2.1 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
 
 ### Install
 
@@ -53,7 +57,7 @@ To install Cortex, just copy the `/lib/db/cortex.php` file into your libs.
 
 ### Setup a DB
 
-Create a DB object of your choice. You can choose [SQL](http://fatfreeframework.com/sql), [Jig](http://fatfreeframework.com/jig) or [MongoDB](http://fatfreeframework.com/mongo). Here are some examples:
+Create a DB object of your choice. You can choose between [SQL](http://fatfreeframework.com/sql), [Jig](http://fatfreeframework.com/jig) or [MongoDB](http://fatfreeframework.com/mongo). Here are some examples:
 
 ```php
 // SQL - MySQL
@@ -68,7 +72,11 @@ $db = new \DB\Mongo('mongodb://localhost:27017','testdb');
 
 ### Let's get it rolling
 
+<<<<<<< HEAD
 If you are familiar with F3's own Data-Mappers, you already know all about the basic CRUD operations you can also do with Cortex, as it implements the ActiveRecord [Cursor Class](http://fatfreeframework.com/cursor) with all its methods. So it's that easy:
+=======
+If you are familiar with F3's own Data-Mappers, you already know all about the basic CRUD operations you can do with Cortex too. It implements the ActiveRecord [Cursor Class](http://fatfreeframework.com/cursor) with all its methods. So it's that easy:
+>>>>>>> refs/remotes/origin/dev-cortex
 
 ```php
 $user = new \DB\Cortex($db, 'users');
@@ -77,24 +85,24 @@ $user->mail = 'jacky@email.com';
 $user->save();
 ```
 
-Okay, not very impressive, Ay? But now let's find this guy again:
+Okay, not very impressive, Ay? But let's find this guy again now:
 
 ``` php
 $user->load(array('mail = ?','jacky@email.com'));
 echo $user->name; // shouts out: Jack Ripper
 ```
 
-As you can see, the syntax for the filter array stays pure SQL logic, but works in all DB engines. This also works for pretty complex where criterias:
+As you can see, the syntax for the filter array stays pure SQL syntax, but works in all DB engines. This also works for pretty complex where criteria:
 
 ```php
-$user->load(array('name like ? AND (deleted = 0 OR rights > ?)','Jack%',3));
+$user->load(array('name like ? AND (deleted = 0 OR rights > ?)', 'Jack%', 3));
 ```
 
 No need for complex criteria objects or confusing Mongo where-array constructions. It's just as simple as you're used to. Using a Jig DB will automatically translate that query into:
 
 ``` php
 Array (
-    [0] => (isset(@name) && preg_match(?,@name)) AND ( @deleted = 0 OR (isset(@rights) && @rights > ?) )
+    [0] => (isset(@name) && preg_match(?,@name)) AND ( (isset(@deleted) && (@deleted = 0)) OR (isset(@rights) && @rights > ?) )
     [1] => /^Jack/
     [2] => 3
 )
@@ -130,7 +138,8 @@ You can use all the fancy methods from Cursor, like `load`, `find`, `cast`, `nex
 
 ## SQL Fluid Mode
 
-When you are prototyping some new objects or just don't want to bother with a table schema, while using Cortex along with a SQL DB backend, you can enable the SQL Fluid Mode. This way Cortex will create all necessary tables and columns automatically, so you can focus on writing your application code. It will try to guess the right datatype, based on the given sample data. To enable the fluid mode, just pass a third argument to the object's constructor:
+When you are prototyping some new objects or just don't want to bother with a table schema, while using Cortex along with a SQL DB backend, you can enable the SQL Fluid Mode.
+This way Cortex will create all necessary tables and columns automatically, so you can focus on writing your application code. It will try to guess the right datatype, based on the given sample data. To enable the fluid mode, just pass a third argument to the object's constructor:
 
 ``` php
 $user = new \DB\Cortex($db, 'users', TRUE);
@@ -140,35 +149,52 @@ $user->active = true;            // boolean|tinyint
 $user->lastlogin = '2013-08-28'; // date
 ```
 
+<<<<<<< HEAD
 This way it also creates datatypes of datetime, float, text (when strlen > 255) and double.
+=======
+This way it also creates datatypes of datetime, float, text (when `strlen > 255`) and double.
+
+The fluid mode disables the caching of the underlying SQL table schema. This could impact on performance, so keep in mind to deactivate this when you're done.
+
+>>>>>>> refs/remotes/origin/dev-cortex
 
 ## Cortex Models
 
-Using the Cortex class directly is easy for some CRUD operations, but to enable some more advanced features, you'll need to wrap Cortex in a Model class like this:
+Using the Cortex class directly is easy for some CRUD operations, but to enable some more advanced features, you'll need to wrap Cortex into a Model class like this:
 
 ``` php
-// file user.php
+// file at app/model/user.php
+namespace Model;
+
 class User extends \DB\Cortex {
 
   protected
     $db = 'AppDB1',     // F3 hive key of a valid DB object
     $table = 'users',   // the DB table to work on
-    $fluid = true;      // triggers the SQL Fluid Mode
+    $fluid = true;      // triggers the SQL Fluid Mode, default: false
+    $ttl = 120;         // caching time of field schema, default: 60
 }
 ```
 
 Now you can create your mapper object that easy:
 
 ``` php
-$user = new \Users();
+$user = new \Model\Users();
 ```
+
+Cortex needs at least a working DB object. You can also pass this through the constructor (`new \Model\Users($db);`) and drop it in the setup.
+`$db` must be a string of a hive key where the DB object is stored, or the DB object itself.
+If no `$table` is provided, Cortex will use the class name as table name.
 
 ### Configuration
 
-Your Cortex Model accepts some sort of field configuration. This way it's able to follow a defined schema of your data entity. It looks like this:
+Cortex does not need that much configuration. But at least it would be useful to have setup the field configuration.
+This way it's able to follow a defined schema of your data entity and enables you to use some auto-installation routines (see [setup](#setup)). It looks like this:
 
 ``` php
-// file user.php
+// file at app/model/user.php
+namespace Model;
+
 class User extends \DB\Cortex {
 
   protected
@@ -193,19 +219,50 @@ class User extends \DB\Cortex {
 }
 ```
 
-You can set datatypes, nullable flags and default values for your columns. Doing so enables you to install new Models into your SQL database, and adds some nullable validation checks and the ability for defaults to the NoSQL engines (Jig and Mongo).
+You can set datatypes (`type`), `nullable` flags and `default` values for your columns. Doing so enables you to install new Models into your SQL database, and adds some nullable validation checks and the ability for defaults to the NoSQL engines (Jig and Mongo).
 
-Because column datatypes are currently only needed for setting up the tables in SQL, it follows that [SQL DataTypes Table](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder#column-class) from the [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/blob/master-v3/SchemaBuilder/lib/db/sql/schema.php). If you don't need that feature and your tables are already existing, then you can just skip the configuration for those fields, because the underlaying SQL Mapper exposes the existing table schema.
+Because column datatypes are currently only needed for setting up the tables in SQL, it follows that [SQL DataTypes Table](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder#column-class) from the [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/blob/master-v3/SchemaBuilder/lib/db/sql/schema.php).
+If you don't need that feature and your tables are already existing, then you can just skip the configuration for those fields, or just setup some of them (i.e. for relations), because the underlying SQL Mapper exposes the existing table schema.
 
+<<<<<<< HEAD
 The datatype values are defined constants from the Schema Plugin. If you'd like to use the autocompletion of your IDE to find the right values, type in the longer path to the constants:
+=======
+You may also extend this config array to have a place for own validation rules or whatever ;)
+
+The datatype values are defined constants from the Schema Plugin. If you'd like to use some auto-completion in your IDE to find the right values, type in the longer path to the constants:
+>>>>>>> refs/remotes/origin/dev-cortex
 
 ``` php
 'type' => \DB\SQL\Schema::DT_VARCHAR256,
 ```
 
+#### Additional Datatypes
+
+Cortex comes with two own datatypes for handling array values in fields. Even when Jig and Mongo support them naturally, most SQL engines do not. Therefore Cortex introduces:
+
++ DT_SERIALIZED
++ DT_JSON
+
+In example:
+
+``` php
+'colors' => array(
+    'type' => self::DT_JSON
+    // or
+    'type' => 'JSON'
+),
+```
+
+Now you're able to save array data in your model field, which get json_encoded behind the scene (of cause only when using a SQL backend).
+
+``` php
+$mapper->colors = array('red','blue','green');
+```
+
+
 #### Alternative Configuration Method
 
-In case you need some more flexible configurations and don't want to hard-wire it, you could overload the Model class constructor to load its config from an ini file or elsewhere. In example:
+In case you need some more flexible configurations and don't want to hard-wire it, you can overload the Model class constructor to load its config from an `ini`-file or elsewhere. In example:
 
 ``` php
 class User extends \DB\Cortex {
@@ -213,7 +270,7 @@ class User extends \DB\Cortex {
     function __construct() {
         $f3 = \Base::instance();
         if(!$f3->exists('usermodel'))
-            $f3->config('app/models/usermodel.ini');        
+            $f3->config('app/models/usermodel.ini');
         foreach ($f3->get('usermodel') as $key => $val)
             $this->{$key} = $val;
         parent::__construct();
@@ -235,19 +292,16 @@ usermodel.fieldConf.rights_level.type = TINYINT
 usermodel.fieldConf.rights_level.default = 3
 ```
 
-
 ### Setup
 
 This method tries to create the SQL DB tables you need to run your Cortex object. It also adds just missing fields to already existing tables.
 
-#### With Model class
 If your Model has a valid field configuration, you are able to run this installation method:
 
 ``` php
-\User::setup();
+\Model\User::setup();
 ``` 
 
-#### Without Model class
 If you have no model class you need to provide all parameters the setup method has.
 
 ``` php
@@ -266,7 +320,7 @@ This method completely removes the specified table from the used database. So ha
 
 ``` php
 // With Model class
-\User::setdown();
+\Model\User::setdown();
 
 // Without Model class
 \DB\Cortex::setdown($db, 'users');
@@ -274,7 +328,11 @@ This method completely removes the specified table from the used database. So ha
 
 ### Custom Field PreProcessors
 
+<<<<<<< HEAD
 You can define some custom functions that are called when you set or get attributes from your models. These are extremely useful for validation  directly in your Model, or some extended save or load cascades.
+=======
+You can define some custom functions that are called when you set or get attributes from your models. These are extremely useful for validation directly in your Model, or some extended save or load cascades.
+>>>>>>> refs/remotes/origin/dev-cortex
 
 #### Setter
 
@@ -325,11 +383,11 @@ class User extends \DB\Cortex {
 
 ## Relations
 
-With Cortex you can create associations between multiple Models. By linking them together, you can create all common relationships you need for smart and easy development.
+With Cortex you can create associations between multiple Models. By linking them together, you can create all common relationships you need for smart and easy persistence.
 
 ### Setup the linkage
 
-To make relations work, you need to use a model class with field configuration. Cortex offers the following types of associations, that mostly must be defined in both classes of a relation:
+To make relations work, you need to use a model class with field configuration. Cortex offers the following types of associations, that mostly **must be defined in both classes** of a relation:
 
 <table>
     <tr>
@@ -376,23 +434,24 @@ This creates an aggregation between Author and News, so
 
 ![UML 1](https://dl.dropboxusercontent.com/u/3077539/_linked/cortex-dia-1.png?)
 
-As a side note: `belongs-to-*` definitions will create a new column in that table, that is used to save the id of the counterpart model. Whereas `has-*` definitions are just virtual fields which are going to query the linked models by their own id. This leads us to the following configuration schema:
+As a side note: `belongs-to-*` definitions will create a new column in that table, that is used to save the id of the counterpart model (foreign key field).
+Whereas `has-*` definitions are just virtual fields which are going to query the linked models by their own id (the inverse way). This leads us to the following configuration schema:
 
 For **belongs-to-one** and **belongs-to-many**
 
 ```
 'realTableField' => array(
-    'relationType' => 'NamespacedClassName',
+    'relationType' => '\Namespace\ClassName',
 ),
 ```
 
-Defining a foreign key for `belongs-to-*` is optional. The default way is to use the identifier field (`id` in SQL, `_id` in NoSQL). If you need to define another id field use `array('NamespacedClassName','pKey')`. 
+Defining a foreign key for `belongs-to-*` is optional. The default way is to use the identifier field (`id` in SQL, `_id` in NoSQL). If you need to define another id field use `array('\Namespace\ClassName','pKey')`.
 
 For **has-one** and **has-many**
 
 ```
 'virtualField' => array(
-    'relationType' => array('NamespacedClassName','foreignKey'),
+    'relationType' => array('\Namespace\ClassName','foreignKey'),
 ),
 ```
 
@@ -453,7 +512,11 @@ $author->load(array('_id = ?', 42));
 $author->news; // is now an array of NewsModel objects
 
 // if you like to cast them all you can use
+<<<<<<< HEAD
 $allNewsByAuthorX = $author->castAll('news'); // is now a multi-dimensional array
+=======
+$allNewsByAuthorX = $author->castField('news'); // is now a multi-dimensional array
+>>>>>>> refs/remotes/origin/dev-cortex
 ```
 
 #### many-to-many, bidirectional
@@ -497,13 +560,19 @@ $tags->load(array('title = ?','Responsive'));
 $tags->news[0]->title; // '10 Responsive Images Plugins'
 ```
 
+This example shows the inverse way of querying (using the TagModel to find the corresponding news). Of cause the can also use a more direct way that offers even more possibilities, therefore check the [has()](#has) method.
+
 #### many-to-many, unidirectional
 
 You can use a `belongs-to-many` field config to define a one-way m:m relation.
 This is a special type for many-to-many as it will not use a 3rd table for reference and just puts a list of IDs into the table field, as commonly practiced in NoSQL solutions.
+<<<<<<< HEAD
 This is an unidirectional binding, because the counterpart wont know anything about its relation and it's harder to query the reserve way, but it's still a lightweight and useful solution in some use cases.
+=======
+This is an unidirectional binding, because the counterpart wont know anything about its relation and it's harder to query the reserve way, but it's still a lightweight and useful solution in some cases.
+>>>>>>> refs/remotes/origin/dev-cortex
 
-Saving works the same way like the other m:m type describes above
+Saving works the same way like the other m:m type described above
 
 ``` php
 $news->tags = array(4, 7); // IDs of TagModel
@@ -522,13 +591,13 @@ echo $news->tags[1]->title; // Responsive
 
 * To release any relation, just set the field to `NULL`.
 
-* All relations are lazy loaded to save performance. That mean, they won't be loaded until you access them by the linked property or casting the whole parent model.
+* All relations are lazy loaded to save performance. That means they won't get loaded until you access them by the linked property or casting the whole parent model.
 
-* lazy loading within a result collection will **automatically** invoke the eager loading of that property to the whole set. This method is called _smart loading_ and is used to get around the [1+N query problem](http://www.phabricator.com/docs/phabricator/article/Performance_N+1_Query_Problem.html).
+* lazy loading within a result collection will **automatically** invoke the eager loading of that property to the whole set. The results are saved to an [Identity Map](http://martinfowler.com/eaaCatalog/identityMap.html) to relieve the strain on further calls. This method i called _smart loading_ and is used to get around the [1+N query problem](http://www.phabricator.com/docs/phabricator/article/Performance_N+1_Query_Problem.html) with no need for extra configuration.
 
 * to get the id of any record use `$user->_id;`
 
-* To find any record by its id use the field `_id` in your filter array like `array('_id = ?',123)`.
+* To find any record by its **id** use the field `_id` in your filter array, like `array('_id = ?', 123)`.
 
 ## Filter Query Syntax
 
@@ -558,6 +627,54 @@ The `$options` array for load operations respects the following keys:
 
 Use `DESC` and `ASC` flags for sorting fields, just like in SQL. Additional `group` settings might be handled in a future version.
 
+## Advanced Filter Techniques
+
+When your application reaches the point where all basic CRUD operations are working, you probably need some more control about finding your records based on conditions for relations.
+Here comes the `has()` and `filter()` methods into play:
+
+### has
+
+The has method adds some conditions to a related field, that must be fulfilled in addition, when the **next** find() or load() method of its parent is fired. So this is meant for limiting the main results.
+
+In other words: Let's find all news records that are tagged by "Responsive".
+
+``` php
+$news->has('tags', array('title = ?','Responsive'));
+$results = $news->find();
+$results[0]->title; // '10 Responsive Images Plugins'
+```
+
+Of cause you can also use the inverse way of querying, using the TagModel, load them by title and access the shared `$tags->news` property to find your records.
+The advantage of the "has" method is that you can also add a condition to the parent as well. This way you could edit the load line into something like this:
+`$news->find(array('published = ?', 1));`. Now you can limit your results based on two different models - you only load *published* news which were tagged "Responsive".
+
+You can also add multiple has-conditions to different relations:
+
+``` php
+$news->has('tags', array('title = ?','Responsive'));
+$news->has('author', array('username = ?','ikkez'));
+$results = $news->find(array('published = ?', 1), array('limit'=>3, 'order'=>'date DESC'));
+```
+
+Now you only load the last 3 published news written by me, which were tagged "Responsive", sorted by release date. ;)
+
+If you like, you can also call them in a fluent style: `$news->has(...)->load(...);`.
+
+### filter
+
+The filter method is meant for limiting the results of relations. In example: load author x and only his news from 2014.
+
+``` php
+$author->filter('news', array('date > ?','2014-01-01'));
+$author->load(array('username = ?', 'ikkez'));
+```
+
+The same way like the `has()` method does, you can add multiple filter conditions. You can mix filter and has conditions too.
+Once a `load` or `find` function is executed, the filter (and has) conditions are cleared for the next upcoming query.
+
+Filter conditions are currently not inherited. That means if you recursively access the fields of a relation ($author->news[0]->author->news) they get not filtered, but fully lazy loaded again.
+
+
 ## Collections
 
 Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). You can also transpose the results by a defined key using `getBy()` or fetch all values of a certain key using `getAll()`. More about that later in the API docs. The CortexCollection implements the `ArrayIterator` interface, so it is accessible like an usual array.
@@ -574,7 +691,7 @@ This plugin is still in an early stage of development. So at this point it may h
 - handle aggregational fields like SUM(), MAX(), AVG()
 - handle creation of indexes
 - extended date functions
-- search and filters for relations
+- ~~search and filters for relations~~
 - logging
 
 
