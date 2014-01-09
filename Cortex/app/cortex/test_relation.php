@@ -189,7 +189,6 @@ class Test_Relation {
 
         $tag->reset();
         $news->load(array('_id = ?', $news_id[1]));
-
         $news->tags = $tag->load(array('_id != ?',$tag_id[0]));
         $news->save();
         $news->reset();

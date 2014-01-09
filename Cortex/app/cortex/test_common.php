@@ -81,6 +81,42 @@ class Test_Common {
 			'copyfrom: limit fields by callback function'
 		);
 
+		$all = $news->find();
+		$allTitle = $all->getAll('title');
+
+		$test->expect(
+			count($allTitle) == 3 &&
+			$allTitle[0] == 'Responsive Images' &&
+			$allTitle[1] == 'CSS3 Showcase' &&
+			$allTitle[2] == 'Touchable Interfaces',
+			'collection getAll returns all values of selected field'
+		);
+
+		$newsByID = $all->getBy('_id');
+		$test->expect(
+			array_keys($newsByID) == array(1,2,3),
+			'collection getBy sorts by given field'
+		);
+
+		$newsByAuthorID = $all->getBy('author',true);
+		$test->expect(
+			array_keys($newsByAuthorID) == array(2, 1) &&
+			count($newsByAuthorID[2]) == 2 &&
+			count($newsByAuthorID[1]) == 1,
+			'collection getBy nested sort by author'
+		);
+
+		$allTitle = array();
+		foreach($all as $record)
+			$allTitle[] = $record->title;
+
+		$test->expect(
+			count($allTitle) == 3 &&
+			$allTitle[0] == 'Responsive Images' &&
+			$allTitle[1] == 'CSS3 Showcase' &&
+			$allTitle[2] == 'Touchable Interfaces',
+			'collection is traversable'
+		);
 
 
 		///////////////////////////////////
