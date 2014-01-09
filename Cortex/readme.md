@@ -72,11 +72,7 @@ $db = new \DB\Mongo('mongodb://localhost:27017','testdb');
 
 ### Let's get it rolling
 
-<<<<<<< HEAD
-If you are familiar with F3's own Data-Mappers, you already know all about the basic CRUD operations you can also do with Cortex, as it implements the ActiveRecord [Cursor Class](http://fatfreeframework.com/cursor) with all its methods. So it's that easy:
-=======
 If you are familiar with F3's own Data-Mappers, you already know all about the basic CRUD operations you can do with Cortex too. It implements the ActiveRecord [Cursor Class](http://fatfreeframework.com/cursor) with all its methods. So it's that easy:
->>>>>>> refs/remotes/origin/dev-cortex
 
 ```php
 $user = new \DB\Cortex($db, 'users');
@@ -149,14 +145,10 @@ $user->active = true;            // boolean|tinyint
 $user->lastlogin = '2013-08-28'; // date
 ```
 
-<<<<<<< HEAD
-This way it also creates datatypes of datetime, float, text (when strlen > 255) and double.
-=======
 This way it also creates datatypes of datetime, float, text (when `strlen > 255`) and double.
 
 The fluid mode disables the caching of the underlying SQL table schema. This could impact on performance, so keep in mind to deactivate this when you're done.
 
->>>>>>> refs/remotes/origin/dev-cortex
 
 ## Cortex Models
 
@@ -224,13 +216,9 @@ You can set datatypes (`type`), `nullable` flags and `default` values for your c
 Because column datatypes are currently only needed for setting up the tables in SQL, it follows that [SQL DataTypes Table](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder#column-class) from the [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/blob/master-v3/SchemaBuilder/lib/db/sql/schema.php).
 If you don't need that feature and your tables are already existing, then you can just skip the configuration for those fields, or just setup some of them (i.e. for relations), because the underlying SQL Mapper exposes the existing table schema.
 
-<<<<<<< HEAD
-The datatype values are defined constants from the Schema Plugin. If you'd like to use the autocompletion of your IDE to find the right values, type in the longer path to the constants:
-=======
 You may also extend this config array to have a place for own validation rules or whatever ;)
 
 The datatype values are defined constants from the Schema Plugin. If you'd like to use some auto-completion in your IDE to find the right values, type in the longer path to the constants:
->>>>>>> refs/remotes/origin/dev-cortex
 
 ``` php
 'type' => \DB\SQL\Schema::DT_VARCHAR256,
@@ -328,11 +316,7 @@ This method completely removes the specified table from the used database. So ha
 
 ### Custom Field PreProcessors
 
-<<<<<<< HEAD
-You can define some custom functions that are called when you set or get attributes from your models. These are extremely useful for validation  directly in your Model, or some extended save or load cascades.
-=======
 You can define some custom functions that are called when you set or get attributes from your models. These are extremely useful for validation directly in your Model, or some extended save or load cascades.
->>>>>>> refs/remotes/origin/dev-cortex
 
 #### Setter
 
@@ -512,11 +496,7 @@ $author->load(array('_id = ?', 42));
 $author->news; // is now an array of NewsModel objects
 
 // if you like to cast them all you can use
-<<<<<<< HEAD
-$allNewsByAuthorX = $author->castAll('news'); // is now a multi-dimensional array
-=======
 $allNewsByAuthorX = $author->castField('news'); // is now a multi-dimensional array
->>>>>>> refs/remotes/origin/dev-cortex
 ```
 
 #### many-to-many, bidirectional
@@ -566,11 +546,7 @@ This example shows the inverse way of querying (using the TagModel to find the c
 
 You can use a `belongs-to-many` field config to define a one-way m:m relation.
 This is a special type for many-to-many as it will not use a 3rd table for reference and just puts a list of IDs into the table field, as commonly practiced in NoSQL solutions.
-<<<<<<< HEAD
-This is an unidirectional binding, because the counterpart wont know anything about its relation and it's harder to query the reserve way, but it's still a lightweight and useful solution in some use cases.
-=======
 This is an unidirectional binding, because the counterpart wont know anything about its relation and it's harder to query the reserve way, but it's still a lightweight and useful solution in some cases.
->>>>>>> refs/remotes/origin/dev-cortex
 
 Saving works the same way like the other m:m type described above
 
