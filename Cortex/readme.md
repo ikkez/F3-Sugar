@@ -38,10 +38,11 @@ It's great for fast and easy data abstraction and offers a bunch of useful filte
   3. [Additional notes](#additional-notes)
 5. [Collections](#collections)  
 6. [Filter Query Syntax](#filter-query-syntax)
-7. [Known Bugs](#known-bugs)
-8. [Roadmap](#roadmap)
-9. [Final Words](#final-words)
-10. [License](#license)
+7. [Advanced Filter Techniques](#advanced-filter-techniques)
+8. [Known Bugs](#known-bugs)
+9. [Roadmap](#roadmap)
+10. [Final Words](#final-words)
+11. [License](#license)
     
 
 ## Quick Start
