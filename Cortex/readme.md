@@ -16,7 +16,10 @@ Cortex is a multi-engine ActiveRecord ORM / ODM that offers easy object persiste
   - custom setter and getter preprocessors for all fields
   - default values and nullable fields for NoSQL
 
-With Cortex you can create generic apps, that work with any DB of the users choice, no matter if it's Postgre, MongoDB or even none. You can also mash-up multiple engines, use them simultaneous or link models of different DB engines together.
+With Cortex you can create generic apps, that work with any DB of the users choice, no matter if it's Postgre, MongoDB or even none.
+You can also mash-up multiple engines, use them simultaneous or link models of different DB engines together.
+
+It's great for fast and easy data abstraction and offers a bunch of useful filter possibilities.
 
 ---
 
@@ -45,7 +48,7 @@ With Cortex you can create generic apps, that work with any DB of the users choi
 
 ### System Requirements
 
-Cortex requires at least Fat-Free v3.1.2 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
+Cortex requires at least Fat-Free v3.2.1 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
 
 ### Install
 
@@ -68,7 +71,7 @@ $db = new \DB\Mongo('mongodb://localhost:27017','testdb');
 
 ### Let's get it rolling
 
-If you are familiar with F3's own Data-Mappers, you already know all about the basic CRUD operations you can also do with Cortex too. It implements the ActiveRecord [Cursor Class](http://fatfreeframework.com/cursor) with all its methods. So it's that easy:
+If you are familiar with F3's own Data-Mappers, you already know all about the basic CRUD operations you can do with Cortex too. It implements the ActiveRecord [Cursor Class](http://fatfreeframework.com/cursor) with all its methods. So it's that easy:
 
 ```php
 $user = new \DB\Cortex($db, 'users');
@@ -84,10 +87,10 @@ $user->load(array('mail = ?','jacky@email.com'));
 echo $user->name; // shouts out: Jack Ripper
 ```
 
-As you can see, the syntax for the filter array stays pure SQL logic, but works in all DB engines. This also works for pretty complex where criteria:
+As you can see, the syntax for the filter array stays pure SQL syntax, but works in all DB engines. This also works for pretty complex where criteria:
 
 ```php
-$user->load(array('name like ? AND (deleted = 0 OR rights > ?)','Jack%',3));
+$user->load(array('name like ? AND (deleted = 0 OR rights > ?)', 'Jack%', 3));
 ```
 
 No need for complex criteria objects or confusing Mongo where-array constructions. It's just as simple as you're used to. Using a Jig DB will automatically translate that query into:
@@ -130,7 +133,8 @@ You can use all the fancy methods from Cursor, like `load`, `find`, `cast`, `nex
 
 ## SQL Fluid Mode
 
-When you are prototyping some new objects or just don't want to bother with a table schema, while using Cortex along with a SQL DB backend, you can enable the SQL Fluid Mode. This way Cortex will create all necessary tables and columns automatically, so you can focus on writing your application code. It will try to guess the right datatype, based on the given sample data. To enable the fluid mode, just pass a third argument to the object's constructor:
+When you are prototyping some new objects or just don't want to bother with a table schema, while using Cortex along with a SQL DB backend, you can enable the SQL Fluid Mode.
+This way Cortex will create all necessary tables and columns automatically, so you can focus on writing your application code. It will try to guess the right datatype, based on the given sample data. To enable the fluid mode, just pass a third argument to the object's constructor:
 
 ``` php
 $user = new \DB\Cortex($db, 'users', TRUE);
@@ -140,35 +144,48 @@ $user->active = true;            // boolean|tinyint
 $user->lastlogin = '2013-08-28'; // date
 ```
 
-This way it also creates datatypes of datetime, float, text (when strlen > 255) and double.
+This way it also creates datatypes of datetime, float, text (when `strlen > 255`) and double.
+
+The fluid mode disables the caching of the underlying SQL table schema. This could impact on performance, so keep in mind to deactivate this when you're done.
+
 
 ## Cortex Models
 
-Using the Cortex class directly is easy for some CRUD operations, but to enable some more advanced features, you'll need to wrap Cortex in a Model class like this:
+Using the Cortex class directly is easy for some CRUD operations, but to enable some more advanced features, you'll need to wrap Cortex into a Model class like this:
 
 ``` php
-// file user.php
+// file at app/model/user.php
+namespace Model;
+
 class User extends \DB\Cortex {
 
   protected
     $db = 'AppDB1',     // F3 hive key of a valid DB object
     $table = 'users',   // the DB table to work on
-    $fluid = true;      // triggers the SQL Fluid Mode
+    $fluid = true;      // triggers the SQL Fluid Mode, default: false
+    $ttl = 120;         // caching time of field schema, default: 60
 }
 ```
 
 Now you can create your mapper object that easy:
 
 ``` php
-$user = new \Users();
+$user = new \Model\Users();
 ```
+
+Cortex needs at least a working DB object. You can also pass this through the constructor (`new \Model\Users($db);`) and drop it in the setup.
+`$db` must be a string of a hive key where the DB object is stored, or the DB object itself.
+If no `$table` is provided, Cortex will use the class name as table name.
 
 ### Configuration
 
-Your Cortex Model accepts some sort of field configuration. This way it's able to follow a defined schema of your data entity. It looks like this:
+Cortex does not need that much configuration. But at least it would be useful to have setup the field configuration.
+This way it's able to follow a defined schema of your data entity and enables you to use some auto-installation routines (see [setup](#setup)). It looks like this:
 
 ``` php
-// file user.php
+// file at app/model/user.php
+namespace Model;
+
 class User extends \DB\Cortex {
 
   protected
@@ -193,19 +210,46 @@ class User extends \DB\Cortex {
 }
 ```
 
-You can set datatypes, nullable flags and default values for your columns. Doing so enables you to install new Models into your SQL database, and adds some nullable validation checks and the ability for defaults to the NoSQL engines (Jig and Mongo).
+You can set datatypes (`type`), `nullable` flags and `default` values for your columns. Doing so enables you to install new Models into your SQL database, and adds some nullable validation checks and the ability for defaults to the NoSQL engines (Jig and Mongo).
 
-Because column datatypes are currently only needed for setting up the tables in SQL, it follows that [SQL DataTypes Table](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder#column-class) from the [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/blob/master-v3/SchemaBuilder/lib/db/sql/schema.php). If you don't need that feature and your tables are already existing, then you can just skip the configuration for those fields, because the underlaying SQL Mapper exposes the existing table schema.
+Because column datatypes are currently only needed for setting up the tables in SQL, it follows that [SQL DataTypes Table](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder#column-class) from the [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/blob/master-v3/SchemaBuilder/lib/db/sql/schema.php).
+If you don't need that feature and your tables are already existing, then you can just skip the configuration for those fields, or just setup some of them (i.e. for relations), because the underlying SQL Mapper exposes the existing table schema.
 
-The datatype values are defined constants from the Schema Plugin. If you'd like to use some autocompletion in your IDE to find the right values, type in the longer path to the constants:
+You may also extend this config array to have a place for own validation rules or whatever ;)
+
+The datatype values are defined constants from the Schema Plugin. If you'd like to use some auto-completion in your IDE to find the right values, type in the longer path to the constants:
 
 ``` php
 'type' => \DB\SQL\Schema::DT_VARCHAR256,
 ```
 
+#### Additional Datatypes
+
+Cortex comes with two own datatypes for handling array values in fields. Even when Jig and Mongo support them naturally, most SQL engines do not. Therefore Cortex introduces:
+
++ DT_SERIALIZED
++ DT_JSON
+
+In example:
+
+``` php
+'colors' => array(
+    'type' => self::DT_JSON
+    // or
+    'type' => 'JSON'
+),
+```
+
+Now you're able to save array data in your model field, which get json_encoded behind the scene (of cause only when using a SQL backend).
+
+``` php
+$mapper->colors = array('red','blue','green');
+```
+
+
 #### Alternative Configuration Method
 
-In case you need some more flexible configurations and don't want to hard-wire it, you could overload the Model class constructor to load its config from an ini file or elsewhere. In example:
+In case you need some more flexible configurations and don't want to hard-wire it, you can overload the Model class constructor to load its config from an `ini`-file or elsewhere. In example:
 
 ``` php
 class User extends \DB\Cortex {
@@ -213,7 +257,7 @@ class User extends \DB\Cortex {
     function __construct() {
         $f3 = \Base::instance();
         if(!$f3->exists('usermodel'))
-            $f3->config('app/models/usermodel.ini');        
+            $f3->config('app/models/usermodel.ini');
         foreach ($f3->get('usermodel') as $key => $val)
             $this->{$key} = $val;
         parent::__construct();
@@ -235,19 +279,16 @@ usermodel.fieldConf.rights_level.type = TINYINT
 usermodel.fieldConf.rights_level.default = 3
 ```
 
-
 ### Setup
 
 This method tries to create the SQL DB tables you need to run your Cortex object. It also adds just missing fields to already existing tables.
 
-#### With Model class
 If your Model has a valid field configuration, you are able to run this installation method:
 
 ``` php
-\User::setup();
+\Model\User::setup();
 ``` 
 
-#### Without Model class
 If you have no model class you need to provide all parameters the setup method has.
 
 ``` php
@@ -266,7 +307,7 @@ This method completely removes the specified table from the used database. So ha
 
 ``` php
 // With Model class
-\User::setdown();
+\Model\User::setdown();
 
 // Without Model class
 \DB\Cortex::setdown($db, 'users');
@@ -274,7 +315,7 @@ This method completely removes the specified table from the used database. So ha
 
 ### Custom Field PreProcessors
 
-You can define some custom functions that are called when you set or get attributes from your models. These are extremely useful for validation  directly in your Model, or some extended save or load cascades.
+You can define some custom functions that are called when you set or get attributes from your models. These are extremely useful for validation directly in your Model, or some extended save or load cascades.
 
 #### Setter
 
@@ -574,7 +615,7 @@ This plugin is still in an early stage of development. So at this point it may h
 - handle aggregational fields like SUM(), MAX(), AVG()
 - handle creation of indexes
 - extended date functions
-- search and filters for relations
+- ~~search and filters for relations~~
 - logging
 
 
