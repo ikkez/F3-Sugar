@@ -366,11 +366,11 @@ class User extends \DB\Cortex {
 
 ## Relations
 
-With Cortex you can create associations between multiple Models. By linking them together, you can create all common relationships you need for smart and easy development.
+With Cortex you can create associations between multiple Models. By linking them together, you can create all common relationships you need for smart and easy persistence.
 
 ### Setup the linkage
 
-To make relations work, you need to use a model class with field configuration. Cortex offers the following types of associations, that mostly must be defined in both classes of a relation:
+To make relations work, you need to use a model class with field configuration. Cortex offers the following types of associations, that mostly **must be defined in both classes** of a relation:
 
 <table>
     <tr>
@@ -417,23 +417,24 @@ This creates an aggregation between Author and News, so
 
 ![UML 1](https://dl.dropboxusercontent.com/u/3077539/_linked/cortex-dia-1.png?)
 
-As a side note: `belongs-to-*` definitions will create a new column in that table, that is used to save the id of the counterpart model. Whereas `has-*` definitions are just virtual fields which are going to query the linked models by their own id. This leads us to the following configuration schema:
+As a side note: `belongs-to-*` definitions will create a new column in that table, that is used to save the id of the counterpart model (foreign key field).
+Whereas `has-*` definitions are just virtual fields which are going to query the linked models by their own id (the inverse way). This leads us to the following configuration schema:
 
 For **belongs-to-one** and **belongs-to-many**
 
 ```
 'realTableField' => array(
-    'relationType' => 'NamespacedClassName',
+    'relationType' => '\Namespace\ClassName',
 ),
 ```
 
-Defining a foreign key for `belongs-to-*` is optional. The default way is to use the identifier field (`id` in SQL, `_id` in NoSQL). If you need to define another id field use `array('NamespacedClassName','pKey')`. 
+Defining a foreign key for `belongs-to-*` is optional. The default way is to use the identifier field (`id` in SQL, `_id` in NoSQL). If you need to define another id field use `array('\Namespace\ClassName','pKey')`.
 
 For **has-one** and **has-many**
 
 ```
 'virtualField' => array(
-    'relationType' => array('NamespacedClassName','foreignKey'),
+    'relationType' => array('\Namespace\ClassName','foreignKey'),
 ),
 ```
 
@@ -494,7 +495,7 @@ $author->load(array('_id = ?', 42));
 $author->news; // is now an array of NewsModel objects
 
 // if you like to cast them all you can use
-$allNewsByAuthorX = $author->castAll('news'); // is now a multi-dimensional array
+$allNewsByAuthorX = $author->castField('news'); // is now a multi-dimensional array
 ```
 
 #### many-to-many, bidirectional
@@ -538,13 +539,15 @@ $tags->load(array('title = ?','Responsive'));
 $tags->news[0]->title; // '10 Responsive Images Plugins'
 ```
 
+This example shows the inverse way of querying (using the TagModel to find the corresponding news). Of cause the can also use a more direct way that offers even more possibilities, therefore check the [has()](#has) method.
+
 #### many-to-many, unidirectional
 
 You can use a `belongs-to-many` field config to define a one-way m:m relation.
 This is a special type for many-to-many as it will not use a 3rd table for reference and just puts a list of IDs into the table field, as commonly practiced in NoSQL solutions.
-This is an unidirectional binding, because the counterpart wont know anything about its relation and it's harder to query the reserve way, but it's still a lightweight and useful solution in some use cases.
+This is an unidirectional binding, because the counterpart wont know anything about its relation and it's harder to query the reserve way, but it's still a lightweight and useful solution in some cases.
 
-Saving works the same way like the other m:m type describes above
+Saving works the same way like the other m:m type described above
 
 ``` php
 $news->tags = array(4, 7); // IDs of TagModel
@@ -563,13 +566,13 @@ echo $news->tags[1]->title; // Responsive
 
 * To release any relation, just set the field to `NULL`.
 
-* All relations are lazy loaded to save performance. That mean, they won't be loaded until you access them by the linked property or casting the whole parent model.
+* All relations are lazy loaded to save performance. That means they won't get loaded until you access them by the linked property or casting the whole parent model.
 
-* lazy loading within a result collection will **automatically** invoke the eager loading of that property to the whole set. This method is called _smart loading_ and is used to get around the [1+N query problem](http://www.phabricator.com/docs/phabricator/article/Performance_N+1_Query_Problem.html).
+* lazy loading within a result collection will **automatically** invoke the eager loading of that property to the whole set. The results are saved to an [Identity Map](http://martinfowler.com/eaaCatalog/identityMap.html) to relieve the strain on further calls. This method i called _smart loading_ and is used to get around the [1+N query problem](http://www.phabricator.com/docs/phabricator/article/Performance_N+1_Query_Problem.html) with no need for extra configuration.
 
 * to get the id of any record use `$user->_id;`
 
-* To find any record by its id use the field `_id` in your filter array like `array('_id = ?',123)`.
+* To find any record by its **id** use the field `_id` in your filter array, like `array('_id = ?', 123)`.
 
 ## Filter Query Syntax
 
@@ -598,6 +601,54 @@ The `$options` array for load operations respects the following keys:
 - offset
 
 Use `DESC` and `ASC` flags for sorting fields, just like in SQL. Additional `group` settings might be handled in a future version.
+
+## Advanced Filter Techniques
+
+When your application reaches the point where all basic CRUD operations are working, you probably need some more control about finding your records based on conditions for relations.
+Here comes the `has()` and `filter()` methods into play:
+
+### has
+
+The has method adds some conditions to a related field, that must be fulfilled in addition, when the **next** find() or load() method of its parent is fired. So this is meant for limiting the main results.
+
+In other words: Let's find all news records that are tagged by "Responsive".
+
+``` php
+$news->has('tags', array('title = ?','Responsive'));
+$results = $news->find();
+$results[0]->title; // '10 Responsive Images Plugins'
+```
+
+Of cause you can also use the inverse way of querying, using the TagModel, load them by title and access the shared `$tags->news` property to find your records.
+The advantage of the "has" method is that you can also add a condition to the parent as well. This way you could edit the load line into something like this:
+`$news->find(array('published = ?', 1));`. Now you can limit your results based on two different models - you only load *published* news which were tagged "Responsive".
+
+You can also add multiple has-conditions to different relations:
+
+``` php
+$news->has('tags', array('title = ?','Responsive'));
+$news->has('author', array('username = ?','ikkez'));
+$results = $news->find(array('published = ?', 1), array('limit'=>3, 'order'=>'date DESC'));
+```
+
+Now you only load the last 3 published news written by me, which were tagged "Responsive", sorted by release date. ;)
+
+If you like, you can also call them in a fluent style: `$news->has(...)->load(...);`.
+
+### filter
+
+The filter method is meant for limiting the results of relations. In example: load author x and only his news from 2014.
+
+``` php
+$author->filter('news', array('date > ?','2014-01-01'));
+$author->load(array('username = ?', 'ikkez'));
+```
+
+The same way like the `has()` method does, you can add multiple filter conditions. You can mix filter and has conditions too.
+Once a `load` or `find` function is executed, the filter (and has) conditions are cleared for the next upcoming query.
+
+Filter conditions are currently not inherited. That means if you recursively access the fields of a relation ($author->news[0]->author->news) they get not filtered, but fully lazy loaded again.
+
 
 ## Collections
 
