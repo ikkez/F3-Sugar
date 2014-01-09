@@ -18,9 +18,9 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.1.0-dev
+        @version 1.1.0
         @since 24.04.2012
-        @date 30.11.2013
+        @date 09.01.2014
  **/
 
 namespace DB;
@@ -445,6 +445,21 @@ class Cortex extends Cursor {
 	 */
 	public function find($filter = NULL, array $options = NULL, $ttl = 0)
 	{
+		$result = $this->filteredFind($filter,$options,$ttl);
+		if (empty($result))
+			return false;
+		foreach($result as &$record) {
+			$record = $this->factory($record);
+			unset($record);
+		}
+		$cc = new \DB\CortexCollection();
+		$cc->setModels($result);
+		$this->clearFilter();
+		return $cc;
+	}
+
+	protected function filteredFind($filter = NULL, array $options = NULL, $ttl = 0)
+	{
 		if ($this->hasCond) {
 			$hasJoin = array();
 			foreach($this->hasCond as $key => $hasCond) {
@@ -501,33 +516,20 @@ class Cortex extends Cursor {
 					$sql .= ' GROUP BY '.$options['group'];
 				unset($filter[0]);
 				$result = $this->db->exec($sql, $filter, $ttl);
-				$cc = new \DB\CortexCollection();
-				// wrap results into new mappers
-				foreach ($result as $record) {
+				foreach ($result as &$record) {
 					$mapper = clone($this->mapper);
 					$mapper->reset();
-					$cx = $this->factory($mapper);
-					$cx->copyfrom($record);
-					$cc->add($cx);
-					unset($cx);
+					foreach ($record as $key=>$val)
+						$mapper->set($key, $val);
+					$record = $mapper;
+					unset($record, $mapper);
 				}
-				$this->clearFilter();
-				return $cc;
+				return $result;
 			}
 		}
 		$filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
 		$options = $this->queryParser->prepareOptions($options, $this->dbsType);
-		$result = $this->mapper->find($filter, $options, $ttl);
-		if (empty($result))
-			return false;
-		foreach($result as &$mapper) {
-			$mapper = $this->factory($mapper);
-			unset($mapper);
-		}
-		$cc = new \DB\CortexCollection();
-		$cc->setModels($result);
-		$this->clearFilter();
-		return $cc;
+		return $this->mapper->find($filter, $options, $ttl);
 	}
 
 	/**
@@ -540,12 +542,9 @@ class Cortex extends Cursor {
 	public function load($filter = NULL, array $options = NULL, $ttl = 0)
 	{
 		$this->reset();
-		$res = $this->find($filter, $options, $ttl);
+		$res = $this->filteredFind($filter, $options, $ttl);
 		if ($res) {
-			$query = array();
-			foreach ($res as $cx)
-				$query[] = $cx->mapper;
-			$this->mapper->query = $query;
+			$this->mapper->query = $res;
 			$this->first();
 		} else
 			$this->mapper->reset();
@@ -1312,14 +1311,21 @@ class Cortex extends Cursor {
 
 	/**
 	 * wrap result mapper
-	 * @param $mapper
+	 * @param Cursor|array $mapper
 	 * @return Cortex
 	 */
 	protected function factory($mapper)
 	{
-		$cx = clone($this);
-		$cx->reset(false);
-		$cx->mapper = $mapper;
+		if (is_array($mapper)) {
+			$mp = clone($this->mapper);
+			$mp->reset();
+			$cx = $this->factory($mp);
+			$cx->copyfrom($mapper);
+		} else {
+			$cx = clone($this);
+			$cx->reset(false);
+			$cx->mapper = $mapper;
+		}
 		return $cx;
 	}
 
