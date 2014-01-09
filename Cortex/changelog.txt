@@ -1,7 +1,8 @@
 CHANGELOG - Cortex ORM
 
-1.1.0
+1.1.0 (09.01.2014)
 *	Feature: has-filter
+*	allow case sensitive table names
 *	addRelFilter renamed to filter
 *	enhanced copyfrom
 *	compatibility fixes for F3 v3.2.1
