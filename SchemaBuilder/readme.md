@@ -135,7 +135,7 @@ The Schema class provides you the following simple methods for:
 -	**$schema->dropTable( $name, [ bool $exec = true ]);**
 
 	Deletes a table. Set `$exec` to `FALSE` will return the generated query instead of executing it.
-	You can also use a short-cut on an altering table object, like `$talbe->drop([ bool $exec = true ]);`.
+	You can also use a short-cut on an altering table object, like `$table->drop([ bool $exec = true ]);`.
 
 
 
