@@ -531,8 +531,17 @@ class Cortex extends Cursor {
 				foreach ($hasJoin as $q)
 					$sql .= ' '.$q;
 				$sql .= ' WHERE '.$filter[0];
-				if (isset($options['group']))
+				if (isset($options['group'])) {
 					$sql .= ' GROUP BY '.$options['group'];
+					// PostgreSQLism: all non-aggregated fields need to be present in the GROUP BY clause
+					if ($this->db->driver() == 'pgsql') {
+						$groupFields = explode(',', preg_replace('/"/','',$options['group']));
+						foreach ($this->mapper->fields() as $field) {
+							if (!in_array($this->table.'.'.$field,$groupFields))
+								$sql .= ', '.$qtable.'.'.$this->db->quotekey($field);
+						}
+					}
+				}
 				unset($filter[0]);
 				$result = $this->db->exec($sql, $filter, $ttl);
 				foreach ($result as &$record) {
