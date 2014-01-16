@@ -12,8 +12,8 @@ class Cortex extends Controller
 
 		$dbs = array(
 			'sql' => new \DB\SQL('mysql:host=localhost;port=3306;dbname=fatfree', 'fatfree', ''),
-//            'sql-sqlite' => new \DB\SQL('sqlite:data/sqlite.db'),
-//            'sql-pgsql' => new \DB\SQL('pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'),
+//			'sql-sqlite' => new \DB\SQL('sqlite:data/sqlite.db'),
+//			'sql-pgsql' => new \DB\SQL('pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'),
 			'jig' => new \DB\Jig('data/'),
 			'mongo' => new \DB\Mongo('mongodb://localhost:27017', 'testdb')
 		);
@@ -40,10 +40,12 @@ class Cortex extends Controller
 			$results = array_merge((array) $results, (array) $test->run($db, $type));
 		}
 
-		$test = new \Test_Common();
-		$f3->set('DB', $dbs['sql']);
-		$results = array_merge((array) $results, (array) $test->run());
-
+		// Further Common Tests
+		if (isset($dbs['sql'])) {
+			$test = new \Test_Common();
+			$f3->set('DB', $dbs['sql']);
+			$results = array_merge((array) $results, (array) $test->run());
+		}
 		$f3->set('results', $results);
 	}
 

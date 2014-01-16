@@ -15,15 +15,24 @@ class Test_Filter {
 		$profile = new \ProfileModel();
 		$tag = new \TagModel();
 
+		$ac=$author::resolveConfiguration();
+		$author_pk = (is_int(strpos($type,'sql'))?$ac['primary']:'_id');
+
+		$nc=$news::resolveConfiguration();
+		$news_pk = (is_int(strpos($type,'sql'))?$nc['primary']:'_id');
+
+		$tc=$tag::resolveConfiguration();
+		$tag_pk = (is_int(strpos($type,'sql'))?$tc['primary']:'_id');
+
 		$authorIDs = $author->find()->getAll('_id');
-		$newsIDs = $news->find()->getAll('_id');
+		$all = $news->find();
+		$newsIDs = $all->getAll('_id');
 		$profileIDs = $profile->find()->getAll('_id');
 		$tagIDs = $tag->find()->getAll('_id');
 
-
 		// add another relation
-		$news->load(array('_id = ?',$newsIDs[1]));
-		$news->author = $author->load(array('_id = ?',$authorIDs[0]));
+		$news->load(array($news_pk.' = ?',$newsIDs[1]));
+		$news->author = $author->load(array($author_pk.' = ?',$authorIDs[0]));
 		$news->save();
 		$news->reset();
 		$author->reset();
@@ -147,7 +156,7 @@ class Test_Filter {
 		);
 
 		// add another news to author 2
-		$news->load(array('_id = ?',$newsIDs[2]));
+		$news->load(array($news_pk.' = ?',$newsIDs[2]));
 		$news->author = $authorIDs[1];
 		$news->save();
 
