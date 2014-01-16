@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.1.0
+        @version 1.2.0-dev
         @since 24.04.2012
         @date 09.01.2014
  **/
@@ -35,6 +35,7 @@ class Cortex extends Cursor {
 		$fluid,         // fluid sql schema mode, boolean
 		$fieldConf,     // field configuration, array
 		$ttl,           // default mapper ttl
+		$primary,       // SQL table primary key
 		// behaviour
 		$smartLoading,  // intelligent lazy eager loading, boolean
 		$standardiseID, // return standardized '_id' field for SQL when casting
@@ -99,6 +100,8 @@ class Cortex extends Cursor {
 			$this->dbsType = 'mongo';
 		if ($table)
 			$this->table = $table;
+		if (!$this->primary || $this->dbsType != 'sql')
+			$this->primary = 'id';
 		if (!$this->table && !$this->fluid)
 			trigger_error(self::E_NO_TABLE);
 		$this->ttl = $ttl ?: 60;
@@ -181,8 +184,9 @@ class Cortex extends Cursor {
 		$conf = array (
 			'table'=>$self->getTable(),
 			'fieldConf'=>$self->getFieldConfiguration(),
-			'db'=> $self->db,
-			'fluid'=> $self->fluid,
+			'db'=>$self->db,
+			'fluid'=>$self->fluid,
+			'primary'=>$self->primary,
 		);
 		unset($self);
 		return $conf;
@@ -276,6 +280,10 @@ class Cortex extends Cursor {
 				$table = $schema->createTable($table);
 				foreach ($fields as $field_key => $field_conf)
 					$table->addColumn($field_key, $field_conf);
+				if(isset($df) && $df['primary'] != 'id') {
+					$table->addColumn($df['primary'])->type_int();
+					$table->primary($df['primary']);
+				}
 				$table->build();
 			} else {
 				// add missing fields
@@ -394,6 +402,7 @@ class Cortex extends Cursor {
 			else {
 				// find foreign field type
 				$fc = $relConf[0]::resolveConfiguration();
+				$field['belongs-to-one']['relPK'] = $fc['primary'];
 				$field['type'] = $fc['fieldConf'][$relConf[1]]['type'];
 			}
 			$field['nullable'] = true;
@@ -414,6 +423,7 @@ class Cortex extends Cursor {
 				$field['has-many']['hasRel'] = 'has-many';
 				$field['has-many']['relTable'] = $rel['table'];
 				$field['has-many']['relField'] = $relConf[1];
+				$field['has-many']['relPK'] = $rel['primary'];
 			} else {
 				$field['has-many']['hasRel'] = 'belongs-to-one';
 			}
@@ -472,19 +482,28 @@ class Cortex extends Cursor {
 					case 'has-many':
 						if (!is_array($fromConf))
 							trigger_error(sprintf(self::E_REL_CONF_INC, $key));
+						$id = $this->dbsType == 'sql' ? $this->primary : '_id';
+						// many-to-many
 						if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
 							if ($this->dbsType == 'sql'
 								&& !isset($has_options['limit']) && !isset($has_options['offset']))
-								$hasJoin = array_merge($hasJoin, $this->_hasJoinMM_sql($key,$hasCond,$filter,$options));
+								$hasJoin = array_merge($hasJoin,
+									$this->_hasJoinMM_sql($key,$hasCond,$filter,$options));
 							elseif ($result = $this->_hasRefsInMM($key,$has_filter,$has_options,$ttl))
-								$addToFilter = array('_id IN ?', $result);
-						} elseif ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
-							$addToFilter = array('_id IN ?', $result);
+								$addToFilter = array($id.' IN ?', $result);
+						} // *-to-one
+						elseif ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
+							$addToFilter = array($id.' IN ?', $result);
 						break;
+					// one-to-*
 					case 'belongs-to-one':
 						if ($this->dbsType == 'sql'
 							&& !isset($has_options['limit']) && !isset($has_options['offset'])) {
-							$rel = $fromConf::resolveConfiguration();
+							if (!is_array($fromConf))
+								$fromConf = array($fromConf, '_id');
+							$rel = $fromConf[0]::resolveConfiguration();
+							if ($this->dbsType == 'sql')
+								$fromConf[1] = $rel['primary'];
 							$hasJoin[] = $this->_hasJoin_sql($key,$rel['table'],$hasCond,$filter,$options);
 						} elseif ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
 								$addToFilter = array($key.' IN ?', $result);
@@ -583,6 +602,8 @@ class Cortex extends Cursor {
 			// one-to-many shortcut
 			$fieldConf = array($fieldConf, '_id');
 		$rel = $this->getRelInstance($fieldConf[0]);
+		if($this->dbsType=='sql')
+			$fieldConf[1] = $rel->primary;
 		$hasSet = $rel->find($filter, $options, $ttl);
 		if (!$hasSet)
 			return false;
@@ -634,8 +655,8 @@ class Cortex extends Cursor {
 			$this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
 		} else
 			$mmTable = $fieldConf['refTable'];
-		$hasJoin[] = $this->_sql_left_join('id',$this->table,$fieldConf['relField'],$mmTable);
-		$hasJoin[] = $this->_sql_left_join($key,$mmTable,'id',$fieldConf['relTable']);
+		$hasJoin[] = $this->_sql_left_join($this->primary,$this->table,$fieldConf['relField'],$mmTable);
+		$hasJoin[] = $this->_sql_left_join($key,$mmTable,$fieldConf['relPK'],$fieldConf['relTable']);
 		$this->mergeRelCondition($hasCond,$fieldConf['relTable'],$filter,$options);
 		return $hasJoin;
 	}
@@ -645,7 +666,10 @@ class Cortex extends Cursor {
 	 */
 	protected function _hasJoin_sql($key, $table, $cond, &$filter, &$options)
 	{
-		$query = $this->_sql_left_join($key,$this->table,'id',$table);
+		$rel = $this->getRelInstance($this->fieldConf[$key]['belongs-to-one']);
+		$fkey = is_array($this->fieldConf[$key]['belongs-to-one']) ?
+			$this->fieldConf[$key]['belongs-to-one'][1] : $rel->primary;
+		$query = $this->_sql_left_join($key,$this->table,$fkey,$table);
 		$this->mergeRelCondition($cond,$table,$filter,$options);
 		return $query;
 	}
@@ -691,7 +715,7 @@ class Cortex extends Cursor {
 			$options['group'] .= ',';
 		else
 			$options['group'] = '';
-		$options['group'] .= $this->db->quotekey($this->getTable().'.id');
+		$options['group'] .= $this->db->quotekey($this->getTable().'.'.$this->primary);
 		if ($cond[1] && isset($cond[1]['group'])) {
 			$hasGroup = preg_replace('/(\w+)/i', $table.'.$1', $cond[1]['group']);
 			$options['group'] .= ','.$hasGroup;
@@ -943,7 +967,7 @@ class Cortex extends Cursor {
 	function get($key,$raw = false)
 	{
 		$fields = $this->fieldConf;
-		$id = ($this->dbsType == 'sql')?'id':'_id';
+		$id = ($this->dbsType == 'sql') ? $this->primary : '_id';
 		if ($key == '_id' && $this->dbsType == 'sql')
 			$key = $id;
 		if ($raw)
@@ -959,9 +983,11 @@ class Cortex extends Cursor {
 					// get config for this field
 					$relConf = $fields[$key]['belongs-to-one'];
 					if (!is_array($relConf))
-						$relConf = array($relConf, $id);
+						$relConf = array($relConf, '_id');
 					// fetch related model
 					$rel = $this->getRelInstance($relConf[0]);
+					if ($this->dbsType == 'sql')
+						$relConf[1] = $rel->primary;
 					// am i part of a result collection?
 					if ($this->collectionID && $this->smartLoading) {
 						$cx = CortexCollection::instance($this->collectionID);
@@ -1000,7 +1026,7 @@ class Cortex extends Cursor {
 					if(!is_array($toConf))
 						$toConf = array($toConf, $id);
 					if ($toConf[1] != $id && (!$this->exists($toConf[1])
-							|| is_null($this->mapper->{$toConf[1]})))
+							|| is_null($this->mapper->get($toConf[1]))))
 						$this->fieldsCache[$key] = null;
 					elseif($this->collectionID && $this->smartLoading) {
 						// part of a result set
@@ -1054,7 +1080,7 @@ class Cortex extends Cursor {
 								// preload all rels
 								$pivotKeys = array_unique($pivotKeys);
 								$fRel = $this->getRelInstance($fromConf[0]);
-								$crit = array($id.' IN ?', $pivotKeys);
+								$crit = array(($fRel->primary!='id' ? $fRel->primary : '_id').' IN ?', $pivotKeys);
 								$relSet = $fRel->find($this->mergeWithRelFilter($key, $crit));
 								$cx->setRelSet($key, $relSet ? $relSet->getBy($id) : NULL);
 								unset($fRel);
@@ -1062,8 +1088,7 @@ class Cortex extends Cursor {
 						}
 						// fetch subset from preloaded rels using cached pivot keys
 						$fkeys = $cx->getSubset($key.'_pivot', array($this->get($id)));
-						$this->fieldsCache[$key] = $fkeys ?
-							$cx->getSubset($key, $fkeys[0]) : NULL;
+						$this->fieldsCache[$key] = $fkeys ? $cx->getSubset($key, $fkeys[0]) : NULL;
 					} // no collection
 					else {
 						// find foreign keys
@@ -1077,7 +1102,7 @@ class Cortex extends Cursor {
 							unset($rel);
 							$rel = $this->getRelInstance($fromConf[0]);
 							// load foreign models
-							$filter = array($id.' IN ?', $fkeys);
+							$filter = array(($rel->primary!='id' ? $rel->primary : '_id').' IN ?', $fkeys);
 							$filter = $this->mergeWithRelFilter($key, $filter);
 							$this->fieldsCache[$key] = $rel->find($filter);
 						}
@@ -1096,8 +1121,10 @@ class Cortex extends Cursor {
 					// create foreign table mapper
 					$relConf = $fields[$key]['belongs-to-many'];
 					if (!is_array($relConf))
-						$relConf = array($relConf, $id);
+						$relConf = array($relConf, '_id');
 					$rel = $this->getRelInstance($relConf[0]);
+					if ($this->dbsType == 'sql')
+						$relConf[1] = $rel->primary;
 					$fkeys = array();
 					foreach ($result as $el)
 						$fkeys[] = (string) $el;
