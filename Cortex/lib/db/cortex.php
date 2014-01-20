@@ -1660,8 +1660,10 @@ class CortexQueryParser extends \Prefab {
 				preg_match('/(@\w+)/i', $part, $match);
 				// find like operator
 				if (is_int(strpos($upart = strtoupper($part), ' @LIKE '))) {
+					if ($not = is_int($npos = strpos($upart, '@NOT')))
+						$pos = $npos;
 					$val = $this->_likeValueToRegEx($val);
-					$part = 'preg_match(?,'.$match[0].')';
+					$part = ($not ? '!' : '').'preg_match(?,'.$match[0].')';
 				} // find IN operator
 				else if (is_int($pos = strpos($upart, ' @IN '))) {
 					if ($not = is_int($npos = strpos($upart, '@NOT')))
@@ -1746,7 +1748,7 @@ class CortexQueryParser extends \Prefab {
 	{
 		if (is_null($part))
 			return $part;
-		if (preg_match('/\<\=|\>\=|\<\>|\<|\>|\!\=|\=\=|\=|like|in|not in/i', $part, $match)) {
+		if (preg_match('/\<\=|\>\=|\<\>|\<|\>|\!\=|\=\=|\=|like|not like|in|not in/i', $part, $match)) {
 			$var = is_int(strpos($part, '?')) ? array_shift($args) : null;
 			$exp = explode($match[0], $part);
 			$key = trim($exp[0]);
@@ -1769,9 +1771,11 @@ class CortexQueryParser extends \Prefab {
 					$var = new \MongoId($var);
 			}
 			// find LIKE operator
-			if ($upart == 'LIKE') {
+			if (in_array($upart, array('LIKE','NOT LIKE'))) {
 				$rgx = $this->_likeValueToRegEx($var);
 				$var = new \MongoRegex($rgx);
+				if ($upart == 'NOT LIKE')
+					$var = array('$not' => $var);
 			} // find IN operator
 			elseif (in_array($upart, array('IN','NOT IN'))) {
 				$var = array(($upart=='NOT IN')?'$nin':'$in' => $var);

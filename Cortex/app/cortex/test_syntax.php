@@ -254,6 +254,13 @@ class Test_Syntax {
             $type.': full search'
         );
 
+        // negated search
+        $result = $this->getResult($cx->find(array('title not like ?', 'foo%')));
+        $test->expect(
+            json_encode($result) == json_encode($expected),
+            $type.': negated search'
+        );
+
         // AND / OR chaining
         $result = $this->getResult($cx->find(
             array('(num2 < ? AND num1 > ?) OR title like ?', 2, 1, '%o9')));
