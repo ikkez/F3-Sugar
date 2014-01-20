@@ -1489,11 +1489,14 @@ class Cortex extends Cursor {
 		return is_int($res) ? $this : $res;
 	}
 
+	function dbtype() {
+		return $this->mapper->dbtype();
+	}
+
 	/**
 	 * cleanup on destruct
 	 */
-	public function __destruct()
-	{
+	public function __destruct() {
 		unset($this->mapper);
 	}
 }
