@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 2.0.1
+        @version 2.0.2
  **/
 
 
@@ -327,7 +327,7 @@ abstract class TableBuilder extends DB_Utils {
                 if(strtoupper($search_cols[$index_cols[$i]]['type']) == 'TEXT')
                     $col.='('.$length.')';
         $cols = implode(',', $quotedCols);
-        $name = $this->db->quotekey(implode('__', $index_cols));
+        $name = $this->db->quotekey($this->name.'___'.implode('__', $index_cols));
         $table = $this->db->quotekey($this->name);
         $index = $unique ? 'UNIQUE INDEX' : 'INDEX';
         $cmd = array(
@@ -571,7 +571,7 @@ class TableModifier extends TableBuilder {
             if ($col->pkey)
                 $pkeys[$key] = $col;
         // indexes
-        $indexes = $this->listIndex();    
+        $indexes = $this->listIndex();
         // drop fields
         if (!empty($this->rebuild_cmd) && array_key_exists('drop', $this->rebuild_cmd))
             foreach ($this->rebuild_cmd['drop'] as $name)
@@ -587,10 +587,21 @@ class TableModifier extends TableBuilder {
                     unset($existing_columns[$name]);
                     // drop index
                     foreach (array_keys($indexes) as $col) {
+                        // for backward compatibility
                         if ($col == $name)
                             unset($indexes[$name]);
+                        // new index names
+                        if ($col == $this->name.'___'.$name)
+                            unset($indexes[$this->name.'___'.$name]);
+                        // check if column is part of an existing combined index
                         if (is_int(strpos($col, '__'))) {
-                            $ci = explode('__', $col);
+                            if (is_int(strpos($col, '___'))) {
+                                $col = explode('___', $col);
+                                $ci = explode('__', $col[1]);
+                                $col = implode('___',$col);
+                            } else // for backward compatibility
+                                $ci = explode('__', $col);
+                            // drop combined index
                             if (in_array($name, $ci))
                                 unset($indexes[$col]);
                         }
@@ -621,8 +632,10 @@ class TableModifier extends TableBuilder {
         $newTable->primary(array_keys($pkeys));
         // add existing indexes
         foreach (array_reverse($indexes) as $name=>$conf) {
+            if (is_int(strpos($name, '___')))
+               list($tname,$name) = explode('___', $name);
             if (is_int(strpos($name, '__')))
-                $name = explode('__', $name); 
+                $name = explode('__', $name);
             if ($exec) {
                 $t = $this->schema->alterTable($oname);
                 $t->dropIndex($name);
@@ -675,7 +688,7 @@ class TableModifier extends TableBuilder {
     public function getCols($types = false)
     {
         $columns = array();
-        $schema = $this->db->schema($this->name, 0);
+        $schema = $this->db->schema($this->name, null, 0);
         if (!$types)
             return array_keys($schema);
         else
@@ -820,7 +833,9 @@ class TableModifier extends TableBuilder {
     public function dropIndex($name)
     {
         if (is_array($name))
-            $name = implode('__', $name);
+            $name = $this->name.'___'.implode('__', $name);
+        elseif(!is_int(strpos($name,'___')))
+            $name = $this->name.'___'.$name;
         $name = $this->db->quotekey($name);
         $table = $this->db->quotekey($this->name);
         $cmd = array(

@@ -469,7 +469,7 @@ class Schema extends Controller
         );
         $indexes = $table->listIndex();
         $this->test->expect(
-            isset($indexes['foo']),
+            isset($indexes[$table->name.'___foo']),
             $this->getTestDesc('column index on table creation')
         );
         $table->addColumn('bar')->type($schema::DT_VARCHAR128)->index(true);
@@ -478,15 +478,15 @@ class Schema extends Controller
         $table->build();
         $indexes = $table->listIndex();
         $this->test->expect(
-            isset($indexes['bar']),
+            isset($indexes[$table->name.'___bar']),
             $this->getTestDesc('column index on table alteration')
         );
         $this->test->expect(
-            isset($indexes['bar']) && $indexes['bar']['unique'] == true,
+            isset($indexes[$table->name.'___bar']) && $indexes[$table->name.'___bar']['unique'] == true,
             $this->getTestDesc('unique index')
         );
         $this->test->expect(
-            isset($indexes['text__baz']),
+            isset($indexes[$table->name.'___text__baz']),
             $this->getTestDesc('index on combined columns')
         );
 
@@ -495,16 +495,17 @@ class Schema extends Controller
             $table->build();
             $indexes = $table->listIndex();
             $this->test->expect(
-                isset($indexes['text__baz']) && isset($indexes['bar']) && $indexes['bar']['unique'],
+                isset($indexes[$table->name.'___text__baz']) && isset($indexes[$table->name.'___bar'])
+                && $indexes[$table->name.'___bar']['unique'],
                 $this->getTestDesc('preserve indexes after table rebuild')
             );
         }
 
-        $table->dropIndex('bar');
+        $table->dropIndex($table->name.'___bar');
         $table->build();
         $indexes = $table->listIndex();
         $this->test->expect(
-            !array_key_exists('bar',$indexes),
+            !array_key_exists($table->name.'___bar',$indexes),
             $this->getTestDesc('drop index')
         );
 
