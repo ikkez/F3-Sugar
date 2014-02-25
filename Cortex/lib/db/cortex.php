@@ -46,7 +46,9 @@ class Cortex extends Cursor {
 		$collectionID,  // collection set identifier
 		$relFilter,     // filter for loading related models
 		$hasCond,       // IDs of records the next find should have
-		$mFuncs;        // magic functions cache
+		$mFuncs,        // magic functions cache
+		$whitelist;     // restrict to these fields
+
 
 	/** @var Cursor */
 	protected $mapper;
@@ -121,7 +123,7 @@ class Cortex extends Cursor {
 				$this->mapper = new Jig\Mapper($this->db, $this->table);
 				break;
 			case 'sql':
-				$this->mapper = new SQL\Mapper($this->db, $this->table, null,
+				$this->mapper = new SQL\Mapper($this->db, $this->table, $this->whitelist,
 					($this->fluid)?0:$this->ttl);
 				break;
 			case 'mongo':
@@ -142,6 +144,32 @@ class Cortex extends Cursor {
 		if(!empty($this->fieldConf))
 			foreach($this->fieldConf as &$conf)
 				$conf=static::resolveRelationConf($conf);
+	}
+
+	/**
+	 * get active fields or set whitelist / blacklist of fields
+	 * @param array $fields
+	 * @param bool  $exclude
+	 * @return array
+	 */
+	public function fields(array $fields=array(), $exclude=false)
+	{
+		$schema = $this->whitelist ?: $this->mapper->fields();
+		if (!$schema && !$this->dbsType != 'sql' && $this->dry()) {
+			$schema = $this->load()->mapper->fields();
+			$this->reset();
+		}
+		if (!$fields || empty($fields))
+			return $schema;
+		elseif ($exclude) {
+			$this->whitelist=array_diff($schema,$fields);
+		} else
+			$this->whitelist=$fields;
+		$id=$this->dbsType=='sql'?$this->primary:'_id';
+		if(!in_array($id,$this->whitelist))
+			$this->whitelist[]=$id;
+		$this->initMapper();
+		return $this->whitelist;
 	}
 
 	/**
@@ -979,6 +1007,8 @@ class Cortex extends Cursor {
 		$id = ($this->dbsType == 'sql') ? $this->primary : '_id';
 		if ($key == '_id' && $this->dbsType == 'sql')
 			$key = $id;
+		if ($this->whitelist && !in_array($key,$this->fields()))
+			return null;
 		if ($raw)
 			return $this->exists($key) ? $this->mapper->{$key} : NULL;
 		if (!empty($fields) && isset($fields[$key]) && is_array($fields[$key])
@@ -1267,10 +1297,12 @@ class Cortex extends Cursor {
 	public function cast($obj = NULL, $rel_depths = 1)
 	{
 		$fields = $this->mapper->cast( ($obj) ? $obj->mapper : null );
-		if(is_int($rel_depths))
+		if (is_int($rel_depths))
 			$rel_depths--;
 		if (!empty($this->fieldConf)) {
 			$fields += array_fill_keys(array_keys($this->fieldConf),NULL);
+			if($this->whitelist)
+				$fields = array_intersect_key($fields, array_flip($this->whitelist));
 			$mp = $obj ? : $this;
 			foreach ($fields as $key => &$val) {
 				//reset relType

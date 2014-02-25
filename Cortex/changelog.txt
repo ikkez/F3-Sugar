@@ -1,6 +1,7 @@
 CHANGELOG - Cortex ORM
 
 1.2.0
+*	added whitelisting of fields
 *	support for custom primary fields in SQL
 *	Bug fix: postgreSQL GROUP BY clause
 *	compatibility fixes for F3 v.3.2.2

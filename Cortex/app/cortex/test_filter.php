@@ -177,6 +177,34 @@ class Test_Filter {
 			$type.': has filter in load context'
 		);
 
+		$news->reset();
+		$news->fields(array('title'));
+		$news->load();
+
+		$test->expect(
+			!empty($news->title) &&
+			empty($news->author) &&
+			empty($news->text) &&
+			empty($news->tags) &&
+			empty($news->tags2),
+			'use a whitelist to restrict fields'
+		);
+
+		unset($news);
+		$news = new \NewsModel();
+
+		$news->fields(array('title','tags','tags2','author'),true);
+		$news->load();
+
+		$test->expect(
+			empty($news->title) &&
+			empty($news->author) &&
+			!empty($news->text) &&
+			empty($news->tags) &&
+			empty($news->tags2),
+			'use a blacklist to restrict fields'
+		);
+
 
 		///////////////////////////////////
 		return $test->results();
