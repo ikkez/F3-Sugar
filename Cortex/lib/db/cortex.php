@@ -1641,7 +1641,7 @@ class CortexQueryParser extends \Prefab {
 	 */
 	protected function splitLogical($cond)
 	{
-		return preg_split('/\s*(\)|\(|\bAND\b|\bOR\b)\s*/i', $cond, -1,
+		return preg_split('/\s*((?<!\()\)|\((?!\))|\bAND\b|\bOR\b)\s*/i', $cond, -1,
 			PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
 	}
 
