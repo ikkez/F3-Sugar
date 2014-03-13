@@ -530,7 +530,7 @@ class Cortex extends Cursor {
 							if (!is_array($fromConf))
 								$fromConf = array($fromConf, '_id');
 							$rel = $fromConf[0]::resolveConfiguration();
-							if ($this->dbsType == 'sql')
+							if ($this->dbsType == 'sql' && $fromConf[1] == '_id')
 								$fromConf[1] = $rel['primary'];
 							$hasJoin[] = $this->_hasJoin_sql($key,$rel['table'],$hasCond,$filter,$options);
 						} elseif ($result = $this->_hasRefsIn($key,$has_filter,$has_options,$ttl))
@@ -1025,7 +1025,7 @@ class Cortex extends Cursor {
 						$relConf = array($relConf, '_id');
 					// fetch related model
 					$rel = $this->getRelInstance($relConf[0]);
-					if ($this->dbsType == 'sql')
+					if ($this->dbsType == 'sql' && $relConf[1] == '_id')
 						$relConf[1] = $rel->primary;
 					// am i part of a result collection?
 					if ($this->collectionID && $this->smartLoading) {
@@ -1162,7 +1162,7 @@ class Cortex extends Cursor {
 					if (!is_array($relConf))
 						$relConf = array($relConf, '_id');
 					$rel = $this->getRelInstance($relConf[0]);
-					if ($this->dbsType == 'sql')
+					if ($this->dbsType == 'sql' && $relConf[1] == '_id')
 						$relConf[1] = $rel->primary;
 					$fkeys = array();
 					foreach ($result as $el)
