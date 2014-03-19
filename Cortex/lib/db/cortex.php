@@ -147,7 +147,7 @@ class Cortex extends Cursor {
 	}
 
 	/**
-	 * get active fields or set whitelist / blacklist of fields
+	 * get fields or set whitelist / blacklist of fields
 	 * @param array $fields
 	 * @param bool  $exclude
 	 * @return array
@@ -159,6 +159,8 @@ class Cortex extends Cursor {
 			$schema = $this->load()->mapper->fields();
 			$this->reset();
 		}
+		if (!$this->whitelist && $this->fieldConf)
+			$schema=array_unique(array_merge($schema,array_keys($this->fieldConf)));
 		if (!$fields || empty($fields))
 			return $schema;
 		elseif ($exclude) {
@@ -1007,7 +1009,7 @@ class Cortex extends Cursor {
 		$id = ($this->dbsType == 'sql') ? $this->primary : '_id';
 		if ($key == '_id' && $this->dbsType == 'sql')
 			$key = $id;
-		if ($this->whitelist && !in_array($key,$this->fields()))
+		if ($this->whitelist && !in_array($key,$this->whitelist))
 			return null;
 		if ($raw)
 			return $this->exists($key) ? $this->mapper->{$key} : NULL;
