@@ -187,7 +187,7 @@ class Test_Filter {
 			empty($news->text) &&
 			empty($news->tags) &&
 			empty($news->tags2),
-			'use a whitelist to restrict fields'
+			$type.': use a whitelist to restrict fields'
 		);
 
 		unset($news);
@@ -202,7 +202,19 @@ class Test_Filter {
 			!empty($news->text) &&
 			empty($news->tags) &&
 			empty($news->tags2),
-			'use a blacklist to restrict fields'
+			$type.': use a blacklist to restrict fields'
+		);
+
+		unset($news);
+		$news = new \NewsModel();
+
+		$news->fields(array('tags.title'));
+		$news->load();
+
+		$test->expect(
+			!empty($news->tags[0]->title) &&
+			empty($news->tags[0]->news),
+			$type.': set restricted fields to related mappers'
 		);
 
 

@@ -47,7 +47,8 @@ class Cortex extends Cursor {
 		$relFilter,     // filter for loading related models
 		$hasCond,       // IDs of records the next find should have
 		$mFuncs,        // magic functions cache
-		$whitelist;     // restrict to these fields
+		$whitelist,     // restrict to these fields
+		$relWhitelist;  // restrict relations to these fields
 
 
 	/** @var Cursor */
@@ -154,6 +155,14 @@ class Cortex extends Cursor {
 	 */
 	public function fields(array $fields=array(), $exclude=false)
 	{
+		if ($fields)
+			// collect restricted fields for related mappers
+			foreach($fields as $i=>$val)
+				if(is_int(strpos($val,'.'))) {
+					list($key, $relField) = explode('.',$val,2);
+					$this->relWhitelist[$key][(int)$exclude][] = $relField;
+					unset($fields[$i]);
+				}
 		$schema = $this->whitelist ?: $this->mapper->fields();
 		if (!$schema && !$this->dbsType != 'sql' && $this->dry()) {
 			$schema = $this->load()->mapper->fields();
@@ -640,7 +649,7 @@ class Cortex extends Cursor {
 		if (!is_array($fieldConf))
 			// one-to-many shortcut
 			$fieldConf = array($fieldConf, '_id');
-		$rel = $this->getRelInstance($fieldConf[0]);
+		$rel = $this->getRelInstance($fieldConf[0],null,$key);
 		if($this->dbsType=='sql')
 			$fieldConf[1] = $rel->primary;
 		$hasSet = $rel->find($filter, $options, $ttl);
@@ -661,7 +670,7 @@ class Cortex extends Cursor {
 	protected function _hasRefsInMM($key, $filter, $options, $ttl=0)
 	{
 		$fieldConf = $this->fieldConf[$key]['has-many'];
-		$rel = $this->getRelInstance($fieldConf[0]);
+		$rel = $this->getRelInstance($fieldConf[0],null,$key);
 		$hasSet = $rel->find($filter,$options,$ttl);
 		$result = false;
 		if ($hasSet) {
@@ -705,7 +714,7 @@ class Cortex extends Cursor {
 	 */
 	protected function _hasJoin_sql($key, $table, $cond, &$filter, &$options)
 	{
-		$rel = $this->getRelInstance($this->fieldConf[$key]['belongs-to-one']);
+		$rel = $this->getRelInstance($this->fieldConf[$key]['belongs-to-one'],null,$key);
 		$fkey = is_array($this->fieldConf[$key]['belongs-to-one']) ?
 			$this->fieldConf[$key]['belongs-to-one'][1] : $rel->primary;
 		$query = $this->_sql_left_join($key,$this->table,$fkey,$table);
@@ -904,7 +913,7 @@ class Cortex extends Cursor {
 					$val->set($relConf[1],NULL);
 				} else {
 					if (!$val instanceof Cortex) {
-						$rel = $this->getRelInstance($relConf[0]);
+						$rel = $this->getRelInstance($relConf[0],null,$key);
 						$rel->load(array('_id = ?', $val));
 						$val = $rel;
 					}
@@ -1026,7 +1035,7 @@ class Cortex extends Cursor {
 					if (!is_array($relConf))
 						$relConf = array($relConf, '_id');
 					// fetch related model
-					$rel = $this->getRelInstance($relConf[0]);
+					$rel = $this->getRelInstance($relConf[0],null,$key);
 					if ($this->dbsType == 'sql' && $relConf[1] == '_id')
 						$relConf[1] = $rel->primary;
 					// am i part of a result collection?
@@ -1058,7 +1067,7 @@ class Cortex extends Cursor {
 				$fromConf = $fields[$key][$type];
 				if (!is_array($fromConf))
 					trigger_error(sprintf(self::E_REL_CONF_INC, $key));
-				$rel = $this->getRelInstance($fromConf[0]);
+				$rel = $this->getRelInstance($fromConf[0],null,$key);
 				$relFieldConf = $rel->getFieldConfiguration();
 				$relType = key($relFieldConf[$fromConf[1]]);
 				// one-to-*, bidirectional, inverse way
@@ -1120,7 +1129,7 @@ class Cortex extends Cursor {
 								$cx->setRelSet($key.'_pivot', $pivotRel);
 								// preload all rels
 								$pivotKeys = array_unique($pivotKeys);
-								$fRel = $this->getRelInstance($fromConf[0]);
+								$fRel = $this->getRelInstance($fromConf[0],null,$key);
 								$crit = array(($fRel->primary!='id' ? $fRel->primary : '_id').' IN ?', $pivotKeys);
 								$relSet = $fRel->find($this->mergeWithRelFilter($key, $crit));
 								$cx->setRelSet($key, $relSet ? $relSet->getBy($id) : NULL);
@@ -1141,7 +1150,7 @@ class Cortex extends Cursor {
 							$fkeys = $results->getAll($key,true);
 							// create foreign table mapper
 							unset($rel);
-							$rel = $this->getRelInstance($fromConf[0]);
+							$rel = $this->getRelInstance($fromConf[0],null,$key);
 							// load foreign models
 							$filter = array(($rel->primary!='id' ? $rel->primary : '_id').' IN ?', $fkeys);
 							$filter = $this->mergeWithRelFilter($key, $filter);
@@ -1163,7 +1172,7 @@ class Cortex extends Cursor {
 					$relConf = $fields[$key]['belongs-to-many'];
 					if (!is_array($relConf))
 						$relConf = array($relConf, '_id');
-					$rel = $this->getRelInstance($relConf[0]);
+					$rel = $this->getRelInstance($relConf[0],null,$key);
 					if ($this->dbsType == 'sql' && $relConf[1] == '_id')
 						$relConf[1] = $rel->primary;
 					$fkeys = array();
@@ -1270,9 +1279,10 @@ class Cortex extends Cursor {
 	 * creates and caches related mapper objects
 	 * @param string $model
 	 * @param array $relConf
+	 * @param string $key
 	 * @return Cortex
 	 */
-	protected function getRelInstance($model=null,$relConf=null)
+	protected function getRelInstance($model=null,$relConf=null,$key='')
 	{
 		if (!$model && !$relConf)
 			trigger_error(self::E_MISSING_REL_CONF);
@@ -1286,6 +1296,13 @@ class Cortex extends Cursor {
 			if (!$rel instanceof Cortex)
 				trigger_error(self::E_WRONG_RELATION_CLASS);
 			\Registry::set($relName, $rel);
+		}
+		// restrict fields of related mapper
+		if(!empty($key) && isset($this->relWhitelist[$key])) {
+			if (isset($this->relWhitelist[$key][0]))
+				$rel->fields($this->relWhitelist[$key][0],false);
+			if (isset($this->relWhitelist[$key][1]))
+				$rel->fields($this->relWhitelist[$key][1],true);
 		}
 		return $rel;
 	}
