@@ -878,6 +878,14 @@ class Cortex extends Cursor {
 	}
 
 	/**
+	 * Count records that are currently loaded
+	 * @return int
+	 */
+	public function countResults() {
+		return count($this->mapper->query);
+	}
+
+	/**
 	 * Bind value to key
 	 * @return mixed
 	 * @param $key string
