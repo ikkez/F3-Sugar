@@ -429,7 +429,7 @@ For **belongs-to-one** and **belongs-to-many**
 ),
 ```
 
-Defining a foreign key for `belongs-to-*` is optional. The default way is to use the identifier field (`id` in SQL, `_id` in NoSQL). If you need to define another id field use `array('\Namespace\ClassName','pKey')`.
+Defining a foreign key for `belongs-to-*` is optional. The default way is to use the identifier field. For SQL engines this is either the default primary key `id` or the custom primary key that can be set with the `$primary` class property. NoSQL engines will use `_id`. If you need to define another non-primary field to join with, use `array('\Namespace\ClassName','cKey')`.
 
 For **has-one** and **has-many**
 
@@ -574,6 +574,10 @@ echo $news->tags[1]->title; // Responsive
 * to get the id of any record use `$user->_id;`
 
 * To find any record by its **id** use the field `_id` in your filter array, like `array('_id = ?', 123)`.
+
+* If you need to use a primary key in SQL which is different from `id` (for any legacy reason), you can use the `$primary` class property to set it to something else. You should use the new custom pkey in your queries now. Doing so will limit your app to SQL engines.
+
+* primary fields should not be included in the `$fieldConf` array. They could interfere with the [setup](#setup) routine.
 
 ## Filter Query Syntax
 

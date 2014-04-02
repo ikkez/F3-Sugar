@@ -1,5 +1,15 @@
 CHANGELOG - Cortex ORM
 
+1.2.0 (02.04.2014)
+*	added whitelisting of own and related fields
+*	added $option parameter to filter() method
+*	support for custom primary fields in SQL
+*	Bug fix: belongs-to-one linkage with non-primary fields
+*	Bug fix: don't split DB functions in where condition 
+*	Bug fix: postgreSQL GROUP BY clause
+*	compatibility fixes for F3 v.3.2.2
+*	added NOT LIKE operator to query parser
+
 1.1.0 (09.01.2014)
 *	Feature: has-filter
 *	allow case sensitive table names
