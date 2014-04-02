@@ -217,6 +217,14 @@ class Test_Filter {
 			$type.': set restricted fields to related mappers'
 		);
 
+		$news->filter('tags2',null,array('order'=>'title ASC'));
+		$news->load();
+
+		$test->expect(
+			$news->tags2[0]->title == 'Responsive' &&
+			$news->tags2[1]->title == 'Web Design',
+			$type.': filter with sorting of related records'
+		);
 
 		///////////////////////////////////
 		return $test->results();
