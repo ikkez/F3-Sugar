@@ -18,9 +18,9 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.2.0-dev
+        @version 1.2.0
         @since 24.04.2012
-        @date 09.01.2014
+        @date 02.04.2014
  **/
 
 namespace DB;

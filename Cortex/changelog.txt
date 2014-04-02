@@ -1,7 +1,8 @@
 CHANGELOG - Cortex ORM
 
-1.2.0
-*	added whitelisting of fields
+1.2.0 (02.04.2014)
+*	added whitelisting of own and related fields
+*	added $option parameter to filter() method
 *	support for custom primary fields in SQL
 *	Bug fix: belongs-to-one linkage with non-primary fields
 *	Bug fix: don't split DB functions in where condition 
