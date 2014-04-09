@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 1.2.0
+        @version 1.3.0-dev
         @since 24.04.2012
         @date 02.04.2014
  **/
@@ -282,7 +282,7 @@ class Cortex extends Cursor {
 					// check m:m relation
 					if (array_key_exists('has-many', $field)) {
 						// m:m relation conf [class,to-key,from-key]
-						if (!is_array($relConf = $field['has-many'])){
+						if (!is_array($relConf = $field['has-many'])) {
 							unset($fields[$key]);
 							continue;
 						}
@@ -292,9 +292,10 @@ class Cortex extends Cursor {
 							&& !is_null($rel['fieldConf'][$relConf[1]])
 							&& $relConf['hasRel'] == 'has-many') {
 							// compute mm table name
-							$fConf = $rel['fieldConf'][$relConf[1]]['has-many'];
-							$mmTable = static::getMMTableName(
-								$rel['table'], $relConf[1], $table, $key, $fConf);
+							$mmTable = isset($relConf[2]) ? $relConf[2] :
+								static::getMMTableName(
+									$rel['table'], $relConf[1], $table, $key,
+									$rel['fieldConf'][$relConf[1]]['has-many']);
 							// create dummy to invoke table
 							$mmRel = new Cortex($db,$mmTable,true);
 							$rand = rand(0,1000000);
@@ -373,9 +374,10 @@ class Cortex extends Cursor {
 				if (array_key_exists($relConf[1],$rel['fieldConf']) && !is_null($relConf[1])
 					&& key($rel['fieldConf'][$relConf[1]]) == 'has-many') {
 					// compute mm table name
-					$fConf = $rel['fieldConf'][$relConf[1]]['has-many'];
-					$deletable[] = static::getMMTableName(
-						$rel['table'], $relConf[1], $table, $key, $fConf);
+					$deletable[] = isset($relConf[2]) ? $relConf[2] :
+						static::getMMTableName(
+							$rel['table'], $relConf[1], $table, $key,
+							$rel['fieldConf'][$relConf[1]]['has-many']);
 				}
 			}
 		}
@@ -678,8 +680,9 @@ class Cortex extends Cursor {
 		if ($hasSet) {
 			$hasIDs = $hasSet->getAll('_id',true);
 			if (!array_key_exists('refTable', $fieldConf)) {
-				$mmTable = static::getMMTableName($fieldConf['relTable'],
-					$fieldConf['relField'], $this->getTable(), $key);
+				$mmTable = isset($fieldConf[2]) ? $fieldConf[2] :
+					static::getMMTableName($fieldConf['relTable'],
+						$fieldConf['relField'], $this->getTable(), $key);
 				$this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
 			} else
 				$mmTable = $fieldConf['refTable'];
@@ -700,8 +703,9 @@ class Cortex extends Cursor {
 		$hasJoin = array();
 		if (!array_key_exists('refTable', $fieldConf)) {
 			// compute mm table name
-			$mmTable = static::getMMTableName($fieldConf['relTable'],
-				$fieldConf['relField'], $this->getTable(), $key);
+			$mmTable = isset($fieldConf[2]) ? $fieldConf[2] :
+				static::getMMTableName($fieldConf['relTable'],
+					$fieldConf['relField'], $this->getTable(), $key);
 			$this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
 		} else
 			$mmTable = $fieldConf['refTable'];
@@ -848,8 +852,9 @@ class Cortex extends Cursor {
 					$relConf = $fields[$key]['has-many'];
 					if (!isset($relConf['refTable'])) {
 						// compute mm table name
-						$mmTable = static::getMMTableName($relConf['relTable'],
-							$relConf['relField'], $this->getTable(), $key);
+						$mmTable = isset($relConf[2]) ? $relConf[2] :
+							static::getMMTableName($relConf['relTable'],
+								$relConf['relField'], $this->getTable(), $key);
 						$this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
 					} else
 						$mmTable = $relConf['refTable'];
@@ -1126,7 +1131,8 @@ class Cortex extends Cursor {
 					if (!array_key_exists('refTable', $fromConf)) {
 						// compute mm table name
 						$toConf = $relFieldConf[$fromConf[1]]['has-many'];
-						$mmTable = static::getMMTableName($fromConf['relTable'],
+						$mmTable = isset($fromConf[2]) ? $fromConf[2] :
+							static::getMMTableName($fromConf['relTable'],
 							$fromConf['relField'], $this->getTable(), $key, $toConf);
 						$this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
 					} else
