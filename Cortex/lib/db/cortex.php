@@ -282,8 +282,10 @@ class Cortex extends Cursor {
 					// check m:m relation
 					if (array_key_exists('has-many', $field)) {
 						// m:m relation conf [class,to-key,from-key]
-						if (!is_array($relConf = $field['has-many']))
+						if (!is_array($relConf = $field['has-many'])){
+							unset($fields[$key]);
 							continue;
+						}
 						$rel = $relConf[0]::resolveConfiguration();
 						// check if foreign conf matches m:m
 						if (array_key_exists($relConf[1],$rel['fieldConf'])
