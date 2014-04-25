@@ -397,7 +397,7 @@ class Cortex extends Cursor {
 		} elseif($db instanceof Mongo) {
 			/** @var Mongo $db */
 			foreach ($deletable as $item)
-				$db->{$item}->drop();
+				$db->selectCollection($item)->drop();
 		}
 	}
 
@@ -1581,6 +1581,10 @@ class Cortex extends Cursor {
 	public function __destruct() {
 		unset($this->mapper);
 	}
+
+	public function __clone() {
+		$this->mapper = clone($this->mapper);
+	}
 }
 
 
@@ -1588,7 +1592,7 @@ class CortexQueryParser extends \Prefab {
 
 	const
 		E_BRACKETS = 'Invalid query: unbalanced brackets found',
-		E_INBINDVALUE = 'Bind value for IN operator must be an array',
+		E_INBINDVALUE = 'Bind value for IN operator must be a populated array',
 		E_ENGINEERROR = 'Engine not supported',
 		E_MISSINGBINDKEY = 'Named bind parameter `%s` does not exist in filter arguments';
 
@@ -1661,7 +1665,7 @@ class CortexQueryParser extends \Prefab {
 					if (is_int(strpos($part, '?'))) {
 						$val = array_shift($args);
 						if (is_int($pos = strpos($part, 'IN ?'))) {
-							if (!is_array($val))
+							if (!is_array($val) || empty($val))
 								trigger_error(self::E_INBINDVALUE);
 							$bindMarks = str_repeat('?,', count($val) - 1).'?';
 							$part = substr($part, 0, $pos).'IN ('.$bindMarks.')';
