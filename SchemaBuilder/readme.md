@@ -135,7 +135,7 @@ The Schema class prodives you the following simple methods for:
 -	**$schema->dropTable( $name, [ bool $exec = true ]);**
 
 	Deletes a table. Set `$exec` to `FALSE` will return the generated query instead of executing it.
-	You can also use a short-cut on an altering table object, like `$talbe->drop([ bool $exec = true ]);`.
+	You can also use a short-cut on an altering table object, like `$table->drop([ bool $exec = true ]);`.
 
 
 
@@ -214,7 +214,7 @@ This class is ment for creating new tables. It can be created by using `$schema-
 
 -   **$table->dropColumn( string $name );**
 
-    Tries to removes a column from the table, if it exists.
+    Tries to remove a column from the table, if it exists.
 
 -   **$table->addIndex( string | array $columns, [ bool $unique = false ]);**
 
