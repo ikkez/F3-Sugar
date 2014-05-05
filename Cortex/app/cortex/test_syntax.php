@@ -9,7 +9,6 @@ class Test_Syntax {
         $test = new \Test();
         $tname = 'test_cortex';
 
-
         \DB\Cortex::setdown($db, $tname);
 
         $fields = array(

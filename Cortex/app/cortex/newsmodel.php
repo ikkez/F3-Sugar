@@ -17,7 +17,8 @@ class NewsModel extends \DB\Cortex {
 				'belongs-to-many' => '\TagModel',
 			),
 			'tags2' => array(
-				'has-many' => array('\TagModel','news'),
+				'has-many' => array('\TagModel','news','news_tags'),
+//				'has-many' => array('\TagModel','news'),
 			),
 		),
 //		$primary='nid',

@@ -218,8 +218,7 @@ class Test_Filter {
 		);
 
 		$news->filter('tags2',null,array('order'=>'title ASC'));
-		$news->load();
-
+		$news->load(array('_id = ?',$newsIDs[0]));
 		$test->expect(
 			$news->tags2[0]->title == 'Responsive' &&
 			$news->tags2[1]->title == 'Web Design',
