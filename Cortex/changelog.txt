@@ -1,5 +1,13 @@
 CHANGELOG - Cortex ORM
 
+1.3.0
+*	Bug fix: has-filter used wrong column on sql many-to-many
+*	added possibility to add own virtual fields
+*	renamed countResults() to loaded() to follow fatfree #581 syntax
+*	Feature: countRel() to add a counter of related records
+*	advanced MongoId recognition/conversion in filter query
+*	added orderBy method to collection, for subsequent sorting
+
 1.2.0 (02.04.2014)
 *	added whitelisting of own and related fields
 *	added $option parameter to filter() method
