@@ -633,7 +633,7 @@ class Cortex extends Cursor {
 				// PostgreSQLism: all non-aggregated fields need to be present in the GROUP BY clause
 				if ($this->db->driver() == 'pgsql') {
 					$groupFields = explode(',', preg_replace('/"/','',$options['group']));
-					foreach ($this->mapper->fields() as $field)
+					foreach (array_diff($this->mapper->fields(),array_keys($this->mapper->adhoc)) as $field)
 						if (!in_array($this->table.'.'.$field,$groupFields))
 							$sql .= ', '.$qtable.'.'.$this->db->quotekey($field);
 				}
