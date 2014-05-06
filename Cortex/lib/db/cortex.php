@@ -535,6 +535,7 @@ class Cortex extends Cursor {
 	 */
 	protected function filteredFind($filter = NULL, array $options = NULL, $ttl = 0)
 	{
+		$qtable = $this->db->quotekey($this->table);
 		if ($this->grp_stack) {
 			if ($this->dbsType == 'mongo') {
 				$group = array(
@@ -616,10 +617,22 @@ class Cortex extends Cursor {
 			}
 			$this->hasCond = null;
 		}
+		// PostgreSQLism:
+		if ($this->db->driver() == 'pgsql') {
+			// sort NULL values to the end of a table
+			if (isset($options['order']))
+				$options['order'] = preg_replace('/\h+DESC/i',' DESC NULLS LAST',$options['order']);
+			// all non-aggregated fields need to be present in the GROUP BY clause
+			if (isset($options['group'])) {
+				$groupFields = explode(',', preg_replace('/"/','',$options['group']));
+				foreach (array_diff($this->mapper->fields(),array_keys($this->mapper->adhoc)) as $field)
+					if (!in_array($this->table.'.'.$field,$groupFields))
+						$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
+			}
+		}
 		if (!empty($hasJoin)) {
 			// assemble full sql query
 			$filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
-			$qtable = $this->db->quotekey($this->table);
 			$adhoc='';
 			if (!empty($this->mapper->adhoc))
 				foreach ($this->mapper->adhoc as $key=>$val)
@@ -628,16 +641,8 @@ class Cortex extends Cursor {
 			foreach ($hasJoin as $q)
 				$sql .= ' '.$q;
 			$sql .= ' WHERE '.$filter[0];
-			if (isset($options['group'])) {
+			if (isset($options['group']))
 				$sql .= ' GROUP BY '.$options['group'];
-				// PostgreSQLism: all non-aggregated fields need to be present in the GROUP BY clause
-				if ($this->db->driver() == 'pgsql') {
-					$groupFields = explode(',', preg_replace('/"/','',$options['group']));
-					foreach (array_diff($this->mapper->fields(),array_keys($this->mapper->adhoc)) as $field)
-						if (!in_array($this->table.'.'.$field,$groupFields))
-							$sql .= ', '.$qtable.'.'.$this->db->quotekey($field);
-				}
-			}
 			if (isset($options['order']))
 				$sql .= ' ORDER BY '.$options['order'];
 			unset($filter[0]);

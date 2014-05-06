@@ -7,6 +7,7 @@ CHANGELOG - Cortex ORM
 *	Feature: countRel() to add a counter of related records
 *	advanced MongoId recognition/conversion in filter query
 *	added orderBy method to collection, for subsequent sorting
+*	unified sorting of NULL values in postgreSQL
 
 1.2.0 (02.04.2014)
 *	added whitelisting of own and related fields
