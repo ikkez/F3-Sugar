@@ -535,7 +535,6 @@ class Cortex extends Cursor {
 	 */
 	protected function filteredFind($filter = NULL, array $options = NULL, $ttl = 0)
 	{
-		$qtable = $this->db->quotekey($this->table);
 		if ($this->grp_stack) {
 			if ($this->dbsType == 'mongo') {
 				$group = array(
@@ -617,17 +616,20 @@ class Cortex extends Cursor {
 			}
 			$this->hasCond = null;
 		}
-		// PostgreSQLism:
-		if ($this->db->driver() == 'pgsql') {
-			// sort NULL values to the end of a table
-			if (isset($options['order']))
-				$options['order'] = preg_replace('/\h+DESC/i',' DESC NULLS LAST',$options['order']);
-			// all non-aggregated fields need to be present in the GROUP BY clause
-			if (isset($options['group'])) {
-				$groupFields = explode(',', preg_replace('/"/','',$options['group']));
-				foreach (array_diff($this->mapper->fields(),array_keys($this->mapper->adhoc)) as $field)
-					if (!in_array($this->table.'.'.$field,$groupFields))
-						$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
+		if ($this->dbsType=='sql') {
+			$qtable = $this->db->quotekey($this->table);
+			// PostgreSQLism:
+			if ($this->db->driver() == 'pgsql') {
+				// sort NULL values to the end of a table
+				if (isset($options['order']))
+					$options['order'] = preg_replace('/\h+DESC/i',' DESC NULLS LAST',$options['order']);
+				// all non-aggregated fields need to be present in the GROUP BY clause
+				if (isset($options['group'])) {
+					$groupFields = explode(',', preg_replace('/"/','',$options['group']));
+					foreach (array_diff($this->mapper->fields(),array_keys($this->mapper->adhoc)) as $field)
+						if (!in_array($this->table.'.'.$field,$groupFields))
+							$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
+				}
 			}
 		}
 		if (!empty($hasJoin)) {
