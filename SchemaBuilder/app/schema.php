@@ -44,7 +44,10 @@ class Schema extends Controller
             /*'pgsql' => new \DB\SQL(
                 'pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'
             ),*/
-        );
+            /*'sqlsrv' => new \DB\SQL('sqlsrv:SERVER=LOCALHOST\SQLEXPRESS;Database=fatfree',
+                    'SA', 'fatfree')*/
+
+	);
 
         $this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
         $this->tname = 'test_table';
@@ -247,9 +250,9 @@ class Schema extends Controller
 
         // current timestamp
         $table->addColumn('stamp')
-                ->type($schema::DT_TIMESTAMP)
-                ->nullable(false)
-                ->defaults($schema::DF_CURRENT_TIMESTAMP);
+              ->type($schema::DT_TIMESTAMP)
+              ->nullable(false)
+              ->defaults($schema::DF_CURRENT_TIMESTAMP);
         $table->build();
         $r1 = $table->getCols(true);
         $this->test->expect(
@@ -373,7 +376,8 @@ class Schema extends Controller
 
         // adding composite primary keys
         $table = $schema->createTable($this->tname);
-        $table->addColumn('version')->type($schema::DT_INT4)->defaults(1);
+        $table->addColumn('version')->type($schema::DT_INT4)
+              ->defaults(1)->nullable(false);
         $table->primary(array('id', 'version'));
         $table = $table->build();
         $r1 = $table->getCols(true);
@@ -474,7 +478,7 @@ class Schema extends Controller
         );
         $table->addColumn('bar')->type($schema::DT_VARCHAR128)->index(true);
         $table->addColumn('baz')->type($schema::DT_VARCHAR128);
-        $table->addIndex(array('text', 'baz'));
+        $table->addIndex(array('foo', 'baz'));
         $table->build();
         $indexes = $table->listIndex();
         $this->test->expect(
@@ -486,7 +490,7 @@ class Schema extends Controller
             $this->getTestDesc('unique index')
         );
         $this->test->expect(
-            isset($indexes[$table->name.'___text__baz']),
+            isset($indexes[$table->name.'___foo__baz']),
             $this->getTestDesc('index on combined columns')
         );
 
@@ -495,7 +499,7 @@ class Schema extends Controller
             $table->build();
             $indexes = $table->listIndex();
             $this->test->expect(
-                isset($indexes[$table->name.'___text__baz']) && isset($indexes[$table->name.'___bar'])
+                isset($indexes[$table->name.'___foo__baz']) && isset($indexes[$table->name.'___bar'])
                 && $indexes[$table->name.'___bar']['unique'],
                 $this->getTestDesc('preserve indexes after table rebuild')
             );

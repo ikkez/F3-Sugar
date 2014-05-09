@@ -13,12 +13,12 @@
                 |  |    < |    <|  -__|-- __|
                 |__|__|__||__|__|_____|_____|
 
-    Copyright (c) 2013 by ikkez
+    Copyright (c) 2014 by ikkez
     Christian Knuth <ikkez0n3@gmail.com>
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 2.0.2
+        @version 2.1.0
  **/
 
 
@@ -78,9 +78,9 @@ class Schema extends DB_Utils {
                                   'mysql|sqlite2?|mssql|sybase|dblib|odbc|sqlsrv' => 'datetime',
                                   'ibm' => 'timestamp',
             ),
-            'TIMESTAMP' =>  array('mysql|dblib|sqlsrv|ibm' => 'timestamp',
+            'TIMESTAMP' =>  array('mysql|ibm' => 'timestamp',
                                   'pgsql|odbc' => 'timestamp without time zone',
-                                  'sqlite2?|mssql|sybase'=>'DATETIME',
+                                  'sqlite2?|mssql|sybase|dblib|sqlsrv'=>'DATETIME',
             ),
             'BLOB' =>       array('mysql|odbc|sqlite2?|ibm' => 'blob',
                                   'pgsql' => 'bytea',
@@ -89,7 +89,8 @@ class Schema extends DB_Utils {
             ),
         ),
         $defaultTypes = array(
-            'CUR_STAMP' =>  array('mysql|mssql|sybase|dblib|odbc|sqlsrv' => 'CURRENT_TIMESTAMP',
+            'CUR_STAMP' =>  array('mysql' => 'CURRENT_TIMESTAMP',
+                                  'mssql|sybase|dblib|odbc|sqlsrv' => 'getdate()',
                                   'pgsql' => 'LOCALTIMESTAMP(0)',
                                   'sqlite2?' => "(datetime('now','localtime'))",
             ),
@@ -226,10 +227,12 @@ class Schema extends DB_Utils {
                 'mysql|ibm' =>
                     "RENAME TABLE $name TO $new_name;",
                 'mssql|sqlsrv|sybase|dblib|odbc' =>
-                    "sp_rename $name, $new_name"
+                    "sp_rename {$name}, $new_name"
             );
             $query = $this->findQuery($cmd);
-            return ($exec) ? $this->db->exec($query) : $query;
+            if (!$exec) return $query;
+            return (preg_match('/mssql|sybase|dblib|sqlsrv/', $this->db->driver()))
+                ? @$this->db->exec($query) : $this->db->exec($query);
         }
     }
 
@@ -257,7 +260,7 @@ class Schema extends DB_Utils {
 
 abstract class TableBuilder extends DB_Utils {
 
-    protected   $columns, $pkeys, $queries, $increments, $rebuild_cmd;
+    protected   $columns, $pkeys, $queries, $increments, $rebuild_cmd, $suppress;
     public      $name, $schema;
 
     const
@@ -372,10 +375,14 @@ abstract class TableBuilder extends DB_Utils {
                 $table = $this->db->quotekey($this->name);
                 $table_key = $this->db->quotekey($this->name.'_pkey');
                 $cmd = array(
-                    'mssql|sybase|dblib|odbc' =>
+                    'odbc' =>
                         "CREATE INDEX $table_key ON $table ( $pk_string );",
                     'mysql' =>
                         "ALTER TABLE $table DROP PRIMARY KEY, ADD PRIMARY KEY ( $pk_string );",
+                    'mssql|sybase|dblib|sqlsrv' => array(
+                        "ALTER TABLE $table DROP CONSTRAINT PK_".$this->name."_ID;",
+                        "ALTER TABLE $table ADD CONSTRAINT $table_key PRIMARY KEY ( $pk_string );",
+                    ),
                     'pgsql' => array(
                         "ALTER TABLE $table DROP CONSTRAINT $table_key;",
                         "ALTER TABLE $table ADD CONSTRAINT $table_key PRIMARY KEY ( $pk_string );",
@@ -430,7 +437,7 @@ class TableCreator extends TableBuilder {
             'pgsql' =>
                 "CREATE TABLE $table ($id SERIAL PRIMARY KEY".$cols.");",
             'mssql|odbc|sqlsrv' =>
-                "CREATE TABLE $table ($id INT IDENTITY PRIMARY KEY".$cols.");",
+                "CREATE TABLE $table ($id INT IDENTITY CONSTRAINT PK_".$this->name."_ID PRIMARY KEY".$cols.");",
             'ibm' =>
                 "CREATE TABLE $table ($id INTEGER AS IDENTITY NOT NULL $cols, PRIMARY KEY($id));",
         );
@@ -524,7 +531,7 @@ class TableModifier extends TableBuilder {
                     $sqlite_queries[] = "ALTER TABLE $table ADD $col_query;";
             } else {
                 $cmd = array(
-                    'mysql|pgsql|mssql|sybase|dblib|odbc' =>
+                    'mysql|pgsql|mssql|sybase|dblib|odbc|sqlsrv' =>
                         "ALTER TABLE $table ADD $col_query;",
                     'ibm' =>
                         "ALTER TABLE $table ADD COLUMN $col_query;",
@@ -542,9 +549,12 @@ class TableModifier extends TableBuilder {
                 $this->addIndex($cname, $column->unique);
         if (empty($this->queries))
             return false;
-        $result = ($exec) ? $this->db->exec($this->queries) : $this->queries;
+        if (is_array($this->queries) && count($this->queries) == 1)
+            $this->queries = $this->queries[0];
+        if (!$exec) return $this->queries;
+        $result = ($this->suppress)
+            ? @$this->db->exec($this->queries) : $this->db->exec($this->queries);
         $this->queries = $this->columns = $this->rebuild_cmd = array();
-        $rebuild = false;
         return $result;
     }
 
@@ -687,7 +697,6 @@ class TableModifier extends TableBuilder {
      */
     public function getCols($types = false)
     {
-        $columns = array();
         $schema = $this->db->schema($this->name, null, 0);
         if (!$types)
             return array_keys($schema);
@@ -695,16 +704,19 @@ class TableModifier extends TableBuilder {
             foreach ($schema as $name => &$cols) {
                 $default = ($cols['default'] === '') ? null : $cols['default'];
                 if (!is_null($default) && (
-                    is_int(strpos($this->findQuery($this->schema->defaultTypes['CUR_STAMP']), $default))
-                        || $default == "('now'::text)::timestamp(0) without time zone")
-                ) {
+                    (is_int(strpos($curdef=$this->findQuery($this->schema->defaultTypes['CUR_STAMP']),
+                    $default)) || is_int(strpos($default,$curdef)))
+                    || $default == "('now'::text)::timestamp(0) without time zone"))
+                {
                     $default = 'CUR_STAMP';
                 } else {
-                    // remove single-qoutes in sqlite
+                    // remove single-qoutes
                     if (preg_match('/sqlite2?/', $this->db->driver()))
                         $default = substr($default, 1, -1);
+                    elseif (preg_match('/mssql|sybase|dblib|odbc|sqlsrv/', $this->db->driver()))
+                        $default = substr($default, 2, -2);
                     // extract value from character_data in postgre
-                    if (preg_match('/pgsql/', $this->db->driver()) && !is_null($default))
+                    elseif (preg_match('/pgsql/', $this->db->driver()) && !is_null($default))
                         if (is_int(strpos($default, 'nextval')))
                             $default = null; // drop autoincrement default
                         elseif (preg_match("/\'(.*)\'/", $default, $match))
@@ -732,11 +744,13 @@ class TableModifier extends TableBuilder {
             $quotedTable = $this->db->quotekey($this->name);
             $quotedColumn = $this->db->quotekey($name);
             $cmd = array(
-                'mysql|mssql|sybase|dblib' =>
+                'mysql' =>
                     "ALTER TABLE $quotedTable DROP $quotedColumn;",
-                'pgsql|odbc|ibm' =>
+                'pgsql|odbc|ibm|mssql|sybase|dblib|sqlsrv' =>
                     "ALTER TABLE $quotedTable DROP COLUMN $quotedColumn;",
             );
+            if (preg_match('/mssql|sybase|dblib|sqlsrv/', $this->db->driver()))
+                $this->suppress=true;
             $this->queries[] = $this->findQuery($cmd);
         }
     }
@@ -774,9 +788,11 @@ class TableModifier extends TableBuilder {
                     "ALTER TABLE $quotedTable CHANGE $quotedColumn $quotedColumnNew ".$existing_columns[$name]['type'].";",
                 'pgsql|ibm' =>
                     "ALTER TABLE $quotedTable RENAME COLUMN $quotedColumn TO $quotedColumnNew;",
-                'mssql|sybase|dblib' =>
-                    "sp_rename $quotedTable.$quotedColumn, $quotedColumnNew;",
+                'mssql|sybase|dblib|sqlsrv' =>
+                    "sp_rename [$this->name.$name], '$new_name', 'Column'",
             );
+            if (preg_match('/mssql|sybase|dblib|sqlsrv/', $this->db->driver()))
+                $this->suppress = true;
             $this->queries[] = $this->findQuery($cmd);
         }
     }
@@ -802,7 +818,7 @@ class TableModifier extends TableBuilder {
                 "ALTER TABLE $table MODIFY COLUMN $column $datatype;",
             'pgsql' =>
                 "ALTER TABLE $table ALTER COLUMN $column TYPE $datatype;",
-            'mssql|sybase|dblib|ibm' =>
+            'sqlsrv|mssql|sybase|dblib|ibm' =>
                 "ALTER TABLE $table ALTER COLUMN $column $datatype;",
             );
             $this->queries[] = $this->findQuery($cmd);
@@ -839,8 +855,10 @@ class TableModifier extends TableBuilder {
         $name = $this->db->quotekey($name);
         $table = $this->db->quotekey($this->name);
         $cmd = array(
-            'pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' =>
+            'pgsql|sqlite2?|ibm' =>
                 "DROP INDEX $name;",
+            'mssql|sybase|dblib|odbc|sqlsrv' =>
+                "DROP INDEX $table.$name;",
             'mysql'=>
                 "ALTER TABLE $table DROP INDEX $name;",
         );
@@ -860,7 +878,7 @@ class TableModifier extends TableBuilder {
                 "PRAGMA index_list($table);",
             'mysql' =>
                 "SHOW INDEX FROM $table;",
-            'mssql|sybase|dblib' =>
+            'mssql|sybase|dblib|sqlsrv' =>
                 "select * from sys.indexes ".
                 "where object_id = (select object_id from sys.objects where name = '$this->name')",
             'pgsql' =>
@@ -875,6 +893,9 @@ class TableModifier extends TableBuilder {
         if (preg_match('/pgsql|sqlite2?/', $this->db->driver())) {
             foreach($result as $row)
                 $indexes[$row['name']] = array('unique' => $row['unique']);
+        } elseif (preg_match('/mssql|sybase|dblib|sqlsrv/', $this->db->driver())) {
+            foreach ($result as $row)
+                $indexes[$row['name']] = array('unique' => $row['is_unique']);
         } elseif (preg_match('/mysql/', $this->db->driver())) {
             foreach($result as $row)
                 $indexes[$row['Key_name']] = array('unique' => !(bool)$row['Non_unique']);
@@ -1089,7 +1110,7 @@ class Column extends DB_Utils {
         // default value
         if ($this->default !== false) {
             $def_cmds = array(
-                'sqlite2?|mysql|pgsql|mssql|sybase|dblib|odbc' => 'DEFAULT',
+                'sqlite2?|mysql|pgsql|mssql|sybase|dblib|odbc|sqlsrv' => 'DEFAULT',
                 'ibm' => 'WITH DEFAULT',
             );
             $def_cmd = $this->findQuery($def_cmds).' ';

@@ -3,7 +3,7 @@
 
 This Plugin provides a SQL table schema builder for the **PHP Fat-Free Framework**. It might be useful for installation scripts, dynamic applications or CMS environments.
 
-Currently MySQL, SQLite & PostgreSQL are supported and fully tested. Further support for SQL Server, MSSQL/Sybase, Access and DB2 are already included, but experimental. Handle with care and test your application. No warranty at all.
+Currently drivers for MySQL, SQLite, PostgreSQL & SQL Server are supported and fully tested. Further support for Sybase, Oracle and DB2 drivers are already included, but experimental. Handle with care and test your application. No warranty at all.
 
 This Plugin is made for F3 version 3.x
 
