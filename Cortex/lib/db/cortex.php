@@ -501,6 +501,27 @@ class Cortex extends Cursor {
 	 */
 	public function find($filter = NULL, array $options = NULL, $ttl = 0)
 	{
+		$sort=false;
+		if ($this->dbsType!='sql') {
+			if (!empty($this->countFields))
+				// see if reordering is needed
+				foreach($this->countFields as $counter) {
+					if ($options && isset($options['order']) &&
+						preg_match('/count_'.$counter.'\h+(asc|desc)/i',$options['order'],$match))
+						$sort=true;
+				}
+			if ($sort) {
+				// backup slice settings
+				if (isset($options['limit'])) {
+					$limit = $options['limit'];
+					unset($options['limit']);
+				}
+				if (isset($options['offset'])) {
+					$offset = $options['offset'];
+					unset($options['offset']);
+				}
+			}
+		}
 		$result = $this->filteredFind($filter,$options,$ttl);
 		if (empty($result))
 			return false;
@@ -508,20 +529,17 @@ class Cortex extends Cursor {
 			$record = $this->factory($record);
 			unset($record);
 		}
-		$sort=false;
 		if (!empty($this->countFields))
 			// add counter for NoSQL engines
-			foreach($this->countFields as $counter) {
+			foreach($this->countFields as $counter)
 				foreach($result as &$mapper)
 					$mapper->virtual('count_'.$counter,count($mapper->get($counter)));
-				if ($options && isset($options['order']) &&
-					preg_match('/count_'.$counter.'\h+(asc|desc)/i',$options['order'],$match))
-						$sort=true;
-			}
 		$cc = new \DB\CortexCollection();
 		$cc->setModels($result);
-		if($sort)
+		if($sort) {
 			$cc->orderBy($options['order']);
+			$cc->slice(isset($offset)?$offset:0,isset($limit)?$limit:NULL);
+		}
 		$this->clearFilter();
 		return $cc;
 	}
@@ -2288,6 +2306,27 @@ class CortexCollection extends \ArrayIterator {
 			}
 			return 0;
 		});
+	}
+
+	/**
+	 * slice the collection
+	 * @param $offset
+	 * @param null $limit
+	 */
+	public function slice($offset,$limit=null) {
+		$this->rewind();
+		$i=0;
+		$del=array();
+		while ($this->valid()) {
+			if ($i < $offset)
+				$del[]=$this->key();
+			elseif ($i >= $offset && $limit && $i >= ($offset+$limit))
+				$del[]=$this->key();
+			$i++;
+			$this->next();
+		}
+		foreach ($del as $ii)
+			unset($this[$ii]);
 	}
 
 	/**

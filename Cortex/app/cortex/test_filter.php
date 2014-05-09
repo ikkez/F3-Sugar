@@ -255,6 +255,16 @@ class Test_Filter {
 			$type.': count and sort on one-to-many relation'
 		);
 
+		$tag->reset();
+		$tag->countRel('news');
+		$result = $tag->find(null,array('order'=>'count_news DESC, title DESC','limit'=>1,'offset'=>1))->castAll(0);
+
+		$test->expect(
+			$result[0]['title'] == 'Web Design' &&
+			$result[0]['count_news'] == 1,
+			$type.': apply limit and offset on aggregated collection'
+		);
+
 
 		$author->reset();
 		$author->countRel('news');
