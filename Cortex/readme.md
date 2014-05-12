@@ -28,21 +28,22 @@ It's great for fast and easy data abstraction and offers a bunch of useful filte
 1. [Quick Start](#quick-start)
 2. [SQL Fluid Mode](#sql-fluid-mode)
 3. [Cortex Models](#cortex-models)
-  1. [Configuration](#configuration)
-  2. [Setup](#setup)
-  3. [Setdown](#setdown)
-  4. [Custom Field PreProcessors](#custom-field-preprocessors)
+	1. [Configuration](#configuration)
+	2. [Setup](#setup)
+	3. [Setdown](#setdown)
+	4. [Custom Field PreProcessors](#custom-field-preprocessors)
 4. [Relations](#relations)
-  1. [Setup the linkage](#setup-the-linkage)
-  2. [Working with Relations](#working-with-relations)
-  3. [Additional notes](#additional-notes)
+	1. [Setup the linkage](#setup-the-linkage)
+	2. [Working with Relations](#working-with-relations)
+	3. [Additional notes](#additional-notes)
 5. [Collections](#collections)  
 6. [Filter Query Syntax](#filter-query-syntax)
 7. [Advanced Filter Techniques](#advanced-filter-techniques)
-8. [Known Bugs](#known-bugs)
-9. [Roadmap](#roadmap)
-10. [Final Words](#final-words)
-11. [License](#license)
+8. [Insight into aggregation](#insight-into-aggregation)
+9. [Known Bugs](#known-bugs)
+10. [Roadmap](#roadmap)
+11. [Final Words](#final-words)
+12. [License](#license)
     
 
 ## Quick Start
@@ -147,7 +148,7 @@ $user->lastlogin = '2013-08-28'; // date
 
 This way it also creates datatypes of datetime, float, text (when `strlen > 255`) and double.
 
-The fluid mode disables the caching of the underlying SQL table schema. This could impact on performance, so keep in mind to deactivate this when you're done.
+The fluid mode disables the caching of the underlying SQL table schema. This could impact on performance, so keep in mind to deactivate this when you're done. Also keep in mind that you are not able to load or find any records from tables that are not existing - consider to create and save some sample data first, so Cortex can create the tables.
 
 
 ## Cortex Models
@@ -441,6 +442,15 @@ For **has-one** and **has-many**
 
 The foreign key is the field name you used in the counterpart model to define the `belongs-to-one` connection.
 
+There is one special case for many-to-many relations: here you use a `has-many` type on both models, which implies that there must be a 3rd pivot table that will be used for keeping the foreign keys that binds everything together. Usually Cortex will auto-create that table upon [setup](#setup) method, using an auto-generated table name. If you like to use a custom name for that joining-table, add a 3rd parameter to the config array of *both* models, i.e.:
+
+```
+'tags' => array(
+    'has-many' => array('\Model\Tag','news','news_tags'),
+),
+```
+
+
 ### Working with Relations
 
 Okay finally we come to the cool part. When configuration is done and setup executed, you're ready to use the following make-my-dev-life-easier methods.
@@ -587,7 +597,7 @@ Well basically the `$filter` syntax for writing cortex queries is simple SQL. Bu
 
 These common filter operators are supported: 
 - relational operators: `<`, `>`, `<=`, `>=`, `==`, `=`, `!=`, `<>`
-- search operators: `LIKE`, `IN`, `NOT IN` (not case-sensitive)
+- search operators: `LIKE`,`NOT LIKE`, `IN`, `NOT IN` (not case-sensitive)
 - logical operators: `(`, `)`, `AND`, `OR`, `&&`, `||`
 
 When using comparison operators, you can compare your table fields against simple values like `array('foo = 1')` or other fields like `array('foo < bar')`. Therefore you can also use placeholders with positional bind-parameters like `array('foo = ?',1)` or named parameters `array('foo = :bar',':bar'=>1)`. You may also mix them together in one query.
@@ -605,7 +615,7 @@ The `$options` array for load operations respects the following keys:
 - limit
 - offset
 
-Use `DESC` and `ASC` flags for sorting fields, just like in SQL. Additional `group` settings might be handled in a future version.
+Use `DESC` and `ASC` flags for sorting fields, just like in SQL. Additional `group` settings are currently just bypassed to the underlying mapper and should work dependant on the selected db engine. Any unification on that might be handled in a future version.
 
 ## Advanced Filter Techniques
 
@@ -655,6 +665,42 @@ Once a `load` or `find` function is executed, the filter (and has) conditions ar
 Filter conditions are currently not inherited. That means if you recursively access the fields of a relation ($author->news[0]->author->news) they get not filtered, but fully lazy loaded again.
 
 
+## Insight into aggregation
+
+Cortex comes with some handy shortcuts that could be used for essential field aggregation.
+
+### counting relations
+
+Sometimes you need to know how many relations a record has - i.e. for some stats or sorting for top 10 list views.
+
+Therefore have a look at the `countRel($key)` method. You can call this to add a new virtual field to the resulting records that counts the related records on `has-many` fields.
+
+```php
+// find all tags with the sum of all news that used the tag, ordered by the top occurring tags first.
+$tag = new \Model\Tag();
+$tag->countRel('news');
+$result = $tag->find(null,array('order'=>'count_news DESC, title'))
+```
+
+The new field that is going to be added to the record is named like `count_{$key}`. As you can see, you can also use that field for additional sorting of your results. You can also combine this with the `has()` and `filter()` methods.
+Notice that `countRel()` only applies to the next called `find()` operation. Currently, you cannot use the virtual count field in your `$filter` query.
+
+### Virtual fields
+
+Cortex has some abilities for own custom virtual fields. These might be useful to add additional fields that may contain data that is not stored in the real db table or computes its value out of other fields or functions, similar to the [custom field setters and getters](#custom-field-preprocessors).
+
+```php
+// just set a simple value
+$user->virtual('is_online', TRUE);
+// or use a callback function
+$user->virtual('full_name', function($this) {
+	return $this->name.' '.$this->surname;
+});
+```
+
+You can also use this to count or sum fields together and even reorder you collection on this fields using `$collection->orderBy('foo DESC, bar ASC')`. Keep in mind that these virtual fields only applies to your final received collection - you cannot use these fields in your filter query or sort condition before the actual find. But if you use a SQL engine, you can use the underlying mapper abilities of virtual fields - just set `$mapper->newField = 'SQL EXPRESSION';` before any load or find operation happens.
+
+
 ## Collections
 
 Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). You can also transpose the results by a defined key using `getBy()` or fetch all values of a certain key using `getAll()`. More about that later in the API docs. The CortexCollection implements the `ArrayIterator` interface, so it is accessible like an usual array.
@@ -665,14 +711,7 @@ This plugin is still in an early stage of development. So at this point it may h
 
 ## Roadmap
 
-- ~~some more caching features~~
-- ~~eager loading / preloading relations for find()~~
-- polymorphic relations
-- handle aggregational fields like SUM(), MAX(), AVG()
-- handle creation of indexes
-- extended date functions
-- ~~search and filters for relations~~
-- logging
+I got a bunch of tasks on my todo list for cortex. If you have any ideas, suggestions or improvements, feel free to add an issue for this on github.
 
 
 ## Final Words
