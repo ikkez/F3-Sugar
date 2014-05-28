@@ -665,6 +665,10 @@ class Cortex extends Cursor {
 				$sql .= ' GROUP BY '.$options['group'];
 			if (isset($options['order']))
 				$sql .= ' ORDER BY '.$options['order'];
+			if (isset($options['limit']))
+				$sql .= ' LIMIT '.(int)$options['limit'];
+			if (isset($options['offset']))
+				$sql .= ' OFFSET '.(int)$options['offset'];
 			unset($filter[0]);
 			$result = $this->db->exec($sql, $filter, $ttl);
 			foreach ($result as &$record) {
