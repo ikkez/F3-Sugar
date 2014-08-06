@@ -2073,7 +2073,7 @@ class CortexQueryParser extends \Prefab {
 					$var = array('$not' => $var);
 			} // find IN operator
 			elseif (in_array($upart, array('IN','NOT IN'))) {
-				$var = array(($upart=='NOT IN')?'$nin':'$in' => $var);
+				$var = array(($upart=='NOT IN')?'$nin':'$in' => array_values($var));
 			} // translate operators
 			elseif (!in_array($match[0], array('==', '='))) {
 				$opr = str_replace(array('<>', '<', '>', '!', '='),
