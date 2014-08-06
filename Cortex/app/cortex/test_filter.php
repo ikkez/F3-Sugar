@@ -31,7 +31,7 @@ class Test_Filter {
 		$tagIDs = $tag->find()->getAll('_id');
 
 		// add another relation
-		$news->load(array($news_pk.' = ?',$newsIDs[1]));
+		$news->load(array('title = ?','CSS3 Showcase'));
 		$news->author = $author->load(array($author_pk.' = ?',$authorIDs[0]));
 		$news->save();
 		$news->reset();
@@ -218,7 +218,7 @@ class Test_Filter {
 		);
 
 		$news->filter('tags2',null,array('order'=>'title ASC'));
-		$news->load(array('_id = ?',$newsIDs[0]));
+		$news->load(array('title = ?','Responsive Images'));
 		$test->expect(
 			$news->tags2[0]->title == 'Responsive' &&
 			$news->tags2[1]->title == 'Web Design',

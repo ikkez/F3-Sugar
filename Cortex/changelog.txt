@@ -8,6 +8,7 @@ CHANGELOG - Cortex ORM
 *	advanced MongoId recognition/conversion in filter query
 *	added orderBy method to collection, for subsequent sorting
 *	unified sorting of NULL values in postgreSQL
+*	compatibility fixed for MongoDB 2.6.x
 
 1.2.0 (02.04.2014)
 *	added whitelisting of own and related fields
