@@ -4,10 +4,10 @@ namespace FAL;
 
 interface MetaStorageInterface {
 
-    function save($file, $data, $ttl);
+	function save($file, $data, $ttl);
 
-    function load($file,$ttl);
+	function load($file,$ttl);
 
-    function delete($file);
+	function delete($file);
 
 }
