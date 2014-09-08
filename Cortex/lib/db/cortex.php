@@ -1189,8 +1189,12 @@ class Cortex extends Cursor {
 				&& $fields[$key]['nullable'] === false)
 				trigger_error(sprintf(self::E_NULLABLE_COLLISION,$key));
 			// MongoId shorthand
-			if ($this->dbsType == 'mongo' && $key == '_id' && !$val instanceof \MongoId)
-				$val = new \MongoId($val);
+			if ($this->dbsType == 'mongo' && !$val instanceof \MongoId) {
+				if ($key == '_id')
+					$val = new \MongoId($val);
+				elseif (preg_match('/INT|BOOL/i',$fields[$key]['type']))
+					$val = (int) $val;
+			}
 		}
 		// fluid SQL
 		if ($this->fluid && $this->dbsType == 'sql') {
