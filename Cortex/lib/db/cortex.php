@@ -1192,7 +1192,8 @@ class Cortex extends Cursor {
 			if ($this->dbsType == 'mongo' && !$val instanceof \MongoId) {
 				if ($key == '_id')
 					$val = new \MongoId($val);
-				elseif (preg_match('/INT|BOOL/i',$fields[$key]['type']))
+				elseif (preg_match('/INT|BOOL/i',$fields[$key]['type']
+					&& !isset($fields[$key]['hasRel'])))
 					$val = (int) $val;
 			}
 		}
