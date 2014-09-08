@@ -51,6 +51,7 @@ class Cortex extends Cursor {
 		$relWhitelist,  // restrict relations to these fields
 		$grp_stack,     // stack of group conditions
 		$countFields,   // relational counter buffer
+		$preBinds,      // bind values to be prepends to $filter
 		$vFields;       // virtual fields buffer
 
 	/** @var Cursor */
@@ -532,8 +533,10 @@ class Cortex extends Cursor {
 		if (!empty($this->countFields))
 			// add counter for NoSQL engines
 			foreach($this->countFields as $counter)
-				foreach($result as &$mapper)
-					$mapper->virtual('count_'.$counter,count($mapper->get($counter)));
+				foreach($result as &$mapper) {
+					$cr=$mapper->get($counter);
+					$mapper->virtual('count_'.$counter,$cr?count($cr):null);
+				}
 		$cc = new \DB\CortexCollection();
 		$cc->setModels($result);
 		if($sort) {
@@ -653,6 +656,11 @@ class Cortex extends Cursor {
 		if (!empty($hasJoin)) {
 			// assemble full sql query
 			$filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
+			if (!empty($this->preBinds)) {
+				$crit = array_shift($filter);
+				$filter = array_merge($this->preBinds,$filter);
+				array_unshift($filter,$crit);
+			}
 			$adhoc='';
 			if (!empty($this->mapper->adhoc))
 				foreach ($this->mapper->adhoc as $key=>$val)
@@ -693,8 +701,15 @@ class Cortex extends Cursor {
 			}
 		} else {
 			$filter = $this->queryParser->prepareFilter($filter,$this->dbsType,$this->fieldConf);
+			if ($this->dbsType == 'sql' && !empty($this->preBinds)) {
+				if (!$filter)
+					$filter = array('1=1');
+				$crit = array_shift($filter);
+				$filter = array_merge($this->preBinds,$filter);
+				array_unshift($filter,$crit);
+			}
 			$options = $this->queryParser->prepareOptions($options,$this->dbsType);
-			$result =  $this->mapper->find($filter,$options,$ttl);
+			$result = $this->mapper->find($filter,$options,$ttl);
 		}
 		return $result;
 	}
@@ -1037,9 +1052,21 @@ class Cortex extends Cursor {
 							$this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
 						} else
 							$mmTable = $relConf['refTable'];
-						$this->set('count_'.$key,'(select count('.$relConf['relField'].') from '.$mmTable.' where '.
-							$mmTable.'.'.$relConf['relField'].' = '.$this->getTable().'.'.$this->primary.
-							' group by '.$mmTable.'.'.$relConf['relField'].')');
+						$filter = array($mmTable.'.'.$relConf['relField'].' = '.$this->getTable().'.'.$this->primary);
+						$from=$mmTable;
+						if (array_key_exists($key, $this->relFilter) &&
+							!empty($this->relFilter[$key][0])) {
+							$options=array();
+							$from = $mmTable.' '.$this->_sql_left_join($key,$mmTable,$relConf['relPK'],$relConf['relTable']);
+							$relFilter = $this->relFilter[$key];
+							$this->_sql_mergeRelCondition($relFilter,$relConf['relTable'],$filter,$options);
+						}
+						$filter = $this->queryParser->prepareFilter($filter,$this->dbsType,$this->fieldConf);
+						$crit = array_shift($filter);
+						if (count($filter)>0)
+							$this->preBinds+=$filter;
+						$this->set('count_'.$key,'(select count('.$relConf['relField'].') from '.$from.' where '.
+							$crit.' group by '.$mmTable.'.'.$relConf['relField'].')');
 					} else {
 						// count rel
 						$this->countFields[]=$key;
@@ -1053,8 +1080,14 @@ class Cortex extends Cursor {
 						$rKey=$this->db->quotekey($relConf[1]);
 						$pKey=$this->db->quotekey($this->primary);
 						$table=$this->db->quotekey($this->getTable());
+						$crit = $fTable.'.'.$rKey.' = '.$table.'.'.$pKey;
+						$filter = $this->mergeWithRelFilter($key,array($crit));
+						$filter = $this->queryParser->prepareFilter($filter,$this->dbsType,$this->fieldConf);
+						$crit = array_shift($filter);
+						if (count($filter)>0)
+							$this->preBinds+=$filter;
 						$this->set('count_'.$key,'(select count('.$fTable.'.'.$fKey.') from '.$fTable.' where '.
-							$fTable.'.'.$rKey.' = '.$table.'.'.$pKey.' group by '.$fTable.'.'.$rKey.')');
+									$crit.' group by '.$fTable.'.'.$rKey.')');
 					} else {
 						// count rel
 						$this->countFields[]=$key;
@@ -1724,6 +1757,7 @@ class Cortex extends Cursor {
 		$this->fieldsCache=array();
 		$this->saveCsd=array();
 		$this->countFields=array();
+		$this->preBinds=array();
 		$this->grp_stack=null;
 		// set default values
 		if (($this->dbsType == 'jig' || $this->dbsType == 'mongo')
