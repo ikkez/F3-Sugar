@@ -44,9 +44,12 @@ class Schema extends Controller
             /*'pgsql' => new \DB\SQL(
                 'pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'
             ),*/
-            /*'sqlsrv' => new \DB\SQL('sqlsrv:SERVER=LOCALHOST\SQLEXPRESS;Database=fatfree',
-                    'SA', 'fatfree')*/
-
+            /*'sqlsrv2012' => new \DB\SQL(
+                'sqlsrv:SERVER=LOCALHOST\SQLEXPRESS2012;Database=fatfree','fatfree', 'fatfree'
+            ),*/
+            /*'sqlsrv2008' => new \DB\SQL(
+                'sqlsrv:SERVER=LOCALHOST\SQLEXPRESS2008;Database=fatfree','fatfree', 'fatfree'
+            )*/
 	);
 
         $this->roundTime = microtime(TRUE) - \Base::instance()->get('timer');
