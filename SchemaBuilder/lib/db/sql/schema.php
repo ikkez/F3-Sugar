@@ -18,7 +18,7 @@
     https://github.com/ikkez/F3-Sugar/
 
         @package DB
-        @version 2.1.0
+        @version 2.1.1
  **/
 
 
@@ -709,19 +709,20 @@ class TableModifier extends TableBuilder {
                     || $default == "('now'::text)::timestamp(0) without time zone"))
                 {
                     $default = 'CUR_STAMP';
-                } else {
+                } elseif (!is_null($default)) {
                     // remove single-qoutes
                     if (preg_match('/sqlite2?/', $this->db->driver()))
-                        $default = substr($default, 1, -1);
+                        $default=preg_replace('/^\s*([\'"])(.*)\1\s*$/','\2',$default);
                     elseif (preg_match('/mssql|sybase|dblib|odbc|sqlsrv/', $this->db->driver()))
-                        $default = substr($default, 2, -2);
+                        $default=preg_replace('/^\s*(\(\')(.*)(\'\))\s*$/','\2',$default);
                     // extract value from character_data in postgre
-                    elseif (preg_match('/pgsql/', $this->db->driver()) && !is_null($default))
+                    elseif (preg_match('/pgsql/', $this->db->driver()))
                         if (is_int(strpos($default, 'nextval')))
                             $default = null; // drop autoincrement default
-                        elseif (preg_match("/\'(.*)\'/", $default, $match))
+                        elseif (preg_match("/^\'*(.*)\'*::(\s*\w)+/", $default, $match))
                             $default = $match[1];
-                }
+                } else
+                    $default=false;
                 $cols['default'] = $default;
             }
         return $schema;
