@@ -1,10 +1,12 @@
 CHANGELOG - Cortex ORM
 
 1.3.0
+*	Bug fix: type-casting to int in MongoDB
+*	Bug fix: consider has-filter on count() method, #40
 *	Bug fix: has-filter used wrong column on sql many-to-many
 *	added possibility to add own virtual fields
 *	renamed countResults() to loaded() to follow fatfree #581 syntax
-*	Feature: countRel() to add a counter of related records
+*	Feature: countRel() to add a counter for related records
 *	advanced MongoId recognition/conversion in filter query
 *	added orderBy method to collection, for subsequent sorting
 *	unified sorting of NULL values in postgreSQL
@@ -33,5 +35,5 @@ CHANGELOG - Cortex ORM
 *	Bug fix: casting many-many relations
 *	Bug fix: Jig filter bind value
 
-1.0.0 (30. November 2013)
+1.0.0 (30.11.2013)
 *	init commit
