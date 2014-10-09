@@ -554,7 +554,7 @@ class Cortex extends Cursor {
 	 * @param int $ttl
 	 * @return array|false array of underlying cursor objects
 	 */
-	protected function filteredFind($filter = NULL, array $options = NULL, $ttl = 0)
+	protected function filteredFind($filter = NULL, array $options = NULL, $ttl = 0, $count=false)
 	{
 		if ($this->grp_stack) {
 			if ($this->dbsType == 'mongo') {
@@ -665,25 +665,31 @@ class Cortex extends Cursor {
 			if (!empty($this->mapper->adhoc))
 				foreach ($this->mapper->adhoc as $key=>$val)
 					$adhoc.=', '.$val['expr'].' AS '.$key;
-			$sql = 'SELECT '.$qtable.'.*'.$adhoc.' FROM '.$qtable;
+			if ($count)
+				$sql = 'SELECT COUNT(*) AS '.$this->db->quotekey('rows').' FROM '.$qtable;
+			else
+				$sql = 'SELECT '.$qtable.'.*'.$adhoc.' FROM '.$qtable;
 			foreach ($hasJoin as $q)
 				$sql .= ' '.$q;
 			$sql .= ' WHERE '.$filter[0];
-			if (isset($options['group']))
-				$sql .= ' GROUP BY '.$options['group'];
-			if (isset($options['order']))
-				$sql .= ' ORDER BY '.$options['order'];
-			if (isset($options['limit']))
-				$sql .= ' LIMIT '.(int)$options['limit'];
-			if (isset($options['offset']))
-				$sql .= ' OFFSET '.(int)$options['offset'];
+			if (!$count) {
+				if (isset($options['group']))
+					$sql.=' GROUP BY '.$options['group'];
+				if (isset($options['order']))
+					$sql.=' ORDER BY '.$options['order'];
+				if (isset($options['limit']))
+					$sql.=' LIMIT '.(int)$options['limit'];
+				if (isset($options['offset']))
+					$sql.=' OFFSET '.(int)$options['offset'];
+			}
 			unset($filter[0]);
 			$result = $this->db->exec($sql, $filter, $ttl);
+			if ($count)
+				return $result[0]['rows'];
 			foreach ($result as &$record) {
 				$mapper = clone($this->mapper);
 				$mapper->reset();
-				if (!empty($adhoc))
-					$m_adhoc=$this->mapper->adhoc;
+				$m_adhoc=empty($adhoc)?array():$this->mapper->adhoc;
 				foreach ($record as $key=>$val)
 					if (isset($this->mapper->adhoc[$key]))
 						$m_adhoc[$key]['value']=$val;
@@ -709,7 +715,10 @@ class Cortex extends Cursor {
 				array_unshift($filter,$crit);
 			}
 			$options = $this->queryParser->prepareOptions($options,$this->dbsType);
-			$result = $this->mapper->find($filter,$options,$ttl);
+			if ($count)
+				$result = $this->mapper->count($filter,$ttl);
+			else
+				$result = $this->mapper->find($filter,$options,$ttl);
 		}
 		return $result;
 	}
@@ -1006,10 +1015,12 @@ class Cortex extends Cursor {
 	 * @param int $ttl
 	 * @return mixed
 	 */
-	public function count($filter = NULL, $ttl = 0)
+	public function count($filter = NULL, $ttl = 60)
 	{
-		$filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
-		return $this->mapper->count($filter, $ttl);
+		$has=$this->hasCond;
+		$count=$this->filteredFind($filter,null,$ttl,true);
+		$this->hasCond=$has;
+		return $count;
 	}
 
 	/**
