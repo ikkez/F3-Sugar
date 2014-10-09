@@ -583,6 +583,7 @@ class Cortex extends Cursor {
 				else
 					$options['group'] = $this->grp_stack;
 			}
+			// Jig can't group yet, but pending enhancement https://github.com/bcosca/fatfree/pull/616
 		}
 		$hasJoin = array();
 		if ($this->hasCond) {
@@ -638,6 +639,7 @@ class Cortex extends Cursor {
 			}
 			$this->hasCond = null;
 		}
+		$filter = $this->queryParser->prepareFilter($filter,$this->dbsType,$this->fieldConf);
 		if ($this->dbsType=='sql') {
 			$m_refl = new \ReflectionObject($this->mapper);
 			$m_ad_prop = $m_refl->getProperty('adhoc');
@@ -659,75 +661,74 @@ class Cortex extends Cursor {
 							$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
 				}
 			}
-		}
-		if (!empty($hasJoin)) {
-			// assemble full sql query
-			$filter = $this->queryParser->prepareFilter($filter,$this->dbsType);
-			if (!empty($this->preBinds)) {
-				$crit = array_shift($filter);
-				$filter = array_merge($this->preBinds,$filter);
-				array_unshift($filter,$crit);
-			}
-			$adhoc='';
-			if (!empty($m_refl_adhoc))
-				foreach ($m_refl_adhoc as $key=>$val)
-					$adhoc.=', '.$val['expr'].' AS '.$key;
-			if ($count)
-				$sql = 'SELECT COUNT(*) AS '.$this->db->quotekey('rows').' FROM '.$qtable;
-			else
-				$sql = 'SELECT '.$qtable.'.*'.$adhoc.' FROM '.$qtable;
-			foreach ($hasJoin as $q)
-				$sql .= ' '.$q;
-			$sql .= ' WHERE '.$filter[0];
-			if (!$count) {
-				if (isset($options['group']))
-					$sql.=' GROUP BY '.$options['group'];
-				if (isset($options['order']))
-					$sql.=' ORDER BY '.$options['order'];
-				if (isset($options['limit']))
-					$sql.=' LIMIT '.(int)$options['limit'];
-				if (isset($options['offset']))
-					$sql.=' OFFSET '.(int)$options['offset'];
-			}
-			unset($filter[0]);
-			$result = $this->db->exec($sql, $filter, $ttl);
-			if ($count)
-				return $result[0]['rows'];
-			foreach ($result as &$record) {
-				// factory new mappers
-				$mapper = clone($this->mapper);
-				$mapper->reset();
-				$m_adhoc=empty($adhoc)?array():$m_refl_adhoc;
-				foreach ($record as $key=>$val)
-					if (isset($m_refl_adhoc[$key]))
-						$m_adhoc[$key]['value']=$val;
-					else
-						$mapper->set($key, $val);
-				if (!empty($adhoc)) {
-					$refl = new \ReflectionObject($mapper);
-					$prop = $refl->getProperty('adhoc');
-					$prop->setAccessible(true);
-					$prop->setValue($mapper,$m_adhoc);
-					$prop->setAccessible(false);
+			if (!empty($hasJoin)) {
+				// assemble full sql query
+				if (!empty($this->preBinds)) {
+					$crit = array_shift($filter);
+					$filter = array_merge($this->preBinds,$filter);
+					array_unshift($filter,$crit);
 				}
-				$record = $mapper;
-				unset($record, $mapper);
-			}
-		} else {
-			$filter = $this->queryParser->prepareFilter($filter,$this->dbsType,$this->fieldConf);
-			if ($this->dbsType == 'sql' && !empty($this->preBinds)) {
+				$adhoc='';
+				if (!empty($m_refl_adhoc))
+					foreach ($m_refl_adhoc as $key=>$val)
+						$adhoc.=', '.$val['expr'].' AS '.$key;
+				if ($count)
+					$sql = 'SELECT COUNT(*) AS '.$this->db->quotekey('rows').' FROM '.$qtable;
+				else
+					$sql = 'SELECT '.$qtable.'.*'.$adhoc.' FROM '.$qtable;
+				foreach ($hasJoin as $q)
+					$sql .= ' '.$q;
+				$sql .= ' WHERE '.$filter[0];
+				if (!$count) {
+					if (isset($options['group']))
+						$sql.=' GROUP BY '.$options['group'];
+					if (isset($options['order']))
+						$sql.=' ORDER BY '.$options['order'];
+					if (isset($options['limit']))
+						$sql.=' LIMIT '.(int)$options['limit'];
+					if (isset($options['offset']))
+						$sql.=' OFFSET '.(int)$options['offset'];
+				}
+				unset($filter[0]);
+				$result = $this->db->exec($sql, $filter, $ttl);
+				if ($count)
+					return $result[0]['rows'];
+				foreach ($result as &$record) {
+					// factory new mappers
+					$mapper = clone($this->mapper);
+					$mapper->reset();
+					$m_adhoc=empty($adhoc)?array():$m_refl_adhoc;
+					foreach ($record as $key=>$val)
+						if (isset($m_refl_adhoc[$key]))
+							$m_adhoc[$key]['value']=$val;
+						else
+							$mapper->set($key, $val);
+					if (!empty($adhoc)) {
+						$refl = new \ReflectionObject($mapper);
+						$prop = $refl->getProperty('adhoc');
+						$prop->setAccessible(true);
+						$prop->setValue($mapper,$m_adhoc);
+						$prop->setAccessible(false);
+					}
+					$record = $mapper;
+					unset($record, $mapper);
+				}
+				return $result;
+			} elseif (!empty($this->preBinds)) {
+				// bind values to adhoc queries
 				if (!$filter)
+					// we need any filter to bind values
 					$filter = array('1=1');
 				$crit = array_shift($filter);
 				$filter = array_merge($this->preBinds,$filter);
 				array_unshift($filter,$crit);
 			}
-			$options = $this->queryParser->prepareOptions($options,$this->dbsType);
-			if ($count)
-				$result = $this->mapper->count($filter,$ttl);
-			else
-				$result = $this->mapper->find($filter,$options,$ttl);
 		}
+		$options = $this->queryParser->prepareOptions($options,$this->dbsType);
+		if ($count)
+			$result = $this->mapper->count($filter,$ttl);
+		else
+			$result = $this->mapper->find($filter,$options,$ttl);
 		return $result;
 	}
 
