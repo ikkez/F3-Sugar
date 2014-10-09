@@ -552,6 +552,7 @@ class Cortex extends Cursor {
 	 * @param array $filter
 	 * @param array $options
 	 * @param int $ttl
+	 * @param bool $count
 	 * @return array|false array of underlying cursor objects
 	 */
 	protected function filteredFind($filter = NULL, array $options = NULL, $ttl = 0, $count=false)
@@ -1204,7 +1205,7 @@ class Cortex extends Cursor {
 				if ($key == '_id')
 					$val = new \MongoId($val);
 				elseif (preg_match('/INT|BOOL/i',$fields[$key]['type'])
-					&& !isset($fields[$key]['hasRel']))
+					&& !isset($fields[$key]['relType']))
 					$val = (int) $val;
 			}
 		}
