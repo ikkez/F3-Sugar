@@ -639,6 +639,12 @@ class Cortex extends Cursor {
 			$this->hasCond = null;
 		}
 		if ($this->dbsType=='sql') {
+			$m_refl = new \ReflectionObject($this->mapper);
+			$m_ad_prop = $m_refl->getProperty('adhoc');
+			$m_ad_prop->setAccessible(true);
+			$m_refl_adhoc = $m_ad_prop->getValue($this->mapper);
+			$m_ad_prop->setAccessible(false);
+			unset($m_ad_prop,$m_refl);
 			$qtable = $this->db->quotekey($this->table);
 			// PostgreSQLism:
 			if ($this->db->driver() == 'pgsql') {
@@ -648,7 +654,7 @@ class Cortex extends Cursor {
 				// all non-aggregated fields need to be present in the GROUP BY clause
 				if (isset($options['group'])) {
 					$groupFields = explode(',', preg_replace('/"/','',$options['group']));
-					foreach (array_diff($this->mapper->fields(),array_keys($this->mapper->adhoc)) as $field)
+					foreach (array_diff($this->mapper->fields(),array_keys($m_refl_adhoc)) as $field)
 						if (!in_array($this->table.'.'.$field,$groupFields))
 							$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
 				}
@@ -663,8 +669,8 @@ class Cortex extends Cursor {
 				array_unshift($filter,$crit);
 			}
 			$adhoc='';
-			if (!empty($this->mapper->adhoc))
-				foreach ($this->mapper->adhoc as $key=>$val)
+			if (!empty($m_refl_adhoc))
+				foreach ($m_refl_adhoc as $key=>$val)
 					$adhoc.=', '.$val['expr'].' AS '.$key;
 			if ($count)
 				$sql = 'SELECT COUNT(*) AS '.$this->db->quotekey('rows').' FROM '.$qtable;
@@ -688,11 +694,12 @@ class Cortex extends Cursor {
 			if ($count)
 				return $result[0]['rows'];
 			foreach ($result as &$record) {
+				// factory new mappers
 				$mapper = clone($this->mapper);
 				$mapper->reset();
-				$m_adhoc=empty($adhoc)?array():$this->mapper->adhoc;
+				$m_adhoc=empty($adhoc)?array():$m_refl_adhoc;
 				foreach ($record as $key=>$val)
-					if (isset($this->mapper->adhoc[$key]))
+					if (isset($m_refl_adhoc[$key]))
 						$m_adhoc[$key]['value']=$val;
 					else
 						$mapper->set($key, $val);
@@ -1279,20 +1286,26 @@ class Cortex extends Cursor {
 	 * @param string $key
 	 * @param bool $raw
 	 */
-	function get($key,$raw = false)
+	function &get($key,$raw = false)
 	{
 		// handle virtual fields
-		if (isset($this->vFields[$key]))
-			return (is_callable($this->vFields[$key]))
-				? call_user_func($this->vFields[$key],$this) : $this->vFields[$key];
+		if (isset($this->vFields[$key])) {
+			$out = (is_callable($this->vFields[$key]))
+				? call_user_func($this->vFields[$key], $this) : $this->vFields[$key];
+			return $out;
+		}
 		$fields = $this->fieldConf;
 		$id = ($this->dbsType == 'sql') ? $this->primary : '_id';
 		if ($key == '_id' && $this->dbsType == 'sql')
 			$key = $id;
-		if ($this->whitelist && !in_array($key,$this->whitelist))
-			return null;
-		if ($raw)
-			return $this->exists($key) ? $this->mapper->{$key} : NULL;
+		if ($this->whitelist && !in_array($key,$this->whitelist)) {
+			$out = null;
+			return $out;
+		}
+		if ($raw) {
+			$out = $this->exists($key) ? $this->mapper->{$key} : NULL;
+			return $out;
+		}
 		if (!empty($fields) && isset($fields[$key]) && is_array($fields[$key])
 			&& !array_key_exists($key,$this->fieldsCache)) {
 			// load relations
@@ -1501,7 +1514,8 @@ class Cortex extends Cursor {
 			$val = (string) $val;
 		}
 		// custom getter
-		return $this->emit('get', $key, $val);
+		$out = $this->emit('get', $key, $val);
+		return $out;
 	}
 
 	/**
