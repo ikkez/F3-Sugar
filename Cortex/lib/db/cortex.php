@@ -46,7 +46,6 @@ class Cortex extends Cursor {
 		$collectionID,  // collection set identifier
 		$relFilter,     // filter for loading related models
 		$hasCond,       // IDs of records the next find should have
-		$mFuncs,        // magic functions cache
 		$whitelist,     // restrict to these fields
 		$relWhitelist,  // restrict relations to these fields
 		$grp_stack,     // stack of group conditions
@@ -136,7 +135,6 @@ class Cortex extends Cursor {
 			default:
 				trigger_error(sprintf(self::E_UNKNOWN_DB_ENGINE,$this->dbsType));
 		}
-		$this->mFuncs = array();
 		$this->queryParser = CortexQueryParser::instance();
 		$this->reset();
 		$this->clearFilter();
@@ -748,6 +746,7 @@ class Cortex extends Cursor {
 			$this->first();
 		} else
 			$this->mapper->reset();
+		$this->emit('load');
 		return $this;
 	}
 
@@ -970,7 +969,9 @@ class Cortex extends Cursor {
 	public function erase($filter = null)
 	{
 		$filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
+		$this->emit('beforeerase');
 		$this->mapper->erase($filter);
+		$this->emit('aftererase');
 	}
 
 	/**
@@ -979,7 +980,13 @@ class Cortex extends Cursor {
 	 **/
 	function save()
 	{
-		$result = $this->dry() ? $this->insert() : $this->update();
+		if ($new = $this->dry()) {
+			$this->emit('beforeinsert');
+			$result=$this->insert();
+		} else {
+			$this->emit('beforeupdate');
+			$result=$this->update();
+		}
 		// m:m save cascade
 		if (!empty($this->saveCsd)) {
 			$fields = $this->fieldConf;
@@ -1015,6 +1022,7 @@ class Cortex extends Cursor {
 				}
 			}
 		}
+		$this->emit($new?'afterinsert':'afterupdate');
 		return $result;
 	}
 
@@ -1186,7 +1194,7 @@ class Cortex extends Cursor {
 				$relConf = $fields[$key]['has-many'];
 				if ($relConf['hasRel'] == 'has-many') {
 					// custom setter
-					$val = $this->emit('set', $key, $val);
+					$val = $this->emit('set_'.$key, $val);
 					$val = $this->getForeignKeysArray($val,'_id',$key);
 					$this->saveCsd[$key] = $val; // array of keys
 					return $val;
@@ -1246,29 +1254,49 @@ class Cortex extends Cursor {
 			}
 		}
 		// custom setter
-		$val = $this->emit('set', $key, $val);
+		$val = $this->emit('set_'.$key, $val);
 		return $this->mapper->set($key, $val);
 	}
 
 	/**
 	 * call custom field handlers
-	 * @param $type
-	 * @param $key
+	 * @param $event
 	 * @param $val
 	 * @return mixed
 	 */
-	protected function emit($type, $key, $val)
+	protected function emit($event, $val=null)
 	{
-		if ($type == 'set' || $type == 'get') {
-			$event = $type.'_'.$key;
-			if (in_array($event, $this->mFuncs))
-				$val = call_user_func(array($this,$event),$val);
-			elseif (method_exists($this,$event)) {
-				$this->mFuncs[] = $event;
-				$val = call_user_func(array($this,$event),$val);
-			}
+		if (isset($this->trigger[$event])) {
+			if (preg_match('/^[sg]et_/',$event)) {
+				$val=(is_string($f = $this->trigger[$event])
+					&& preg_match('/^[sg]et_/',$f))
+					? call_user_func(array($this, $event), $val)
+					: \Base::instance()->call($f,array($val));
+			} else
+				\Base::instance()->call($this->trigger[$event],array($this));
+		} elseif (preg_match('/^[sg]et_/',$event) && method_exists($this,$event)) {
+			$this->trigger[] = $event;
+			$val = call_user_func(array($this,$event),$val);
 		}
 		return $val;
+	}
+
+	/**
+	 * Define a custom field setter
+	 * @param $key
+	 * @param $func
+	 */
+	public function onset($key,$func) {
+		$this->trigger['set_'.$key] = $func;
+	}
+
+	/**
+	 * Define a custom field getter
+	 * @param $key
+	 * @param $func
+	 */
+	public function onget($key,$func) {
+		$this->trigger['get_'.$key] = $func;
 	}
 
 	/**
@@ -1515,7 +1543,7 @@ class Cortex extends Cursor {
 			$val = (string) $val;
 		}
 		// custom getter
-		$out = $this->emit('get', $key, $val);
+		$out = $this->emit('get_'.$key, $val);
 		return $out;
 	}
 
@@ -1666,7 +1694,7 @@ class Cortex extends Cursor {
 		}
 		// custom getter
 		foreach ($fields as $key => &$val) {
-			$val = $this->emit('get', $key, $val);
+			$val = $this->emit('get_'.$key, $val);
 			unset($val);
 		}
 		return $fields;
@@ -1708,6 +1736,7 @@ class Cortex extends Cursor {
 			$cx->reset(false);
 			$cx->mapper = $mapper;
 		}
+		$cx->emit('load');
 		return $cx;
 	}
 
