@@ -296,14 +296,15 @@ class Cortex extends Cursor {
 								static::getMMTableName(
 									$rel['table'], $relConf[1], $table, $key,
 									$rel['fieldConf'][$relConf[1]]['has-many']);
-							// create dummy to invoke table
-							$mmRel = new Cortex($db,$mmTable,true);
-							$rand = rand(0,1000000);
-							$mmRel->{$relConf[1]} = $rand;
-							$mmRel->{$key} = $rand;
-							$mmRel->save();
-							$mmRel->reset();
-							$mmRel->erase(array($relConf[1].' = :rand AND '.$key.' = :rand',':rand'=>$rand));
+							if (!in_array($mmTable,$schema->getTables())) {
+								$mmt = $schema->createTable($mmTable);
+								$mmt->addColumn($relConf[1])->type_int();
+								$mmt->addColumn($key)->type_int();
+								$index = array($relConf[1],$key);
+								sort($index);
+								$mmt->addIndex($index);
+								$mmt->build();
+							}
 						}
 					}
 					// skip virtual fields with no type
