@@ -217,10 +217,9 @@ class Cortex extends Cursor {
 	 */
 	static public function resolveConfiguration()
 	{
-		$refl = new \ReflectionClass(get_called_class());
-		$refl->setStaticPropertyValue('init', true);
-		$self = $refl->newInstance();
-		$refl->setStaticPropertyValue('init', false);
+		static::$init=true;
+		$self = new static();
+		static::$init=false;
 		$conf = array (
 			'table'=>$self->getTable(),
 			'fieldConf'=>$self->getFieldConfiguration(),
