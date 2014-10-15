@@ -50,7 +50,7 @@ class Cortex extends Cursor {
 		$relWhitelist,  // restrict relations to these fields
 		$grp_stack,     // stack of group conditions
 		$countFields,   // relational counter buffer
-		$preBinds,      // bind values to be prepends to $filter
+		$preBinds,      // bind values to be prepended to $filter
 		$vFields;       // virtual fields buffer
 
 	/** @var Cursor */
@@ -1002,12 +1002,12 @@ class Cortex extends Cursor {
 					} else
 						$mmTable = $relConf['refTable'];
 					$rel = $this->getRelInstance(null, array('db'=>$this->db, 'table'=>$mmTable));
+					$id = $this->get('_id',true);
 					// delete all refs
 					if (is_null($val))
-						$rel->erase(array($relConf['relField'].' = ?', $this->get('_id',true)));
+						$rel->erase(array($relConf['relField'].' = ?', $id));
 					// update refs
 					elseif (is_array($val)) {
-						$id = $this->get('_id',true);
 						$rel->erase(array($relConf['relField'].' = ?', $id));
 						foreach($val as $v) {
 							$rel->set($key,$v);
@@ -1125,6 +1125,10 @@ class Cortex extends Cursor {
 		}
 	}
 
+	/**
+	 * merge mongo group options array
+	 * @param $opt
+	 */
 	protected function _mongo_addGroup($opt){
 		if (!$this->grp_stack)
 			$this->grp_stack = array('keys'=>array(),'initial'=>array(),'reduce'=>'','finalize'=>'');
@@ -1647,19 +1651,13 @@ class Cortex extends Cursor {
 				$fields = array_intersect_key($fields, array_flip($this->whitelist));
 			$mp = $obj ? : $this;
 			foreach ($fields as $key => &$val) {
-				//reset relType
-				unset($relType);
 				// post process configured fields
 				if (isset($this->fieldConf[$key]) && is_array($this->fieldConf[$key])) {
 					// handle relations
 					if (($rel_depths === TRUE || (is_int($rel_depths) && $rel_depths >= 0))) {
-						$relTypes = array('belongs-to-one','has-many','belongs-to-many','has-one');
-						foreach ($relTypes as $type)
-							if (isset($this->fieldConf[$key][$type])) {
-								$relType = $type;
-								break;
-							}
-						if (isset($relType)) {
+						if ($type=preg_grep('/[belongs|has]-(to-)*[one|many]/',
+							array_keys($this->fieldConf[$key]))) {
+							$relType=$type[0];
 							// cast relations
 							$val = (($relType == 'belongs-to-one' || $relType == 'belongs-to-many')
 								&& !$mp->exists($key)) ? NULL : $mp->get($key);
@@ -1786,7 +1784,7 @@ class Cortex extends Cursor {
 	public function skip($ofs = 1)
 	{
 		$this->reset(false);
-		if($this->mapper->skip($ofs))
+		if ($this->mapper->skip($ofs))
 			return $this;
 		else
 			$this->reset(false);
@@ -2123,7 +2121,8 @@ class CortexQueryParser extends \Prefab {
 		if (isset($add))
 			return array('$and' => $ncond);
 		elseif (isset($or))
-			return array('$or' => $ncond); else
+			return array('$or' => $ncond);
+		else
 			return $ncond[0];
 	}
 
