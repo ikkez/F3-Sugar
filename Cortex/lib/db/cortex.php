@@ -969,9 +969,10 @@ class Cortex extends Cursor {
 	public function erase($filter = null)
 	{
 		$filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
-		$this->emit('beforeerase');
-		$this->mapper->erase($filter);
-		$this->emit('aftererase');
+		if ($this->emit('beforeerase')!==false) {
+			$this->mapper->erase($filter);
+			$this->emit('aftererase');
+		}
 	}
 
 	/**
@@ -981,10 +982,12 @@ class Cortex extends Cursor {
 	function save()
 	{
 		if ($new = $this->dry()) {
-			$this->emit('beforeinsert');
+			if ($this->emit('beforeinsert')===false)
+				return false;
 			$result=$this->insert();
 		} else {
-			$this->emit('beforeupdate');
+			if ($this->emit('beforeupdate')===false)
+				return false;
 			$result=$this->update();
 		}
 		// m:m save cascade
@@ -1272,12 +1275,12 @@ class Cortex extends Cursor {
 	{
 		if (isset($this->trigger[$event])) {
 			if (preg_match('/^[sg]et_/',$event)) {
-				$val=(is_string($f = $this->trigger[$event])
+				$val = (is_string($f=$this->trigger[$event])
 					&& preg_match('/^[sg]et_/',$f))
-					? call_user_func(array($this, $event), $val)
-					: \Base::instance()->call($f,array($val));
+					? call_user_func(array($this,$event),$val)
+					: \Base::instance()->call($f,array($this,$val));
 			} else
-				\Base::instance()->call($this->trigger[$event],array($this));
+				$val = \Base::instance()->call($this->trigger[$event],array($this,$val));
 		} elseif (preg_match('/^[sg]et_/',$event) && method_exists($this,$event)) {
 			$this->trigger[] = $event;
 			$val = call_user_func(array($this,$event),$val);
