@@ -1072,7 +1072,7 @@ class Cortex extends Cursor {
 					trigger_error('Cannot add direct relational counter.');
 			} elseif($this->fieldConf[$key]['relType'] == 'has-many') {
 				$relConf=$this->fieldConf[$key]['has-many'];
-				if ($this->fieldConf[$key]['has-many']['hasRel']=='has-many') {
+			 	if ($relConf['hasRel']=='has-many') {
 					// many-to-many
 					if ($this->dbsType == 'sql') {
 						if (!isset($relConf['refTable'])) {
@@ -1544,7 +1544,7 @@ class Cortex extends Cursor {
 		}
 		// fetch cached value, if existing
 		$val = array_key_exists($key,$this->fieldsCache) ? $this->fieldsCache[$key]
-			: (($this->exists($key) || $key == $id) ? $this->mapper->{$key} : null);
+			: (($this->exists($key)) ? $this->mapper->{$key} : null);
 		if ($this->dbsType == 'mongo' && $val instanceof \MongoId) {
 			// conversion to string makes further processing in template, etc. much easier
 			$val = (string) $val;
@@ -1671,7 +1671,7 @@ class Cortex extends Cursor {
 								elseif ($relType == 'belongs-to-many' || $relType == 'has-many')
 									// multiple objects
 									foreach ($val as $k => $item)
-										$val[$k] = !is_null($item) ? $item->cast(null, $rel_depths) : null;
+										$val[$k] = is_object($item) ? $item->cast(null, $rel_depths) : null;
 							}
 						}
 						if ($val instanceof CortexCollection)
@@ -1840,8 +1840,9 @@ class Cortex extends Cursor {
 	 * @return bool
 	 */
 	function exists($key, $relField = false) {
-		if ($key == '_id') return true;
-		return $this->mapper->exists($key) || ($relField && isset($this->fieldConf[$key]['relType']));
+		if (!$this->dry() && $key == '_id') return true;
+		return $this->mapper->exists($key) ||
+			($relField && isset($this->fieldConf[$key]['relType']));
 	}
 
 	/**
