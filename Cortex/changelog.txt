@@ -1,6 +1,7 @@
 CHANGELOG - Cortex ORM
 
 1.3.0
+*	clean up pivot table on deleting items with mm-relations
 *	added support for the cursor even handlers
 *	compatibility fixes for F3 v 3.3.1 (ArrayAccess by Reference)
 *	Bug fix: type-casting to int and bool in MongoDB
