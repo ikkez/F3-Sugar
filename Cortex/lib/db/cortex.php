@@ -652,18 +652,15 @@ class Cortex extends Cursor {
 			$m_ad_prop->setAccessible(false);
 			unset($m_ad_prop,$m_refl);
 			$qtable = $this->db->quotekey($this->table);
-			// PostgreSQLism:
-			if ($this->db->driver() == 'pgsql') {
-				// sort NULL values to the end of a table
-				if (isset($options['order']))
-					$options['order'] = preg_replace('/\h+DESC/i',' DESC NULLS LAST',$options['order']);
+			if (isset($options['order']) && $this->db->driver() == 'pgsql')
+				// PostgreSQLism: sort NULL values to the end of a table
+				$options['order'] = preg_replace('/\h+DESC/i',' DESC NULLS LAST',$options['order']);
+			if (isset($options['group']) && preg_match('/pgsql|sybase|dblib|odbc|sqlsrv/i',$this->db->driver())) {
 				// all non-aggregated fields need to be present in the GROUP BY clause
-				if (isset($options['group'])) {
-					$groupFields = explode(',', preg_replace('/"/','',$options['group']));
-					foreach (array_diff($this->mapper->fields(),array_keys($m_refl_adhoc)) as $field)
-						if (!in_array($this->table.'.'.$field,$groupFields))
-							$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
-				}
+				$groupFields = explode(',', preg_replace('/"/','',$options['group']));
+				foreach (array_diff($this->mapper->fields(),array_keys($m_refl_adhoc)) as $field)
+					if (!in_array($this->table.'.'.$field,$groupFields))
+						$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
 			}
 			if (!empty($hasJoin)) {
 				// assemble full sql query
@@ -688,10 +685,27 @@ class Cortex extends Cursor {
 						$sql.=' GROUP BY '.$options['group'];
 					if (isset($options['order']))
 						$sql.=' ORDER BY '.$options['order'];
-					if (isset($options['limit']))
-						$sql.=' LIMIT '.(int)$options['limit'];
-					if (isset($options['offset']))
-						$sql.=' OFFSET '.(int)$options['offset'];
+					if (preg_match('/mssql|sqlsrv|odbc/', $this->db->driver()) &&
+						(isset($options['limit']) || isset($options['offset']))) {
+						$ofs=isset($options['offset'])?(int)$options['offset']:0;
+						$lmt=isset($options['limit'])?(int)$options['limit']:0;
+						if (strncmp($this->db->version(),'11',2)>=0) {
+							// SQL Server 2012
+							if (!isset($options['order']))
+								$sql.=' ORDER BY '.$this->db->quotekey($this->primary);
+							$sql.=' OFFSET '.$ofs.' ROWS'.($lmt?' FETCH NEXT '.$lmt.' ROWS ONLY':'');
+						} else {
+							// SQL Server 2008
+							$sql=str_replace('SELECT','SELECT '.($lmt>0?'TOP '.($ofs+$lmt):'').' ROW_NUMBER() '.
+								'OVER (ORDER BY '.$this->db->quotekey($this->table).'.'.$this->db->quotekey($this->primary).') AS rnum,',$sql);
+							$sql='SELECT * FROM ('.$sql.') x WHERE rnum > '.($ofs);
+						}
+					} else {
+						if (isset($options['limit']))
+							$sql.=' LIMIT '.(int)$options['limit'];
+						if (isset($options['offset']))
+							$sql.=' OFFSET '.(int)$options['offset'];
+					}
 				}
 				unset($filter[0]);
 				$result = $this->db->exec($sql, $filter, $ttl);
@@ -976,17 +990,16 @@ class Cortex extends Cursor {
 	public function erase($filter = null)
 	{
 		$filter = $this->queryParser->prepareFilter($filter, $this->dbsType);
-		if ((!$filter && $this->emit('beforeerase')!==false)||$filter) {
+		if ((!$filter && $this->emit('beforeerase')!==false) || $filter) {
 			if ($this->fieldConf) {
 				foreach($this->fieldConf as $field => $conf)
 					if (isset($conf['has-many']) &&
-						$conf['has-many']['hasRel']=='has-many') {
+						$conf['has-many']['hasRel']=='has-many')
 						$this->set($field,null);
-					}
 				$this->save();
 			}
 			$this->mapper->erase($filter);
-			if(!$filter)
+			if (!$filter)
 				$this->emit('aftererase');
 		}
 	}
