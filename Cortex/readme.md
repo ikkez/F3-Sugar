@@ -8,13 +8,13 @@ Cortex is a multi-engine ActiveRecord ORM / ODM that offers easy object persiste
 
   - It handles SQL, Jig and MongoDB database engines
   - Write queries in well-known SQL Syntax, they can be translated to Jig and Mongo
-  - Make SQL schema-less with the fluid SQL mode and let missing table columns be created automatically
-  - Support for model objects
+  - Easy prototyping with the SQL Fluid Mode, which makes your RDBMS schema-less and adds new table columns automatically
+  - Support for models and collections
   - Relationships: link multiple models together to one-to-one, one-to-many and many-to-many associations
   - smart-loading of related models (intelligent lazy and eager-loading without configuration)
-  - setup model schemes to auto create DB tables from installer or migrate scripts
-  - custom setter and getter preprocessors for all fields
-  - default values and nullable fields for NoSQL
+  - automatically setup the model tables from installer or migrate scripts by defined schemes
+  - lots of event handlers and custom setter / getter preprocessors for all fields
+  - define default values and nullable fields for NoSQL
 
 With Cortex you can create generic apps, that work with any DB of the users choice, no matter if it's Postgre, MongoDB or even none.
 You can also mash-up multiple engines, use them simultaneous or link models of different DB engines together.
@@ -29,18 +29,29 @@ It's great for fast and easy data abstraction and offers a bunch of useful filte
 2. [SQL Fluid Mode](#sql-fluid-mode)
 3. [Cortex Models](#cortex-models)
 	1. [Configuration](#configuration)
-	2. [Setup](#setup)
-	3. [Setdown](#setdown)
-	4. [Custom Field PreProcessors](#custom-field-preprocessors)
+		1. [Additional Data Types](#additional-data-types)
+		2. [Alternative Configuration](#alternative-configuration-method)
+		2. [Blacklist Fields](#blacklist-fields)
+	2. [Setup](#set-up)
+	3. [Setdown](#set-down)
 4. [Relations](#relations)
 	1. [Setup the linkage](#setup-the-linkage)
 	2. [Working with Relations](#working-with-relations)
 	3. [Additional notes](#additional-notes)
-5. [Collections](#collections)  
+5. [Event Handlers](#event-handlers)
+	1. [Custom Field Handler](#custom-field-handler)
 6. [Filter Query Syntax](#filter-query-syntax)
+	1. [Operators](#operators)
+	2. [Options Array](#options)
 7. [Advanced Filter Techniques](#advanced-filter-techniques)
+	1. [has](#has)
+	2. [filter](#filter)
 8. [Insight into aggregation](#insight-into-aggregation)
-9. [Known Bugs](#known-bugs)
+	1. [Counting Relations](#counting-relations)
+	2. [Virtual Fields](#virtual-fields)
+5. [Collections](#collections)
+
+9. [Known Issues](#known-issues)
 10. [Roadmap](#roadmap)
 11. [Final Words](#final-words)
 12. [License](#license)
@@ -50,11 +61,11 @@ It's great for fast and easy data abstraction and offers a bunch of useful filte
 
 ### System Requirements
 
-Cortex requires at least Fat-Free v3.2.1 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
+Cortex requires at least Fat-Free v3.3.1 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
 
 ### Install
 
-To install Cortex, just copy the `/lib/db/cortex.php` file into your libs.
+To install Cortex, just copy the `/lib/db/cortex.php` file into your libs. For the SQL Schema Plugin, copy `lib/db/sql/schema.php` as well.
 
 ### Setup a DB
 
@@ -82,14 +93,14 @@ $user->mail = 'jacky@email.com';
 $user->save();
 ```
 
-Okay, not very impressive, Ay? But let's find this guy again now:
+Okay, not very impressive, Aye? But let's find this guy again now:
 
 ``` php
 $user->load(array('mail = ?','jacky@email.com'));
 echo $user->name; // shouts out: Jack Ripper
 ```
 
-As you can see, the syntax for the filter array stays pure SQL syntax, but works in all DB engines. This also works for pretty complex where criteria:
+As you can see, the filter array stays pure SQL syntax, but will work with all DB engines. This also works for pretty complex where criteria:
 
 ```php
 $user->load(array('name like ? AND (deleted = 0 OR rights > ?)', 'Jack%', 3));
@@ -136,7 +147,7 @@ You can use all the fancy methods from Cursor, like `load`, `find`, `cast`, `nex
 ## SQL Fluid Mode
 
 When you are prototyping some new objects or just don't want to bother with a table schema, while using Cortex along with a SQL DB backend, you can enable the SQL Fluid Mode.
-This way Cortex will create all necessary tables and columns automatically, so you can focus on writing your application code. It will try to guess the right datatype, based on the given sample data. To enable the fluid mode, just pass a third argument to the object's constructor:
+This way Cortex will create all necessary tables and columns automatically, so you can focus on writing your application code. It will try to guess the right data type, based on the given sample data. To enable the fluid mode, just pass a third argument to the object's constructor:
 
 ``` php
 $user = new \DB\Cortex($db, 'users', TRUE);
@@ -146,7 +157,7 @@ $user->active = true;            // boolean|tinyint
 $user->lastlogin = '2013-08-28'; // date
 ```
 
-This way it also creates datatypes of datetime, float, text (when `strlen > 255`) and double.
+This way it also creates data types of datetime, float, text (when `strlen > 255`) and double.
 
 The fluid mode disables the caching of the underlying SQL table schema. This could impact on performance, so keep in mind to deactivate this when you're done. Also keep in mind that you are not able to load or find any records from tables that are not existing - consider to create and save some sample data first, so Cortex can create the tables.
 
@@ -163,9 +174,7 @@ class User extends \DB\Cortex {
 
   protected
     $db = 'AppDB1',     // F3 hive key of a valid DB object
-    $table = 'users',   // the DB table to work on
-    $fluid = true;      // triggers the SQL Fluid Mode, default: false
-    $ttl = 120;         // caching time of field schema, default: 60
+    $table = 'users';   // the DB table to work on
 }
 ```
 
@@ -182,7 +191,7 @@ If no `$table` is provided, Cortex will use the class name as table name.
 ### Configuration
 
 Cortex does not need that much configuration. But at least it would be useful to have setup the field configuration.
-This way it's able to follow a defined schema of your data entity and enables you to use some auto-installation routines (see [setup](#setup)). It looks like this:
+This way it's able to follow a defined schema of your data entity and enables you to use some auto-installation routines (see [setup](#set-up)). It looks like this:
 
 ``` php
 // file at app/model/user.php
@@ -207,30 +216,35 @@ class User extends \DB\Cortex {
             'default' => 3,
         ),
     ),
-    $db = 'AppDB1',
-    $table = 'users';
+    $db = 'DB',
+    $table = 'users'
+    $fluid = true,      // triggers the SQL Fluid Mode, default: false
+    $primary = 'uid',   // name of the primary key, default: id
+    $ttl = 120,         // caching time of field schema, default: 60
+    $rel_ttl = 30;      // caching time of relations, default: 0
 }
 ```
 
-You can set datatypes (`type`), `nullable` flags and `default` values for your columns. Doing so enables you to install new Models into your SQL database, and adds some nullable validation checks and the ability for defaults to the NoSQL engines (Jig and Mongo).
+In the `$fieldConf` array, you can set data types (`type`), `nullable` flags and `default` values for your columns. Doing so enables you to install new Models into your SQL database, and adds some nullable validation checks and the ability for defaults to the NoSQL engines (Jig and Mongo).
 
-Because column datatypes are currently only needed for setting up the tables in SQL, it follows that [SQL DataTypes Table](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder#column-class) from the [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/blob/master-v3/SchemaBuilder/lib/db/sql/schema.php).
-If you don't need that feature and your tables are already existing, then you can just skip the configuration for those fields, or just setup some of them (i.e. for relations), because the underlying SQL Mapper exposes the existing table schema.
+Because column data types are currently only needed for setting up the tables in SQL, it follows that [SQL Data Types Table](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder#column-class) from the [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/blob/master-v3/SchemaBuilder/lib/db/sql/schema.php).
+**You don't need to configure all fields this way.** The underlying SQL Mapper exposes the existing table schema, 
+so if you don't need that install feature and your tables are already existing, then you can just skip the configuration for those fields, or just setup some of them (i.e. for fields with relations).
 
-You may also extend this config array to have a place for own validation rules or whatever ;)
+You may also extend this config array to have a place for own validation rules or whatever.
 
-The datatype values are defined constants from the Schema Plugin. If you'd like to use some auto-completion in your IDE to find the right values, type in the longer path to the constants:
+The data type values are defined constants from the Schema Plugin. If you'd like to use some auto-completion in your IDE to find the right values, type in the longer path to the constants:
 
 ``` php
 'type' => \DB\SQL\Schema::DT_VARCHAR256,
 ```
 
-#### Additional Datatypes
+#### Additional Data Types
 
-Cortex comes with two own datatypes for handling array values in fields. Even when Jig and Mongo support them naturally, most SQL engines do not. Therefore Cortex introduces:
+Cortex comes with two own data types for handling array values in fields. Even when Jig and Mongo support them naturally, most SQL engines do not. Therefore Cortex introduces:
 
-+ DT_SERIALIZED
-+ DT_JSON
++ `DT_SERIALIZED`
++ `DT_JSON`
 
 In example:
 
@@ -242,7 +256,7 @@ In example:
 ),
 ```
 
-Now you're able to save array data in your model field, which get json_encoded behind the scene (of cause only when using a SQL backend).
+Now you're able to save array data in your model field, which is json_encoded behind the scene (of cause only when using a SQL backend).
 
 ``` php
 $mapper->colors = array('red','blue','green');
@@ -281,7 +295,14 @@ usermodel.fieldConf.rights_level.type = TINYINT
 usermodel.fieldConf.rights_level.default = 3
 ```
 
-### Setup
+#### Blacklist Fields
+
+The `field()` method can be used to return the available fields on the current model. If called with one simple array argument like `$news->fields(array('title'));`, it'll apply the provided elements as a whitelist to the whole mapper. For the rest of its lifetime it'll only hydrate the fields you permitted here.
+If called with a 2nd argument like `$news->fields(array('author'),true);`, the array is going to be uses as a blacklist instead, and restrict the access to the provided fields.
+You can also define deep nested fields using a dot as separator: `$news->fields(array('tags.title'));` will only hydrate the tag title in your news model and wont load or save any other field that exists in your tag model.
+
+
+### Set up
 
 This method tries to create the SQL DB tables you need to run your Cortex object. It also adds just missing fields to already existing tables.
 
@@ -303,7 +324,7 @@ $fields = array(
 ``` 
 
 
-### Setdown
+### Set down
 
 This method completely removes the specified table from the used database. So handle with care. 
 
@@ -315,56 +336,6 @@ This method completely removes the specified table from the used database. So ha
 \DB\Cortex::setdown($db, 'users');
 ``` 
 
-### Custom Field PreProcessors
-
-You can define some custom functions that are called when you set or get attributes from your models. These are extremely useful for validation directly in your Model, or some extended save or load cascades.
-
-#### Setter
-
-To create a setter for any field, just a create class method named `set_*`, where `*` is the name of your field. In example:
-
-``` php
-class User extends \DB\Cortex {    
-    [...]
-    
-    // validate email address
-    public function set_mail($value) {
-        if (\Audit::instance()->email($value) == false) {
-            // no valid email address
-            // throw exception or set an error var and display a flash message
-            $value = null;
-        }
-        return $value;
-    }
-    
-    // hash a password before saving
-    public function set_password($value) {        
-        return \Bcrypt::instance()->hash($value);
-    }
-}
-```
-
-So setting these fields in your Model, like:
-
-``` php
-$user->password = 'secret';
-$user->mail = 'foo@bar.com';
-```
-
-will now trigger your custom setters, doing anything you like.
-
-#### Getter
-
-Custom getters works the same like setters. Just create a method that prepends the field name like `get_*`:
-
-``` php
-class User extends \DB\Cortex {    
-    [...]    
-    public function get_name($value) {
-        return ucfirst($value);
-    }    
-}
-```
 
 ## Relations
 
@@ -442,7 +413,7 @@ For **has-one** and **has-many**
 
 The foreign key is the field name you used in the counterpart model to define the `belongs-to-one` connection.
 
-There is one special case for many-to-many relations: here you use a `has-many` type on both models, which implies that there must be a 3rd pivot table that will be used for keeping the foreign keys that binds everything together. Usually Cortex will auto-create that table upon [setup](#setup) method, using an auto-generated table name. If you like to use a custom name for that joining-table, add a 3rd parameter to the config array of *both* models, i.e.:
+There is one special case for many-to-many relations: here you use a `has-many` type on both models, which implies that there must be a 3rd pivot table that will be used for keeping the foreign keys that binds everything together. Usually Cortex will auto-create that table upon [setup](#set-up) method, using an auto-generated table name. If you like to use a custom name for that joining-table, add a 3rd parameter to the config array of *both* models, i.e.:
 
 ```
 'tags' => array(
@@ -523,11 +494,6 @@ $news->tags2 = array(12, 5);
 // OR a split-able string
 $news->tags2 = '12;5;3;9'; // delimiter: [,;|]
 // OR an array of single mapper objects
-$tag = new \TagModel();
-$tag->load(array('_id = ?', 1));
-$tag2 = new \TagModel();
-$tag2->load(array('_id = ?', 2));
-$tag3 = $tag->findone(array('_id = ?', 3));
 $news->tags = array($tag,$tag2,$tag3);
 // OR a hydrated mapper that may contain multiple results
 $news->tags2 = $tag->load(array('_id != ?',42));
@@ -561,7 +527,7 @@ This is an unidirectional binding, because the counterpart wont know anything ab
 Saving works the same way like the other m:m type described above
 
 ``` php
-$news->tags = array(4, 7); // IDs of TagModel
+$news->tags = array(4,7); // IDs of TagModel
 $news->save();
 ```
 
@@ -573,21 +539,83 @@ echo $news->tags[0]->title; // Web Design
 echo $news->tags[1]->title; // Responsive
 ```
 
-### Additional notes
 
-* To release any relation, just set the field to `NULL`.
+## Event Handlers
 
-* All relations are lazy loaded to save performance. That means they won't get loaded until you access them by the linked property or casting the whole parent model.
+Cortex inherits all setters form the [Cursor Event Handlers](http://fatfreeframework.com/cursor#event-handlers) and additionally adds custom field handlers (setter/getter). These can be used to execute some extra code right before or after doing something. This could be useful for validation directly in your Model, or some extended save, load or delete cascades.
 
-* lazy loading within a result collection will **automatically** invoke the eager loading of that property to the whole set. The results are saved to an [Identity Map](http://martinfowler.com/eaaCatalog/identityMap.html) to relieve the strain on further calls. This method i called _smart loading_ and is used to get around the [1+N query problem](http://www.phabricator.com/docs/phabricator/article/Performance_N+1_Query_Problem.html) with no need for extra configuration.
+The following events are supported:
 
-* to get the id of any record use `$user->_id;`
+* `onload`
+* `onset`
+* `onget`
+* `beforeerase`
+* `aftererase`
+* `beforeinsert`
+* `afterinsert`
+* `beforeupdate`
+* `afterupdate`
 
-* To find any record by its **id** use the field `_id` in your filter array, like `array('_id = ?', 123)`.
 
-* If you need to use a primary key in SQL which is different from `id` (for any legacy reason), you can use the `$primary` class property to set it to something else. You should use the new custom pkey in your queries now. Doing so will limit your app to SQL engines.
+You can setup own handlers to this events like this:
 
-* primary fields should not be included in the `$fieldConf` array. They could interfere with the [setup](#setup) routine.
+```php
+$mapper->onload(function($self){
+	// custom code
+});
+// or 
+$mapper->onload('App/Foo/Bar::doSomething');
+```
+
+You can provide anything that is accepted by the [Base->call](http://fatfreeframework.com/base#call) method as handler function. Notice to use the `$self->set('field','val')` instead of `$self->field=val`, if you define a handler within a child class of Cortex (i.e. an extended `__construct` in your own model class).
+
+If any `before*` event returns a `false` result, the action that is going to be performed will be aborted, and the `after*` events are skipped. 
+
+### Custom Field Handler
+
+The `onset` and `onget` events have slightly different parameters:
+ 
+```php
+$mapper->onset('field',function($self, $val){
+	return md5($val);
+});
+```
+
+You can also define these custom field preprocessors as a method within the class, named `set_*` or `get_*`, where `*` is the name of your field. In example:
+
+``` php
+class User extends \DB\Cortex {
+    // [...]
+        
+    // validate email address
+    public function set_mail($value) {
+        if (\Audit::instance()->email($value) == false) {
+            // no valid email address
+            // throw exception or set an error var and display a flash message
+            $value = null;
+        }
+        return $value;
+    }    
+    // hash a password before saving
+    public function set_password($value) {
+        return \Bcrypt::instance()->hash($value);
+    } 
+    public function get_name($value) {
+        return ucfirst($value);
+    }  
+}
+```
+
+So setting these fields in your Model, like:
+
+``` php
+$user->password = 'secret';
+$user->mail = 'foo@bar.com';
+```
+
+will now trigger your custom setters, doing anything you like.
+
+
 
 ## Filter Query Syntax
 
@@ -703,11 +731,64 @@ You can also use this to count or sum fields together and even reorder you colle
 
 ## Collections
 
-Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). You can also transpose the results by a defined key using `getBy()` or fetch all values of a certain key using `getAll()`. More about that later in the API docs. The CortexCollection implements the `ArrayIterator` interface, so it is accessible like an usual array.
+Whenever you use the `find` method, it will return an instance of the new CortexCollection class. This way we are able determine the whole collection from the inside of every single mapper in the results, and that gives us some more advanced features, like the [smart-loading of relations](https://github.com/ikkez/F3-Sugar/issues/23#issuecomment-24956163). The CortexCollection implements the `ArrayIterator` interface, so it is accessible like an usual array. Here are some of the most useful methods the Cortex Collection offers:
 
-## Known Bugs
+### getBy
 
-This plugin is still in an early stage of development. So at this point it may have some ;) If you find any, please file a [new Issue](https://github.com/ikkez/F3-Sugar/issues) on github.
+You can transpose the results by a defined key using `getBy()`.
+Therefore you need to provide an existing field in the mapper, like this;
+ 
+ ```php
+ $comment_result = $comments->find();
+ $comment_result->getBy('email');
+ ```
+ 
+ This will resort the resulting array by the email field of each mapper, which gives you a result array like `array("foo@domain.com"=>array(...))`. If you provide `true` as 2nd argument, the records are ordered into another array depth, to keep track of multiple results per key.
+ 
+### getAll
+
+You can fetch all values of a certain key from all containing mappers using `getAll()`. Set the 2nd argument to `true` the get only the raw DB results instead of resolved mappers on fields that are configured as a relation.
+
+### castAll
+
+Similar to the `Cortex->afind` method, which automatically cast all resulting mappers to a simple nested array.
+
+### orderBy
+
+If you need to re-sort a result collection once more to another key, use this method like `$results->orderBy('name DESC');`.
+
+
+### Additional notes
+
+* To release any relation, just set the field to `NULL` and save the mapper.
+
+* All relations are lazy loaded to save performance. That means they won't get loaded until you access them by the linked property or cast the whole parent model.
+
+* lazy loading within a result collection will **automatically** invoke the eager loading of that property to the whole set. The results are saved to an [Identity Map](http://martinfowler.com/eaaCatalog/identityMap.html) to relieve the strain on further calls. I called this _smart loading_ and is used to get around the [1+N query problem](http://www.phabricator.com/docs/phabricator/article/Performance_N+1_Query_Problem.html) with no need for extra configuration.
+
+* If you need to use a primary key in SQL which is different from `id` (for any legacy reason), you can use the `$primary` class property to set it to something else. You should use the new custom pkey in your queries now. Doing so will limit your app to SQL engines.
+
+* to get the id of any record use `$user->_id;`. This even works if you have setup a custom primary key.
+
+* To find any record by its **id** use the field `_id` in your filter array, like `array('_id = ?', 123)`.
+
+* primary fields should not be included in the `$fieldConf` array. They could interfere with the [setup](#set-up) routine.
+
+* the `copyfrom` method has extended functionality. The 1st argument accepts a hive key or an array of fields as source for the copy action. Its 2nd argument accepts a lambda function, an array of fields, or a split-able string for fields, that are used to filter the source array. 
+
+* There are some little behaviours of Cortex you can control by these hive keys:
+
+	* `CORTEX.queryParserCache`: if `TRUE` all query string are going to be cached too. Default: `FALSE` (may add a lot of cache entries)
+
+	* `CORTEX.smartLoading`: triggers the intelligent-lazy-eager-loading. Default is `TRUE`, but turn it off if you think something works wrong. Could cause a lot of extra queries send to your DB, if deactivated.
+
+	* `CORTEX.standardiseID`: Default `TRUE`. This moves any defined primary key into the `_id` field on returned arrays. 
+
+## Known Issues
+
+* Not really a bug, but collections returned by `find()` method are not cloneable because they need to keep unique references to the identity map of its relations. This leads to the point that all containing mappers are not automatically escaped in templates, regardless of the `ESCAPE` setting. Keep in mind to add the `| esc` filter to your tokens.
+
+If you find any issues or bugs, please file a [new Issue](https://github.com/ikkez/F3-Sugar/issues) on github or write a mail. Thanks.
 
 ## Roadmap
 
@@ -717,7 +798,7 @@ I got a bunch of tasks on my todo list for cortex. If you have any ideas, sugges
 ## Final Words
 
 Cortex may try to bind them all, but at least it's not the one ring from Mordor!
-So by the nature of a general purpose tool, it currently only reflects to the most common use cases. If you need more extensive control over your queries or the DB, you may consider to use the underlaying Mapper or DB directly. This could be done in custom methods or field preprocessors in your Model classes.
+So by the nature of a general purpose tool, it currently only reflects to the most common use cases. If you need more extensive control over your queries or the DB, you may consider to use the underlying mapper or DB directly. This could be done in custom methods or field preprocessors in your Model classes.
 
 Anyways, i hope you find this useful. If you like this plugin, why not make a donation?
 
