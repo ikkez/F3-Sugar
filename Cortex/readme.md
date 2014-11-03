@@ -37,7 +37,6 @@ It's great for fast and easy data abstraction and offers a bunch of useful filte
 4. [Relations](#relations)
 	1. [Setup the linkage](#setup-the-linkage)
 	2. [Working with Relations](#working-with-relations)
-	3. [Additional notes](#additional-notes)
 5. [Event Handlers](#event-handlers)
 	1. [Custom Field Handler](#custom-field-handler)
 6. [Filter Query Syntax](#filter-query-syntax)
@@ -49,12 +48,12 @@ It's great for fast and easy data abstraction and offers a bunch of useful filte
 8. [Insight into aggregation](#insight-into-aggregation)
 	1. [Counting Relations](#counting-relations)
 	2. [Virtual Fields](#virtual-fields)
-5. [Collections](#collections)
-
-9. [Known Issues](#known-issues)
-10. [Roadmap](#roadmap)
-11. [Final Words](#final-words)
-12. [License](#license)
+9. [Collections](#collections)
+10. [Additional notes](#additional-notes)
+11. [Known Issues](#known-issues)
+12. [Roadmap](#roadmap)
+13. [Final Words](#final-words)
+14. [License](#license)
     
 
 ## Quick Start
@@ -758,7 +757,7 @@ Similar to the `Cortex->afind` method, which automatically cast all resulting ma
 If you need to re-sort a result collection once more to another key, use this method like `$results->orderBy('name DESC');`.
 
 
-### Additional notes
+## Additional notes
 
 * To release any relation, just set the field to `NULL` and save the mapper.
 
