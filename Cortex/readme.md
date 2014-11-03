@@ -23,6 +23,10 @@ It's great for fast and easy data abstraction and offers a bunch of useful filte
 
 ---
 
+**Cortex v1.3** with lots of improvements for the latest F3 3.3.1-dev is almost there. Check the [dev-branch](https://github.com/ikkez/F3-Sugar/tree/dev-cortex/Cortex)
+
+---
+
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
