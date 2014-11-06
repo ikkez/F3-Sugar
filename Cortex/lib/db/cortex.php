@@ -1912,15 +1912,16 @@ class Cortex extends Cursor {
 		return $this->mapper->dbtype();
 	}
 
-	/**
-	 * cleanup on destruct
-	 */
 	public function __destruct() {
 		unset($this->mapper);
 	}
 
 	public function __clone() {
 		$this->mapper = clone($this->mapper);
+	}
+
+	function getiterator() {
+		return new \ArrayIterator($this->cast(null,false));
 	}
 }
 
