@@ -902,18 +902,13 @@ class Cortex extends Cursor {
 	{
 		$table = $this->db->quotekey($table);
 		if (!empty($cond[0])) {
-			if (!$filter)
-				$filter = array('');
-			if (!empty($filter[0]))
-				$filter[0] .= ' and ';
 			$whereClause = '('.array_shift($cond[0]).')';
-			$db = $this->db;
-			$whereClause = preg_replace_callback('/\w+/i',function($match) use($table,$db) {
-				if (preg_match('/\b(AND|OR|IN|LIKE|NOT)\b/i',$match[0]))
-					return $match[0];
-				return $table.'.'.$db->quotekey($match[0]);
-			}, $whereClause);
-			$filter[0] .= $whereClause;
+			$whereClause = $this->_sql_quoteCondition($whereClause,$table);
+			if (!$filter)
+				$filter = array($whereClause);
+			elseif (!empty($filter[0]))
+				$filter[0] = '('.$this->_sql_quoteCondition($filter[0],
+					$this->db->quotekey($this->getTable())).') and '.$whereClause;
 			$filter = array_merge($filter, $cond[0]);
 		}
 		if (isset($options['group']))
@@ -925,6 +920,18 @@ class Cortex extends Cursor {
 			$hasGroup = preg_replace('/(\w+)/i', $table.'.$1', $cond[1]['group']);
 			$options['group'] .= ','.$hasGroup;
 		}
+	}
+
+	protected function _sql_quoteCondition($cond, $table)
+	{
+		$db = $this->db;
+		if (preg_match('/[`\'"\[\]]/i',$cond))
+			return $cond;
+		return preg_replace_callback('/\w+/i',function($match) use($table,$db) {
+			if (preg_match('/\b(AND|OR|IN|LIKE|NOT)\b/i',$match[0]))
+				return $match[0];
+			return $table.'.'.$db->quotekey($match[0]);
+		}, $cond);
 	}
 
 	/**
