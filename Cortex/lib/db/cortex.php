@@ -871,7 +871,9 @@ class Cortex extends Cursor {
 	 */
 	protected function _hasJoin_sql($key, $table, $cond, &$filter, &$options)
 	{
-		$rel = $this->getRelInstance($this->fieldConf[$key]['belongs-to-one'],null,$key);
+		$relConf = $this->fieldConf[$key]['belongs-to-one'];
+		$relModel = is_array($relConf)?$relConf[0]:$relConf;
+		$rel = $this->getRelInstance($relModel,null,$key);
 		$fkey = is_array($this->fieldConf[$key]['belongs-to-one']) ?
 			$this->fieldConf[$key]['belongs-to-one'][1] : $rel->primary;
 		$query = $this->_sql_left_join($key,$this->table,$fkey,$table);
