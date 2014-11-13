@@ -1265,7 +1265,7 @@ class Cortex extends Cursor {
 			if ($this->dbsType == 'mongo' && !$val instanceof \MongoId) {
 				if ($key == '_id')
 					$val = new \MongoId($val);
-				elseif (preg_match('/INT|BOOL/i',$fields[$key]['type'])
+				elseif (preg_match('/INT/i',$fields[$key]['type'])
 					&& !isset($fields[$key]['relType']))
 					$val = (int) $val;
 			}
@@ -1582,6 +1582,8 @@ class Cortex extends Cursor {
 					$this->fieldsCache[$key] = unserialize($this->mapper->{$key});
 				elseif ($fields[$key]['type'] == self::DT_JSON)
 					$this->fieldsCache[$key] = json_decode($this->mapper->{$key},true);
+				elseif ($this->fieldConf[$key]['type'] == Schema::DT_BOOLEAN)
+					$this->fieldsCache[$key] = (bool)$this->mapper->{$key};
 			}
 		}
 		// fetch cached value, if existing
@@ -1720,11 +1722,14 @@ class Cortex extends Cursor {
 							$val = $val->expose();
 					}
 					// decode array fields
-					elseif ($this->dbsType == 'sql' && isset($this->fieldConf[$key]['type']))
+					elseif ($this->dbsType == 'sql' && isset($this->fieldConf[$key]['type'])) {
 						if ($this->fieldConf[$key]['type'] == self::DT_SERIALIZED)
 							$val=unserialize($this->mapper->{$key});
 						elseif ($this->fieldConf[$key]['type'] == self::DT_JSON)
 							$val=json_decode($this->mapper->{$key}, true);
+						elseif ($this->fieldConf[$key]['type'] == Schema::DT_BOOLEAN)
+							$val=(bool)$val;
+					}
 				}
 				if ($this->dbsType == 'mongo' && $key == '_id')
 					$val = (string) $val;
