@@ -1,6 +1,6 @@
 <?php
 /**
-    taghandler.php
+    Abstract TagHandler for creating own Tag-Element-Renderer
     
     The contents of this file are subject to the terms of the GNU General
     Public License Version 3.0. You may not use this file except in
@@ -10,7 +10,7 @@
     Copyright (c) 2014 ~ ikkez
     Christian Knuth <ikkez0n3@gmail.com>
  
-        @version 0.1.0
+        @version 0.1.1
         @date: 07.03.14 
  **/
 
@@ -21,8 +21,16 @@ abstract class TagHandler extends \Prefab {
 	/** @var  \Template */
 	protected $template;
 
+	protected static $engine;
+
+
 	public function __construct() {
-		$this->template = \Template::instance();
+		$this->template = ($tmpl=static::$engine)
+			? $tmpl::instance() : \Template::instance();
+	}
+
+	static public function setEngine(\Template $obj) {
+		static::$engine = $obj;
 	}
 
 	/**
@@ -42,12 +50,11 @@ abstract class TagHandler extends \Prefab {
 	static public function render($node) {
 		$attr = $node['@attrib'];
 		unset($node['@attrib']);
-		$tmp = \Template::instance();
 
-		$content = (isset($node[0])) ? $tmp->build($node) : '';
-
-		/** @var \TagHandler $handler */
+		/** @var TagHandler $handler */
 		$handler = new static;
+		$content = (isset($node[0])) ? $handler->template->build($node) : '';
+
 		return $handler->build($attr,$content);
 	}
 
@@ -58,14 +65,13 @@ abstract class TagHandler extends \Prefab {
 	 * @return string
 	 */
 	protected function resolveParams(array $params) {
-		$tmp = \Template::instance();
 		$out = '';
 		foreach ($params as $key => $value) {
 			// build dynamic tokens
 			if (preg_match('/{{(.+?)}}/s', $value))
-				$value = $tmp->build($value);
+				$value = $this->template->build($value);
 			if (preg_match('/{{(.+?)}}/s', $key))
-				$key = $tmp->build($key);
+				$key = $this->template->build($key);
 			// inline token
 			if (is_numeric($key))
 				$out .= ' '.$value;
@@ -91,7 +97,7 @@ abstract class TagHandler extends \Prefab {
 				PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
 			foreach ($split as &$part) {
 				if (substr($part, 0, 2) == '{{') {
-					$part = \Template::instance()->token($part);
+					$part = $this->template->token($part);
 				} else
 					$part = "'".$part."'";
 			}
