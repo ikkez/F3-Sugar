@@ -74,8 +74,8 @@ class Sheet extends \Prefab {
 				$val='';
 				if ($i==0)
 					$val = current($headers);
-				elseif (isset($rows[$i][$ckey]))
-					$val = $rows[$i][$ckey];
+				elseif (isset($rows[$i-1][$ckey]))
+					$val = $rows[$i-1][$ckey];
 				if (is_array($val))
 					$val = json_encode($val);
 				$xls.= (is_numeric($val))
