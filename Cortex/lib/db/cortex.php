@@ -476,6 +476,9 @@ class Cortex extends Cursor {
 				$field['has-many']['relPK'] = $rel['primary'];
 			} else {
 				$field['has-many']['hasRel'] = 'belongs-to-one';
+				$toConf=$rel['fieldConf'][$relConf[1]]['belongs-to-one'];
+				if (is_array($toConf))
+					$field['has-many']['relField'] = $toConf[1];
 			}
 		} elseif(array_key_exists('has-one', $field))
 			$field['relType'] = 'has-one';
@@ -602,6 +605,9 @@ class Cortex extends Cursor {
 						if (!is_array($fromConf))
 							trigger_error(sprintf(self::E_REL_CONF_INC, $key));
 						$id = $this->dbsType == 'sql' ? $this->primary : '_id';
+						if ($type=='has-many' && isset($fromConf['relField'])
+							&& $fromConf['hasRel'] == 'belongs-to-one')
+							$id=$fromConf['relField'];
 						// many-to-many
 						if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
 							if ($this->dbsType == 'sql'
