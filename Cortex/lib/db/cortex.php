@@ -1130,7 +1130,8 @@ class Cortex extends Cursor {
 							$this->fieldConf[$key]['has-many']['refTable'] = $mmTable;
 						} else
 							$mmTable = $relConf['refTable'];
-						$filter = array($mmTable.'.'.$relConf['relField'].' = '.$this->getTable().'.'.$this->primary);
+						$filter = array($this->db->quotekey($mmTable).'.'.$this->db->quotekey($relConf['relField'])
+							.' = '.$this->db->quotekey($this->getTable()).'.'.$this->db->quotekey($this->primary));
 						$from=$mmTable;
 						if (array_key_exists($key, $this->relFilter) &&
 							!empty($this->relFilter[$key][0])) {
