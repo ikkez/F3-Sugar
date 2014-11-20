@@ -651,11 +651,13 @@ class Cortex extends Cursor {
 		}
 		$filter = $this->queryParser->prepareFilter($filter,$this->dbsType,$this->fieldConf);
 		if ($this->dbsType=='sql') {
-			$m_refl = new \ReflectionObject($this->mapper);
-			$m_ad_prop = $m_refl->getProperty('adhoc');
-			$m_ad_prop->setAccessible(true);
-			$m_refl_adhoc = $m_ad_prop->getValue($this->mapper);
-			$m_ad_prop->setAccessible(false);
+			if (!$count) {
+				$m_refl=new \ReflectionObject($this->mapper);
+				$m_ad_prop=$m_refl->getProperty('adhoc');
+				$m_ad_prop->setAccessible(true);
+				$m_refl_adhoc=$m_ad_prop->getValue($this->mapper);
+				$m_ad_prop->setAccessible(false);
+			}
 			unset($m_ad_prop,$m_refl);
 			$qtable = $this->db->quotekey($this->table);
 			if (isset($options['order']) && $this->db->driver() == 'pgsql')
@@ -664,9 +666,10 @@ class Cortex extends Cursor {
 			if (isset($options['group']) && preg_match('/pgsql|sybase|dblib|odbc|sqlsrv/i',$this->db->driver())) {
 				// all non-aggregated fields need to be present in the GROUP BY clause
 				$groupFields = explode(',', preg_replace('/"/','',$options['group']));
-				foreach (array_diff($this->mapper->fields(),array_keys($m_refl_adhoc)) as $field)
-					if (!in_array($this->table.'.'.$field,$groupFields))
-						$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
+				if (isset($m_refl_adhoc))
+					foreach (array_diff($this->mapper->fields(),array_keys($m_refl_adhoc)) as $field)
+						if (!in_array($this->table.'.'.$field,$groupFields))
+							$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
 			}
 			if (!empty($hasJoin)) {
 				// assemble full sql query
@@ -738,7 +741,7 @@ class Cortex extends Cursor {
 					unset($record, $mapper);
 				}
 				return $result;
-			} elseif (!empty($this->preBinds)) {
+			} elseif (!empty($this->preBinds) && !$count) {
 				// bind values to adhoc queries
 				if (!$filter)
 					// we need any filter to bind values
@@ -1941,7 +1944,8 @@ class Cortex extends Cursor {
 	}
 
 	function getiterator() {
-		return new \ArrayIterator($this->cast(null,false));
+//		return new \ArrayIterator($this->cast(null,false));
+		return new \ArrayIterator(array());
 	}
 }
 
