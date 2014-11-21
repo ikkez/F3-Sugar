@@ -1279,6 +1279,8 @@ class Cortex extends Cursor {
 					&& !isset($fields[$key]['relType']))
 					$val = (int) $val;
 			}
+			if (preg_match('/BOOL/i',$fields[$key]['type']))
+				$val = $val==='false' ? false : (bool) $val;
 		}
 		// fluid SQL
 		if ($this->fluid && $this->dbsType == 'sql') {
@@ -1587,13 +1589,16 @@ class Cortex extends Cursor {
 				}
 			}
 			// resolve array fields
-			elseif ($this->dbsType == 'sql' && isset($fields[$key]['type'])) {
-				if ($fields[$key]['type'] == self::DT_SERIALIZED)
-					$this->fieldsCache[$key] = unserialize($this->mapper->{$key});
-				elseif ($fields[$key]['type'] == self::DT_JSON)
-					$this->fieldsCache[$key] = json_decode($this->mapper->{$key},true);
-				elseif ($this->fieldConf[$key]['type'] == Schema::DT_BOOLEAN)
-					$this->fieldsCache[$key] = (bool)$this->mapper->{$key};
+			elseif (isset($fields[$key]['type'])) {
+				if ($this->dbsType == 'sql') {
+					if ($fields[$key]['type'] == self::DT_SERIALIZED)
+						$this->fieldsCache[$key] = unserialize($this->mapper->{$key});
+					elseif ($fields[$key]['type'] == self::DT_JSON)
+						$this->fieldsCache[$key] = json_decode($this->mapper->{$key},true);
+				}
+				if ($this->exists($key) && preg_match('/BOOL/i',$fields[$key]['type'])) {
+					$this->fieldsCache[$key] = (bool) $this->mapper->{$key};
+				}
 			}
 		}
 		// fetch cached value, if existing
@@ -1711,34 +1716,37 @@ class Cortex extends Cursor {
 				// post process configured fields
 				if (isset($this->fieldConf[$key]) && is_array($this->fieldConf[$key])) {
 					// handle relations
-					if (($rel_depths === TRUE || (is_int($rel_depths) && $rel_depths >= 0))) {
-						if ($type=preg_grep('/[belongs|has]-(to-)*[one|many]/',
+					if (($rel_depths === TRUE || (is_int($rel_depths) && $rel_depths >= 0))
+						&& $type=preg_grep('/[belongs|has]-(to-)*[one|many]/',
 							array_keys($this->fieldConf[$key]))) {
-							$relType=$type[0];
-							// cast relations
-							$val = (($relType == 'belongs-to-one' || $relType == 'belongs-to-many')
-								&& !$mp->exists($key)) ? NULL : $mp->get($key);
-							if (is_array($val) || is_object($val)) {
-								if ($relType == 'belongs-to-one' || $relType == 'has-one')
-									// single object
-									$val = $val->cast(null, $rel_depths);
-								elseif ($relType == 'belongs-to-many' || $relType == 'has-many')
-									// multiple objects
-									foreach ($val as $k => $item)
-										$val[$k] = is_object($item) ? $item->cast(null, $rel_depths) : null;
-							}
+						$relType=$type[0];
+						// cast relations
+						$val = (($relType == 'belongs-to-one' || $relType == 'belongs-to-many')
+							&& !$mp->exists($key)) ? NULL : $mp->get($key);
+						if (is_array($val) || is_object($val)) {
+							if ($relType == 'belongs-to-one' || $relType == 'has-one')
+								// single object
+								$val = $val->cast(null, $rel_depths);
+							elseif ($relType == 'belongs-to-many' || $relType == 'has-many')
+								// multiple objects
+								foreach ($val as $k => $item)
+									$val[$k] = is_object($item) ? $item->cast(null, $rel_depths) : null;
 						}
 						if ($val instanceof CortexCollection)
 							$val = $val->expose();
 					}
 					// decode array fields
-					elseif ($this->dbsType == 'sql' && isset($this->fieldConf[$key]['type'])) {
-						if ($this->fieldConf[$key]['type'] == self::DT_SERIALIZED)
-							$val=unserialize($this->mapper->{$key});
-						elseif ($this->fieldConf[$key]['type'] == self::DT_JSON)
-							$val=json_decode($this->mapper->{$key}, true);
-						elseif ($this->fieldConf[$key]['type'] == Schema::DT_BOOLEAN)
-							$val=(bool)$val;
+					elseif (isset($this->fieldConf[$key]['type'])) {
+						if ($this->dbsType == 'sql') {
+							if ($this->fieldConf[$key]['type'] == self::DT_SERIALIZED)
+								$val=unserialize($this->mapper->{$key});
+							elseif ($this->fieldConf[$key]['type'] == self::DT_JSON)
+								$val=json_decode($this->mapper->{$key}, true);
+						}
+						if ($this->exists($key)
+							&& preg_match('/BOOL/i',$this->fieldConf[$key]['type'])) {
+							$val = (bool) $this->mapper->{$key};
+						}
 					}
 				}
 				if ($this->dbsType == 'mongo' && $key == '_id')
