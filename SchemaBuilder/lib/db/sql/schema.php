@@ -30,8 +30,7 @@ class Schema extends DB_Utils {
 
     public
         $dataTypes = array(
-            'BOOLEAN' =>    array('mysql|sqlite2?' => 'BOOLEAN',
-                                  'pgsql' => 'text',
+            'BOOLEAN' =>    array('mysql|sqlite2?|pgsql' => 'BOOLEAN',
                                   'mssql|sybase|dblib|odbc|sqlsrv' => 'bit',
                                   'ibm' => 'numeric(1,0)',
             ),
