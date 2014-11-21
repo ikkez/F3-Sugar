@@ -1259,7 +1259,7 @@ class Cortex extends Cursor {
 				}
 			}
 			// convert array content
-			if (is_array($val) && $this->dbsType == 'sql' && !empty($fields))
+			if (is_array($val) && $this->dbsType == 'sql')
 				if ($fields[$key]['type'] == self::DT_SERIALIZED)
 					$val = serialize($val);
 				elseif ($fields[$key]['type'] == self::DT_JSON)
@@ -1268,8 +1268,7 @@ class Cortex extends Cursor {
 					trigger_error(sprintf(self::E_ARRAY_DATATYPE, $key));
 			// add nullable polyfill
 			if ($val === NULL && ($this->dbsType == 'jig' || $this->dbsType == 'mongo')
-				&& !empty($fields) && array_key_exists('nullable', $fields[$key])
-				&& $fields[$key]['nullable'] === false)
+				&& array_key_exists('nullable', $fields[$key]) && $fields[$key]['nullable'] === false)
 				trigger_error(sprintf(self::E_NULLABLE_COLLISION,$key));
 			// MongoId shorthand
 			if ($this->dbsType == 'mongo' && !$val instanceof \MongoId) {
@@ -1279,8 +1278,11 @@ class Cortex extends Cursor {
 					&& !isset($fields[$key]['relType']))
 					$val = (int) $val;
 			}
-			if (preg_match('/BOOL/i',$fields[$key]['type']))
-				$val = $val==='false' ? false : (bool) $val;
+			if (preg_match('/BOOL/i',$fields[$key]['type'])) {
+				$val = !$val || $val==='false' ? false : (bool) $val;
+				if ($this->dbsType == 'sql')
+					$val = (int) $val;
+			}
 		}
 		// fluid SQL
 		if ($this->fluid && $this->dbsType == 'sql') {
