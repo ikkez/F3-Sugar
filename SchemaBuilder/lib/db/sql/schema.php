@@ -60,7 +60,7 @@ class Schema extends DB_Utils {
             ),
             'VARCHAR128' => array('mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => 'varchar(128)',
             ),
-            'VARCHAR256' => array('mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => 'varchar(256)',
+            'VARCHAR256' => array('mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => 'varchar(255)',
             ),
             'VARCHAR512' => array('mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => 'varchar(512)',
             ),
