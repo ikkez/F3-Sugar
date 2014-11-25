@@ -1,5 +1,5 @@
 ## F3 Sugar
-some custom helpers and plugins for the PHP Fat-Free Framework
+some custom helpers and plugins for the [PHP Fat-Free Framework](https://github.com/bcosca/fatfree)
 
 ### Cortex
 
@@ -19,27 +19,21 @@ A File Abstraction Layer across multiple filesystem adapters, with meta data sup
 
 ***
 
-### FileUnit
-
-A Plugin which offers some file system functionality. *(deprecated - will completely move into FAL FileSystem Adapter)*
-
-***
-
 ### Pagination
 
 A little class that helps you to build a pagebrowser for your template and setup specific pagination routing.
 
 ***
 
-### Router
-
-This plugin is useful to create named routes and access them easily from template.
-
-***
-
 ### SchemaBuilder
 
 A SQL database extension for managing database table structures.
+
+***
+
+### Sheet
+
+Just some tools for parsing CSV files and generating Excel documents.
 
 ***
 
@@ -62,4 +56,3 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/ikkez/f3-sugar/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
