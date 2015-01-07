@@ -592,6 +592,14 @@ class Cortex extends Cursor {
 			}
 			// Jig can't group yet, but pending enhancement https://github.com/bcosca/fatfree/pull/616
 		}
+		if ($this->dbsType == 'sql' && !$count) {
+			$m_refl=new \ReflectionObject($this->mapper);
+			$m_ad_prop=$m_refl->getProperty('adhoc');
+			$m_ad_prop->setAccessible(true);
+			$m_refl_adhoc=$m_ad_prop->getValue($this->mapper);
+			$m_ad_prop->setAccessible(false);
+			unset($m_ad_prop,$m_refl);
+		}
 		$hasJoin = array();
 		if ($this->hasCond) {
 			foreach($this->hasCond as $key => $hasCond) {
@@ -611,9 +619,18 @@ class Cortex extends Cursor {
 						// many-to-many
 						if ($type == 'has-many' && $fromConf['hasRel'] == 'has-many') {
 							if ($this->dbsType == 'sql'
-								&& !isset($has_options['limit']) && !isset($has_options['offset']))
+								&& !isset($has_options['limit']) && !isset($has_options['offset'])) {
 								$hasJoin = array_merge($hasJoin,
 									$this->_hasJoinMM_sql($key,$hasCond,$filter,$options));
+								$options['group'] = (isset($options['group'])?$options['group'].',':'').
+									$this->db->quotekey($this->table.'.'.$this->primary);
+								$groupFields = explode(',', preg_replace('/"/','',$options['group']));
+								// all non-aggregated fields need to be present in the GROUP BY clause
+								if (isset($m_refl_adhoc) && preg_match('/sybase|dblib|odbc|sqlsrv/i',$this->db->driver()))
+									foreach (array_diff($this->mapper->fields(),array_keys($m_refl_adhoc)) as $field)
+										if (!in_array($this->table.'.'.$field,$groupFields))
+											$options['group'] .= ', '.$this->db->quotekey($this->table.'.'.$field);
+							}
 							elseif ($result = $this->_hasRefsInMM($key,$has_filter,$has_options,$ttl))
 								$addToFilter = array($id.' IN ?', $result);
 						} // *-to-one
@@ -651,49 +668,32 @@ class Cortex extends Cursor {
 		}
 		$filter = $this->queryParser->prepareFilter($filter,$this->dbsType,$this->fieldConf);
 		if ($this->dbsType=='sql') {
-			if (!$count) {
-				$m_refl=new \ReflectionObject($this->mapper);
-				$m_ad_prop=$m_refl->getProperty('adhoc');
-				$m_ad_prop->setAccessible(true);
-				$m_refl_adhoc=$m_ad_prop->getValue($this->mapper);
-				$m_ad_prop->setAccessible(false);
-			}
-			unset($m_ad_prop,$m_refl);
 			$qtable = $this->db->quotekey($this->table);
 			if (isset($options['order']) && $this->db->driver() == 'pgsql')
 				// PostgreSQLism: sort NULL values to the end of a table
 				$options['order'] = preg_replace('/\h+DESC/i',' DESC NULLS LAST',$options['order']);
-			if (isset($options['group']) && preg_match('/pgsql|sybase|dblib|odbc|sqlsrv/i',$this->db->driver())) {
-				// all non-aggregated fields need to be present in the GROUP BY clause
-				$groupFields = explode(',', preg_replace('/"/','',$options['group']));
-				if (isset($m_refl_adhoc))
-					foreach (array_diff($this->mapper->fields(),array_keys($m_refl_adhoc)) as $field)
-						if (!in_array($this->table.'.'.$field,$groupFields))
-							$options['group'] .= ', '.$qtable.'.'.$this->db->quotekey($field);
-			}
 			if (!empty($hasJoin)) {
 				// assemble full sql query
-				if (!empty($this->preBinds)) {
-					$crit = array_shift($filter);
-					$filter = array_merge($this->preBinds,$filter);
-					array_unshift($filter,$crit);
-				}
 				$adhoc='';
-				if (!empty($m_refl_adhoc))
-					foreach ($m_refl_adhoc as $key=>$val)
-						$adhoc.=', '.$val['expr'].' AS '.$key;
 				if ($count)
 					$sql = 'SELECT COUNT(*) AS '.$this->db->quotekey('rows').' FROM '.$qtable;
-				else
+				else {
+					if (!empty($this->preBinds)) {
+						$crit = array_shift($filter);
+						$filter = array_merge($this->preBinds,$filter);
+						array_unshift($filter,$crit);
+					}
+					if (!empty($m_refl_adhoc))
+						foreach ($m_refl_adhoc as $key=>$val)
+							$adhoc.=', '.$val['expr'].' AS '.$key;
 					$sql = 'SELECT '.$qtable.'.*'.$adhoc.' FROM '.$qtable;
-				foreach ($hasJoin as $q)
-					$sql .= ' '.$q;
-				$sql .= ' WHERE '.$filter[0];
+				}
+				$sql .= ' '.implode(' ',$hasJoin).' WHERE '.$filter[0];
 				if (!$count) {
 					if (isset($options['group']))
-						$sql.=' GROUP BY '.$options['group'];
+						$sql .= ' GROUP BY '.$this->_sql_quoteCondition($options['group'], $this->table);
 					if (isset($options['order']))
-						$sql.=' ORDER BY '.$options['order'];
+						$sql .= ' ORDER BY '.$options['order'];
 					if (preg_match('/mssql|sqlsrv|odbc/', $this->db->driver()) &&
 						(isset($options['limit']) || isset($options['offset']))) {
 						$ofs=isset($options['offset'])?(int)$options['offset']:0;
@@ -705,8 +705,10 @@ class Cortex extends Cursor {
 							$sql.=' OFFSET '.$ofs.' ROWS'.($lmt?' FETCH NEXT '.$lmt.' ROWS ONLY':'');
 						} else {
 							// SQL Server 2008
+							$order=(!isset($options['order']))
+								?($this->db->quotekey($this->table.'.'.$this->primary)):$options['order'];
 							$sql=str_replace('SELECT','SELECT '.($lmt>0?'TOP '.($ofs+$lmt):'').' ROW_NUMBER() '.
-								'OVER (ORDER BY '.$this->db->quotekey($this->table).'.'.$this->db->quotekey($this->primary).') AS rnum,',$sql);
+								'OVER (ORDER BY '.$order.') AS rnum,',$sql);
 							$sql='SELECT * FROM ('.$sql.') x WHERE rnum > '.($ofs);
 						}
 					} else {
@@ -724,7 +726,7 @@ class Cortex extends Cursor {
 					// factory new mappers
 					$mapper = clone($this->mapper);
 					$mapper->reset();
-					$m_adhoc=empty($adhoc)?array():$m_refl_adhoc;
+					$m_adhoc = empty($adhoc) ? array() : $m_refl_adhoc;
 					foreach ($record as $key=>$val)
 						if (isset($m_refl_adhoc[$key]))
 							$m_adhoc[$key]['value']=$val;
@@ -744,19 +746,16 @@ class Cortex extends Cursor {
 			} elseif (!empty($this->preBinds) && !$count) {
 				// bind values to adhoc queries
 				if (!$filter)
-					// we need any filter to bind values
+					// we (PDO) need any filter to bind values
 					$filter = array('1=1');
 				$crit = array_shift($filter);
 				$filter = array_merge($this->preBinds,$filter);
 				array_unshift($filter,$crit);
 			}
 		}
-		$options = $this->queryParser->prepareOptions($options,$this->dbsType);
-		if ($count)
-			$result = $this->mapper->count($filter,$ttl);
-		else
-			$result = $this->mapper->find($filter,$options,$ttl);
-		return $result;
+		return ($count)
+			? $this->mapper->count($filter,$ttl)
+			: $this->mapper->find($filter,$this->queryParser->prepareOptions($options,$this->dbsType),$ttl);
 	}
 
 	/**
@@ -919,14 +918,9 @@ class Cortex extends Cursor {
 				$filter = array($whereClause);
 			elseif (!empty($filter[0]))
 				$filter[0] = '('.$this->_sql_quoteCondition($filter[0],
-					$this->db->quotekey($this->getTable())).') and '.$whereClause;
+					$this->db->quotekey($this->table)).') and '.$whereClause;
 			$filter = array_merge($filter, $cond[0]);
 		}
-		if (isset($options['group']))
-			$options['group'] .= ',';
-		else
-			$options['group'] = '';
-		$options['group'] .= $this->db->quotekey($this->getTable().'.'.$this->primary);
 		if ($cond[1] && isset($cond[1]['group'])) {
 			$hasGroup = preg_replace('/(\w+)/i', $table.'.$1', $cond[1]['group']);
 			$options['group'] .= ','.$hasGroup;
@@ -1498,6 +1492,8 @@ class Cortex extends Cursor {
 							if (!$mmRes)
 								$cx->setRelSet($key, NULL);
 							else {
+								$pivotRel = array();
+								$pivotKeys = array();
 								foreach($mmRes as $model) {
 									$val = $model->get($key,true);
 									$pivotRel[ (string) $model->get($fromConf['relField'])][] = $val;
