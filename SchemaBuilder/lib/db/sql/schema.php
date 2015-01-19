@@ -1,24 +1,24 @@
 <?php
 
 /**
-    SQL Table Schema Builder extension for the PHP Fat-Free Framework
-
-    The contents of this file are subject to the terms of the GNU General
-    Public License Version 3.0. You may not use this file except in
-    compliance with the license. Any of the license terms and conditions
-    can be waived if you get permission from the copyright holder.
-
-    crafted by   __ __     __
-                |__|  |--.|  |--.-----.-----.
-                |  |    < |    <|  -__|-- __|
-                |__|__|__||__|__|_____|_____|
-
-    Copyright (c) 2014 by ikkez
-    Christian Knuth <ikkez0n3@gmail.com>
-    https://github.com/ikkez/F3-Sugar/
-
-        @package DB
-        @version 2.1.1
+ *  SQL Table Schema Builder extension for the PHP Fat-Free Framework
+ *
+ *  The contents of this file are subject to the terms of the GNU General
+ *  Public License Version 3.0. You may not use this file except in
+ *  compliance with the license. Any of the license terms and conditions
+ *  can be waived if you get permission from the copyright holder.
+ *
+ *  crafted by   __ __     __
+ *              |__|  |--.|  |--.-----.-----.
+ *              |  |    < |    <|  -__|-- __|
+ *              |__|__|__||__|__|_____|_____|
+ *
+ *  Copyright (c) 2014 by ikkez
+ *  Christian Knuth <ikkez0n3@gmail.com>
+ *  https://github.com/ikkez/F3-Sugar/
+ *
+ *  @package DB
+ *  @version 2.1.1
  **/
 
 
