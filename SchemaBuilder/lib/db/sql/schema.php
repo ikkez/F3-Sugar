@@ -1,24 +1,24 @@
 <?php
 
 /**
-    SQL Table Schema Builder extension for the PHP Fat-Free Framework
-
-    The contents of this file are subject to the terms of the GNU General
-    Public License Version 3.0. You may not use this file except in
-    compliance with the license. Any of the license terms and conditions
-    can be waived if you get permission from the copyright holder.
-
-    crafted by   __ __     __
-                |__|  |--.|  |--.-----.-----.
-                |  |    < |    <|  -__|-- __|
-                |__|__|__||__|__|_____|_____|
-
-    Copyright (c) 2014 by ikkez
-    Christian Knuth <ikkez0n3@gmail.com>
-    https://github.com/ikkez/F3-Sugar/
-
-        @package DB
-        @version 2.1.0
+ *  SQL Table Schema Builder extension for the PHP Fat-Free Framework
+ *
+ *  The contents of this file are subject to the terms of the GNU General
+ *  Public License Version 3.0. You may not use this file except in
+ *  compliance with the license. Any of the license terms and conditions
+ *  can be waived if you get permission from the copyright holder.
+ *
+ *  crafted by   __ __     __
+ *              |__|  |--.|  |--.-----.-----.
+ *              |  |    < |    <|  -__|-- __|
+ *              |__|__|__||__|__|_____|_____|
+ *
+ *  Copyright (c) 2014 by ikkez
+ *  Christian Knuth <ikkez0n3@gmail.com>
+ *  https://github.com/ikkez/F3-Sugar/
+ *
+ *  @package DB
+ *  @version 2.1.1
  **/
 
 
@@ -30,8 +30,7 @@ class Schema extends DB_Utils {
 
     public
         $dataTypes = array(
-            'BOOLEAN' =>    array('mysql|sqlite2?' => 'BOOLEAN',
-                                  'pgsql' => 'text',
+            'BOOLEAN' =>    array('mysql|sqlite2?|pgsql' => 'BOOLEAN',
                                   'mssql|sybase|dblib|odbc|sqlsrv' => 'bit',
                                   'ibm' => 'numeric(1,0)',
             ),
@@ -61,15 +60,17 @@ class Schema extends DB_Utils {
             ),
             'VARCHAR128' => array('mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => 'varchar(128)',
             ),
-            'VARCHAR256' => array('mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => 'varchar(256)',
+            'VARCHAR256' => array('mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => 'varchar(255)',
             ),
             'VARCHAR512' => array('mysql|pgsql|sqlite2?|ibm|mssql|sybase|dblib|odbc|sqlsrv' => 'varchar(512)',
             ),
-            'TEXT' =>       array('mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv' => 'text',
+            'TEXT' =>       array('mysql|sqlite2?|pgsql|mssql' => 'text',
+                                  'sybase|dblib|odbc|sqlsrv' => 'nvarchar(max)',
                                   'ibm' => 'BLOB SUB_TYPE TEXT',
             ),
             'LONGTEXT' =>   array('mysql' => 'LONGTEXT',
-                                  'sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv' => 'text',
+                                  'sqlite2?|pgsql|mssql' => 'text',
+                                  'sybase|dblib|odbc|sqlsrv' => 'nvarchar(max)',
                                   'ibm' => 'CLOB(2000000000)',
             ),
             'DATE' =>       array('mysql|sqlite2?|pgsql|mssql|sybase|dblib|odbc|sqlsrv|ibm' => 'date',
@@ -709,19 +710,20 @@ class TableModifier extends TableBuilder {
                     || $default == "('now'::text)::timestamp(0) without time zone"))
                 {
                     $default = 'CUR_STAMP';
-                } else {
+                } elseif (!is_null($default)) {
                     // remove single-qoutes
                     if (preg_match('/sqlite2?/', $this->db->driver()))
-                        $default = substr($default, 1, -1);
+                        $default=preg_replace('/^\s*([\'"])(.*)\1\s*$/','\2',$default);
                     elseif (preg_match('/mssql|sybase|dblib|odbc|sqlsrv/', $this->db->driver()))
-                        $default = substr($default, 2, -2);
+                        $default=preg_replace('/^\s*(\(\')(.*)(\'\))\s*$/','\2',$default);
                     // extract value from character_data in postgre
-                    elseif (preg_match('/pgsql/', $this->db->driver()) && !is_null($default))
+                    elseif (preg_match('/pgsql/', $this->db->driver()))
                         if (is_int(strpos($default, 'nextval')))
                             $default = null; // drop autoincrement default
-                        elseif (preg_match("/\'(.*)\'/", $default, $match))
+                        elseif (preg_match("/^\'*(.*)\'*::(\s*\w)+/", $default, $match))
                             $default = $match[1];
-                }
+                } else
+                    $default=false;
                 $cols['default'] = $default;
             }
         return $schema;
