@@ -1,27 +1,27 @@
 <?php
 
 /**
-    Cortex - a general purpose mapper for the PHP Fat-Free Framework
-
-    The contents of this file are subject to the terms of the GNU General
-    Public License Version 3.0. You may not use this file except in
-    compliance with the license. Any of the license terms and conditions
-    can be waived if you get permission from the copyright holder.
-
-    crafted by   __ __     __
-                |__|  |--.|  |--.-----.-----.
-                |  |    < |    <|  -__|-- __|
-                |__|__|__||__|__|_____|_____|
-
-    Copyright (c) 2014 by ikkez
-    Christian Knuth <ikkez0n3@gmail.com>
-    https://github.com/ikkez/F3-Sugar/
-
-        @package DB
-        @version 1.3.0-dev
-        @since 24.04.2012
-        @date 02.04.2014
- **/
+ *  Cortex - a general purpose mapper for the PHP Fat-Free Framework
+ *
+ *  The contents of this file are subject to the terms of the GNU General
+ *  Public License Version 3.0. You may not use this file except in
+ *  compliance with the license. Any of the license terms and conditions
+ *  can be waived if you get permission from the copyright holder.
+ *
+ *  crafted by   __ __     __
+ *              |__|  |--.|  |--.-----.-----.
+ *              |  |    < |    <|  -__|-- __|
+ *              |__|__|__||__|__|_____|_____|
+ *
+ *  Copyright (c) 2014 by ikkez
+ *  Christian Knuth <ikkez0n3@gmail.com>
+ *  https://github.com/ikkez/F3-Sugar/
+ *
+ *  @package DB
+ *  @version 1.3.0
+ *  @since 24.04.2012
+ *  @date 19.01.2015
+ */
 
 namespace DB;
 use DB\SQL\Schema;
