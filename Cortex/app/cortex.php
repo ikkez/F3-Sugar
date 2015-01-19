@@ -15,9 +15,10 @@ class Cortex extends Controller
 //			'sql-sqlite' => new \DB\SQL('sqlite:data/sqlite.db'),
 //			'sql-pgsql' => new \DB\SQL('pgsql:host=localhost;dbname=fatfree', 'fatfree', 'fatfree'),
 			'jig' => new \DB\Jig('data/'),
-			'mongo' => new \DB\Mongo('mongodb://localhost:27017', 'testdb')
+			'mongo' => new \DB\Mongo('mongodb://localhost:27017', 'testdb'),
+//			'sqlsrv2012' => new \DB\SQL('sqlsrv:SERVER=LOCALHOST\SQLEXPRESS2012;Database=fatfree','fatfree', 'fatfree'),
+//			'sqlsrv2008' => new \DB\SQL('sqlsrv:SERVER=LOCALHOST\SQLEXPRESS2008;Database=fatfree','fatfree', 'fatfree'),
 		);
-
 		$results = array();
 
 		// Test Syntax

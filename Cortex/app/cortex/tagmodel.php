@@ -8,7 +8,7 @@ class TagModel extends \DB\Cortex {
 				'type' => \DB\SQL\Schema::DT_VARCHAR128
 			),
 			'news' => array(
-				'has-many' => array('\NewsModel','tags2'),
+				'has-many' => array('\NewsModel','tags2','news_tags'),
 			),
 		),
 //		$primary = 'tid',

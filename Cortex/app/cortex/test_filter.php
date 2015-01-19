@@ -31,7 +31,7 @@ class Test_Filter {
 		$tagIDs = $tag->find()->getAll('_id');
 
 		// add another relation
-		$news->load(array($news_pk.' = ?',$newsIDs[1]));
+		$news->load(array('title = ?','CSS3 Showcase'));
 		$news->author = $author->load(array($author_pk.' = ?',$authorIDs[0]));
 		$news->save();
 		$news->reset();
@@ -218,12 +218,81 @@ class Test_Filter {
 		);
 
 		$news->filter('tags2',null,array('order'=>'title ASC'));
-		$news->load();
-
+		$news->load(array('title = ?','Responsive Images'));
 		$test->expect(
 			$news->tags2[0]->title == 'Responsive' &&
 			$news->tags2[1]->title == 'Web Design',
 			$type.': filter with sorting of related records'
+		);
+
+		// get all tags sorted by their usage in news articles
+		$tag->reset();
+		$tag->countRel('news');
+		$result = $tag->find(null,array('order'=>'count_news DESC, title'))->castAll(0);
+
+		$test->expect(
+			$result[0]['title'] == 'Responsive' &&
+			$result[0]['count_news'] == 3 &&
+			$result[1]['title'] == 'Usability' &&
+			$result[1]['count_news'] == 1 &&
+			$result[2]['title'] == 'Web Design' &&
+			$result[2]['count_news'] == 1,
+			$type.': count and sort on many-to-many relation'
+		);
+
+		// get all authors sorted by the amount of news they have written
+		$author->reset();
+		$author->countRel('news');
+		$result = $author->find(null,array('order'=>'count_news DESC'))->castAll(0);
+
+		$test->expect(
+			$result[0]['name'] == 'Ridley Scott' &&
+			$result[0]['count_news'] == 2 &&
+			$result[1]['name'] == 'Johnny English' &&
+			$result[1]['count_news'] == 1 &&
+			$result[2]['name'] == 'James T. Kirk' &&
+			$result[2]['count_news'] == null,
+			$type.': count and sort on one-to-many relation'
+		);
+
+		$tag->reset();
+		$tag->countRel('news');
+		$result = $tag->find(null,array('order'=>'count_news DESC, title DESC','limit'=>1,'offset'=>1))->castAll(0);
+
+		$test->expect(
+			$result[0]['title'] == 'Web Design' &&
+			$result[0]['count_news'] == 1,
+			$type.': apply limit and offset on aggregated collection'
+		);
+
+
+		$author->reset();
+		$author->countRel('news');
+		$author->has('news',array('text like ?','%Lorem%'));
+		$result = $author->find()->castAll(0);
+
+		$test->expect(
+			count($result) == 1 &&
+			$result[0]['name'] == 'Ridley Scott' &&
+			$result[0]['count_news'] == 2 ,
+			$type.': has-filter and 1:M relation counter'
+		);
+
+
+		$author->reset();
+		$id = $author->load()->next()->_id;
+		$tag->reset();
+		$tag->countRel('news');
+		$tag->has('news',array('author = ?',$id));
+		$result = $tag->find(null,array('order'=>'count_news desc'))->castAll(0);
+
+		$test->expect(
+			count($result) == 2 &&
+			$result[0]['title'] == 'Responsive' &&
+			$result[0]['count_news'] == 3 &&
+			$result[1]['title'] == 'Web Design' &&
+			$result[1]['count_news'] == 1,
+			$type.': has-filter and M:M relation counter'
 		);
 
 		///////////////////////////////////
