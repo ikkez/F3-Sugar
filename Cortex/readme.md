@@ -60,7 +60,7 @@ It's great for fast and easy data abstraction and offers a bunch of useful filte
 
 ### System Requirements
 
-Cortex requires at least Fat-Free v3.3.1 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
+Cortex requires at least Fat-Free v3.4 and PHP 5.3.3. For some of the features, it also requires the F3 [SQL Schema Plugin](https://github.com/ikkez/F3-Sugar/tree/master-v3/SchemaBuilder).
 
 ### Install
 
