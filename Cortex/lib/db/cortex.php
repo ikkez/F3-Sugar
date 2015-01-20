@@ -982,13 +982,6 @@ class Cortex extends Cursor {
 		return $crit;
 	}
 
-	protected function getRelFilterOption($key)
-	{
-		return (array_key_exists($key, $this->relFilter) &&
-			!empty($this->relFilter[$key][1]))
-			? $this->relFilter[$key][1] : null;
-	}
-
 	/**
 	 * returns the option condition for a relation filter, if defined
 	 * @param string $key
@@ -1192,14 +1185,6 @@ class Cortex extends Cursor {
 			$this->grp_stack['initial']+=$opt['initial'];
 		if (isset($opt['finalize']))
 			$this->grp_stack['finalize'].=$opt['finalize'];
-	}
-
-	/**
-	 * Count records that are currently loaded
-	 * @return int
-	 */
-	public function countResults() {
-		return count($this->mapper->query);
 	}
 
 	/**
