@@ -39,7 +39,7 @@ for use cases like:
 
 ```html
 <div class="box {{ @FLASH->getKey('highlight') }}">
-  <F3:check if="@FLASH->get('show-hint')">
+  <F3:check if="{{@FLASH->get('show-hint')}}">
   <p>It's new !!!</p>
   </F3:check>
   ...
