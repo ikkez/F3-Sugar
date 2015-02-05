@@ -32,7 +32,7 @@ class Flash extends Prefab {
     }
 
     public function addMessage($text,$status = 'info') {
-        $this->msg[] = array('text'=>$text,'status'=>$status);;
+        $this->msg[] = array('text'=>$text,'status'=>$status);
     }
 
     public function getMessages() {
@@ -60,5 +60,9 @@ class Flash extends Prefab {
             unset($this->key[$key]);
         }
         return $out;
+    }
+
+    public function hasKey($key) {
+        return ($this->key && array_key_exists($key,$this->key));
     }
 }
