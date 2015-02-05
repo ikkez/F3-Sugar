@@ -63,6 +63,6 @@ class Flash extends Prefab {
     }
 
     public function hasKey($key) {
-        return array_key_exists($key,$this->key);
+        return ($this->key && array_key_exists($key,$this->key));
     }
 }
