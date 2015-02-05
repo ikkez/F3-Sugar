@@ -31,8 +31,9 @@ If you need, you could also add simple keys:
 ```php
 $flash = \Flash::instance()
 $f3->set('FLASH', $flash);
-$flash->addKey('highlight','bg-success'); // with value
-$flash->addKey('show-hint'); // without returns just TRUE
+$flash->setKey('highlight','bg-success'); // with value
+$flash->setKey('show-hint'); // without returns just TRUE
+$flash->setKey('error','Catastrophic error occured! ');
 ```
 
 for use cases like:
@@ -46,3 +47,8 @@ for use cases like:
 </div>
 ```
 
+```html
+<F3:check if="{{ @@FLASH && @FLASH->hasKey('error') }}">
+    <p>{{ @FLASH->getKey('error') }}</p>
+</F3:check>
+```
