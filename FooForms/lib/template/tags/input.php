@@ -12,15 +12,9 @@ class Input extends \Template\TagHandler {
 	 */
 	function build($attr, $content) {
 		if (isset($attr['type']) && isset($attr['name'])) {
-			if ($attr['type'] == 'text' || $attr['type'] == 'email') {
-				if (!(isset($attr['value']) && !empty($attr['value']))) {
-					$name = $attr['name'];
-					$name = $this->makeInjectable($name);
-					$attr['value'] = $this->template->build('{{ isset(@POST['.$name.'])?@POST['.$name.']:\'\'}}');
-				}
-			} elseif ($attr['type'] == 'checkbox') {
+			$name = $this->makeInjectable($attr['name']);
+			if ($attr['type'] == 'checkbox') {
 				$value = $this->makeInjectable(isset($attr['value'])?$attr['value']:'on');
-				$name = $this->makeInjectable($attr['name']);
 				// basic match
 				$str = '(isset(@POST['.$name.']) && @POST['.$name.']=='.$value.')';
 				// dynamic array match
@@ -39,9 +33,13 @@ class Input extends \Template\TagHandler {
 
 			} elseif ($attr['type'] == 'radio' && isset($attr['value'])) {
 				$value = $this->makeInjectable(isset($attr['value'])?$attr['value']:'on');
-				$name = $this->makeInjectable($attr['name']);
 				$attr[] = $this->template->build('{{ isset(@POST['.$name.']) && '.
 					'@POST['.$attr['name'].']=='.$value.'?\'checked="checked"\':\'\'}}');
+			} else {
+				// all other types
+				if (!(isset($attr['value']) && !empty($attr['value']))) {
+					$attr['value'] = $this->template->build('{{ isset(@POST['.$name.'])?@POST['.$name.']:\'\'}}');
+				}
 			}
 		}
 		// resolve all other / unhandled tag attributes
