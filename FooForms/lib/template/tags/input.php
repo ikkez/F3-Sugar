@@ -35,11 +35,9 @@ class Input extends \Template\TagHandler {
 				$value = $this->makeInjectable(isset($attr['value'])?$attr['value']:'on');
 				$attr[] = $this->template->build('{{ isset(@POST['.$name.']) && '.
 					'@POST['.$attr['name'].']=='.$value.'?\'checked="checked"\':\'\'}}');
-			} else {
-				// all other types
-				if (!(isset($attr['value']) && !empty($attr['value']))) {
-					$attr['value'] = $this->template->build('{{ isset(@POST['.$name.'])?@POST['.$name.']:\'\'}}');
-				}
+			} elseif($attr['type'] != 'password' && !array_key_exists('value',$attr)) {
+				// all other types, except password fields
+				$attr['value'] = $this->template->build('{{ isset(@POST['.$name.'])?@POST['.$name.']:\'\'}}');
 			}
 		}
 		// resolve all other / unhandled tag attributes
