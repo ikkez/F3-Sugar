@@ -75,10 +75,11 @@ class Sheet extends \Prefab {
 				if ($i==0)
 					$val = current($headers);
 				elseif (isset($rows[$i-1][$ckey]))
-					$val = $rows[$i-1][$ckey];
+					$val = trim($rows[$i-1][$ckey]);
 				if (is_array($val))
 					$val = json_encode($val);
-				$xls.= (is_numeric($val))
+				$xls.= (is_int($val)
+					|| (ctype_digit($val) && ($val[0]!='0' && strlen($val)>1)))
 					? $this->xlsWriteNumber($i,$c,$val)
 					: $this->xlsWriteString($i,$c,utf8_decode($val));
 				next($headers);
