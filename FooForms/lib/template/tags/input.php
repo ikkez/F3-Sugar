@@ -37,7 +37,9 @@ class Input extends \Template\TagHandler {
 					'@POST['.$attr['name'].']=='.$value.'?\'checked="checked"\':\'\'}}');
 			} elseif($attr['type'] != 'password' && !array_key_exists('value',$attr)) {
 				// all other types, except password fields
-				$attr['value'] = $this->template->build('{{ isset(@POST['.$name.'])?@POST['.$name.']:\'\'}}');
+				$ar_name = preg_replace('/\'*(\w+)(\[.*\])\'*/i','[$1]$2',$name,-1,$i);
+				$name = $i ? $ar_name : '['.$name.']';
+				$attr['value'] = $this->template->build('{{ isset(@POST'.$name.')?@POST'.$name.':\'\'}}');
 			}
 		}
 		// resolve all other / unhandled tag attributes
