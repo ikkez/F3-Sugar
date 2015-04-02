@@ -10,8 +10,8 @@
  *
  * (c) Christian Knuth
  *
- * @date: 09.09.14
- * @version 0.3.0
+ * @date: 16.03.2015
+ * @version 0.4.0
  */
 
 
@@ -148,6 +148,67 @@ class Sheet extends \Prefab {
 		$out = pack("ssssss", 0x204, 8+$l, $row, $col, 0x0, $l);
 		$out.= $val;
 		return $out;
+	}
+
+	/**
+	 * build and return CSV data sheet
+	 * @param $rows
+	 * @param $headers
+	 * @param string $delimiter
+	 * @param string $enclosure
+	 * @param bool $encloseAll
+	 * @return string
+	 */
+	public function dumpCSV($rows,$headers,$delimiter=';',$enclosure='"',$encloseAll=true) {
+		$numColumns = count($headers);
+		$numRows = count($rows);
+		foreach($headers as $key=>$val)
+			if (is_numeric($key)) {
+				$headers[$val]=ucfirst($val);
+				unset($headers[$key]);
+			}
+		$out = array();
+		for ($i = 0; $i <= $numRows; $i++) {
+			$line = array();
+			for ($c = 0; $c <= $numColumns; $c++) {
+				$ckey = key($headers);
+				$field='';
+				if ($i==0)
+					$field = current($headers);
+				elseif (isset($rows[$i-1][$ckey]))
+					$field = trim($rows[$i-1][$ckey]);
+				if (is_array($field))
+					$field = json_encode($field);
+				if (empty($field) && $field !== 0)
+					$line[] = '';
+				elseif ($encloseAll || preg_match('/(?:'.preg_quote($delimiter, '/').'|'.
+						preg_quote($enclosure, '/').'|\s)/', $field))
+					$line[] = $enclosure.str_replace($enclosure, $enclosure.$enclosure, $field).$enclosure;
+				else
+					$line[] = $field;
+				next($headers);
+			}
+			$out[] = implode($delimiter, $line);
+			reset($headers);
+		}
+		return implode("\n",$out);
+	}
+
+	/**
+	 * send CSV file to client
+	 * @param $rows
+	 * @param $headers
+	 * @param $filename
+	 */
+	function renderCSV($rows,$headers,$filename) {
+		$data = $this->dumpCSV($rows,$headers);
+		header("Expires: 0");
+		header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+		header('Content-Type: text/csv;charset=UTF-16LE');
+		header("Content-Disposition: attachment;filename=".$filename);
+		header("Content-Transfer-Encoding: binary");
+		echo "\xFF"."\xFE".mb_convert_encoding($data, 'UTF-16LE', 'UTF-8');
+		exit();
 	}
 
 }
