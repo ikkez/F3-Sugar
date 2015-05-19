@@ -2,3 +2,7 @@
 	path = SchemaBuilder
 	url = https://github.com/ikkez/f3-schema-builder.git
 	branch = master
+[submodule "Cortex"]
+	path = Cortex
+	url = https://github.com/ikkez/f3-cortex.git
+	branch = master
