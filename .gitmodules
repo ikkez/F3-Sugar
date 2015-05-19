@@ -1,3 +1,4 @@
 [submodule "SchemaBuilder"]
 	path = SchemaBuilder
 	url = https://github.com/ikkez/f3-schema-builder.git
+	branch = master
