@@ -1,8 +1,31 @@
 <?php
+/**
+ *	Image TagHandler
+ *
+ *	The contents of this file are subject to the terms of the GNU General
+ *	Public License Version 3.0. You may not use this file except in
+ *	compliance with the license. Any of the license terms and conditions
+ *	can be waived if you get permission from the copyright holder.
+ *
+ *	Copyright (c) 2015 ~ ikkez
+ *	Christian Knuth <ikkez0n3@gmail.com>
+ *
+ *	@version: 0.4.0
+ *	@date: 15.07.2015
+ *
+ **/
 
 namespace Template\Tags;
 
 class Image extends \Template\TagHandler {
+
+	function __construct() {
+		/** @var \Base $f3 */
+		$f3 = \Base::instance();
+		if (!$f3->exists('template.image.tempDir'))
+			$f3->set('template.image.tempDir',$f3->get('TEMP').'img/');
+		parent::__construct();
+	}
 
 	/**
 	 * build tag string
@@ -23,17 +46,12 @@ class Image extends \Template\TagHandler {
 			// merge into defaults
 			$opt = array_intersect_key($attr + $opt, $opt);
 			// get dynamic path
-			$path = $this->template->token($attr['src']);
+			$path = $this->tmpl->token($attr['src']);
 			// clean up attributes
 			$attr=array_diff_key($attr,$opt);
-
-			/** @var \Base $f3 */
-			$f3 = \Base::instance();
 			$opt = var_export($opt,true);
-
-		$out='<?php $imgPath = \Template\Tags\Image::instance()->resize('.$path.','.$opt.'); ?>'
-			.'<img src="<?php echo $imgPath;?>" '.$this->resolveParams($attr).' />';
-
+			$out='<img src="<?php echo \Template\Tags\Image::instance()->resize('.
+				$path.','.$opt.');?>"'.$this->resolveParams($attr).' />';
 		} else
 			// just forward / bypass further processing
 			$out = '<img'.$this->resolveParams($attr).' />';
@@ -41,11 +59,18 @@ class Image extends \Template\TagHandler {
 		return $out;
 	}
 
+	/**
+	 * on demand image resize
+	 * @param $path
+	 * @param $opt
+	 * @return string
+	 */
 	function resize($path,$opt) {
 		$f3 = \Base::instance();
 		$hash = $f3->hash($path.$f3->serialize($opt));
+		// TODO: file ext
 		$new_file_name = $hash.'.jpg';
-		$dst_path = $f3->get('TEMP').'img/';
+		$dst_path = $f3->get('template.image.tempDir');
 		$path = explode('/', $path);
 		$file = array_pop($path);
 		if (!is_dir($dst_path))
@@ -59,6 +84,7 @@ class Image extends \Template\TagHandler {
 			if (!$opt['height'])
 				$opt['height'] = round(($opt['width']/$ow)*$oh);
 			$imgObj->resize((int)$opt['width'], (int)$opt['height'], $opt['crop'], $opt['enlarge']);
+			// TODO: file ext
 			$file_data = $imgObj->dump('jpeg', null, $opt['quality']);
 			$f3->write($dst_path.$new_file_name, $file_data);
 		}
