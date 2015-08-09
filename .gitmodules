@@ -6,3 +6,6 @@
 	path = Cortex
 	url = https://github.com/ikkez/f3-cortex.git
 	branch = master
+[submodule "Assets"]
+	path = Assets
+	url = https://github.com/ikkez/f3-assets.git
