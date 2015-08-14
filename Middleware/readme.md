@@ -8,7 +8,6 @@ $f3 = require('lib/base.php');
 
 // imagine you have some admin routes
 $f3->route('GET|POST /admin','Controller\Admin->login');
-$f3->route('POST /admin','Controller\Admin->login');
 // and these actions should be protected
 $f3->route('GET|POST /admin/@action','Controller\Admin->@action');
 $f3->route('GET|POST /admin/@action/@type','Controller\Admin->@action');
