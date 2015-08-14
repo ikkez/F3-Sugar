@@ -11,7 +11,7 @@
  * (c) Christian Knuth
  *
  * @date: 16.03.2015
- * @version 0.4.0
+ * @version 0.4.1
  */
 
 
@@ -31,7 +31,7 @@ class Sheet extends \Prefab {
 		}
 		$data = \Base::instance()->read($filepath,true);
 		if(!preg_match_all('/((?:.*?)'.$delimiter.'(?:'.$enclosure.'.*?'.
-			$enclosure.'|['.$delimiter.'\d])*\n)/s',$data,$matches))
+			$enclosure.'|['.$delimiter.'(?:\d|\.|\/)*\d])*\n)/s',$data,$matches))
 			user_error('no rows found');
 		$out = array_map(function($val) use($delimiter,$enclosure) {
 			return str_getcsv($val,$delimiter,$enclosure);
