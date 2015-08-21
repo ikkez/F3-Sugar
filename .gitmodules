@@ -9,3 +9,6 @@
 [submodule "Assets"]
 	path = Assets
 	url = https://github.com/ikkez/f3-assets.git
+[submodule "Opauth"]
+	path = Opauth
+	url = https://github.com/ikkez/f3-opauth.git
