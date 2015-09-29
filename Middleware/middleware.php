@@ -10,7 +10,7 @@
  *	Copyright (c) 2015 ~ ikkez
  *	Christian Knuth <ikkez0n3@gmail.com>
  *
- *	@version: 1.0.0
+ *	@version: 1.0.1
  *	@date: 14.08.2015
  *
  **/
@@ -44,6 +44,8 @@ class Middleware extends \Prefab {
 	}
 	
 	public function run($event='before') {
+		if (!isset($this->routes[$event]))
+			return true;
 		foreach ($keys=array_keys($this->routes[$event]) as $key)
 			$paths[]=str_replace('@','*@',$key);
 		$vals=array_values($this->routes[$event]);
