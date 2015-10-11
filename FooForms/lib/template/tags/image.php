@@ -74,7 +74,7 @@ class Image extends \Template\TagHandler {
 		$path = explode('/', $path);
 		$file = array_pop($path);
 		if (!is_dir($dst_path))
-			mkdir($dst_path,0775);
+			mkdir($dst_path,0775,true);
 		if (!file_exists($dst_path.$new_file_name)) {
 			$imgObj = new \Image($file, false, implode('/',$path).'/');
 			$ow = $imgObj->width();
