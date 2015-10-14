@@ -10,7 +10,7 @@
  *	Copyright (c) 2015 ~ ikkez
  *	Christian Knuth <ikkez0n3@gmail.com>
  *
- *	@version: 0.4.0
+ *	@version: 0.4.1
  *	@date: 15.07.2015
  *
  **/
@@ -50,6 +50,7 @@ class Image extends \Template\TagHandler {
 			// clean up attributes
 			$attr=array_diff_key($attr,$opt);
 			$opt = var_export($opt,true);
+			unset($attr['src']);
 			$out='<img src="<?php echo \Template\Tags\Image::instance()->resize('.
 				$path.','.$opt.');?>"'.$this->resolveParams($attr).' />';
 		} else
