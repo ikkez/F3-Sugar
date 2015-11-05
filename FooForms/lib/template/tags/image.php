@@ -10,8 +10,8 @@
  *	Copyright (c) 2015 ~ ikkez
  *	Christian Knuth <ikkez0n3@gmail.com>
  *
- *	@version: 0.4.1
- *	@date: 15.07.2015
+ *	@version: 0.5.0
+ *	@date: 05.11.2015
  *
  **/
 
@@ -46,7 +46,8 @@ class Image extends \Template\TagHandler {
 			// merge into defaults
 			$opt = array_intersect_key($attr + $opt, $opt);
 			// get dynamic path
-			$path = $this->tmpl->token($attr['src']);
+			$path = preg_match('/{{(.+?)}}/s',$attr['src']) ?
+					$this->tmpl->token($attr['src']) : var_export($attr['src'],true);
 			// clean up attributes
 			$attr=array_diff_key($attr,$opt);
 			$opt = var_export($opt,true);
@@ -74,10 +75,16 @@ class Image extends \Template\TagHandler {
 		$dst_path = $f3->get('template.image.tempDir');
 		$path = explode('/', $path);
 		$file = array_pop($path);
+		$src_path = implode('/',$path).'/';
 		if (!is_dir($dst_path))
 			mkdir($dst_path,0775,true);
 		if (!file_exists($dst_path.$new_file_name)) {
-			$imgObj = new \Image($file, false, implode('/',$path).'/');
+			if (file_exists($src_path.$file))
+				$imgObj = new \Image($file, false, $src_path);
+			elseif ($f3->exists('template.image.not_found',$nfPath))
+				$imgObj = new \Image($nfPath, false);
+			else
+				return 'http://placehold.it/250x250?text=Not+Found';
 			$ow = $imgObj->width();
 			$oh = $imgObj->height();
 			if (!$opt['width'])
