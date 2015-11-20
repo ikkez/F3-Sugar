@@ -178,7 +178,7 @@ class FAL extends Magic
 	 * @param $key
 	 * @return bool
 	 */
-	public function get($key)
+	public function &get($key)
 	{
 		return ($this->exists($key)) ? $this->meta[$key] : false;
 	}
