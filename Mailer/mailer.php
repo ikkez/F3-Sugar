@@ -11,7 +11,7 @@
  * (c) Christian Knuth, ikkez0n3@gmail.com
  *
  * @date: 13.02.2015
- * @version 0.6.0
+ * @version 0.6.1
  */
 
 class Mailer {
@@ -183,9 +183,11 @@ class Mailer {
 	/**
 	 * add a file attachment
 	 * @param $path
+	 * @param null $alias
+	 * @param null $cid
 	 */
-	public function attachFile($path) {
-		$this->smtp->attach($path);
+	public function attachFile($path, $alias=null, $cid=null) {
+		$this->smtp->attach($path,$alias,$cid);
 	}
 
 	/**
@@ -266,9 +268,9 @@ class Mailer {
 			$ping_route = '/mailer-ping/@hash.png';
 		\Base::instance()->route('GET '.$ping_route,'\Mailer->ping');
 
-		if (!$f3->exists('mailer.jump_route',$ping_route))
-			$ping_route = '/mailer-jump';
-		\Base::instance()->route('GET '.$ping_route,'\Mailer->jump');
+		if (!$f3->exists('mailer.jump_route',$jump_route))
+			$jump_route = '/mailer-jump';
+		\Base::instance()->route('GET '.$jump_route,'\Mailer->jump');
 	}
 
 }
