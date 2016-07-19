@@ -11,7 +11,7 @@
     Copyright (c) 2012 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.4.1
+    @version 1.4.2
  **/
 
 class Pagination {
@@ -222,6 +222,7 @@ class Pagination {
         $this->fw->set('pg.firstPage',$this->getFirst());
         $this->fw->set('pg.lastPage',$this->getLast());
         $this->fw->set('pg.rangePages',$this->getInRange());
+        $this->fw->set('pg.allPages',$this->getMax());
         $output = \Template::instance()->render($this->template);
         $this->fw->clear('pg');
         return $output;
