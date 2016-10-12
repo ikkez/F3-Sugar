@@ -10,8 +10,8 @@
  *
  * (c) Christian Knuth, ikkez0n3@gmail.com
  *
- * @date: 13.02.2015
- * @version 0.6.1
+ * @date: 13.10.2016
+ * @version 0.6.2
  */
 
 class Mailer {
@@ -212,7 +212,7 @@ class Mailer {
 			$body .= 'Content-Type: text/plain; charset='.$this->charset.$eol;
 			$body .= $this->message['text'].$eol.$eol;
 			$body .= '--'.$hash.$eol;
-			$body .= 'Content-Type: text/html; charset='.$this->charset.$eol;
+			$body .= 'Content-Type: text/html; charset='.$this->charset.$eol.$eol;
 			$body .= $this->message['html'].$eol;
 		} elseif (isset($this->message['text'])) {
 			$this->smtp->set('Content-Type', 'text/plain; charset='.$this->charset);
