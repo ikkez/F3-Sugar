@@ -12,3 +12,6 @@
 [submodule "Opauth"]
 	path = Opauth
 	url = https://github.com/ikkez/f3-opauth.git
+[submodule "Mailer"]
+	path = Mailer
+	url = https://github.com/ikkez/f3-mailer.git
