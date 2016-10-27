@@ -1,0 +1,104 @@
+<html>
+<head>
+    <base href="{{ @SCHEME.'://'.@HOST.(!@PORT||@PORT==80||@PORT==443?'':':'.@PORT).@BASE.'/'.@UI }}" />
+    <meta charset="{{ @ENCODING}}" />
+
+    <title>{{ @VERSION }}: {{ @active }}</title>
+    <link rel="stylesheet" type="text/css" href="css/theme.css" />
+    <style>
+        *{
+            font-family: "Arial", sans-serif;
+            font-size: 16px;
+        }
+        .debug {
+            background-color: #ddd;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+            padding: 10px;
+            font-size: 12px;
+            width: 100px;
+        }
+        .results {
+            width: 500px;
+        }
+        .results li {
+            padding: 20px;
+            border-bottom: 1px solid #d6d6d6;
+        }
+
+        .pagination {
+            padding: 0;
+        }
+        .pagination li {
+            list-style: none;
+            text-align: center;
+            display: inline-block;
+
+        }
+        .pagination li a {
+            display: inline-block;
+            text-decoration: none;
+            color: black;
+            font-weight: bold;
+            height: 30px;
+            min-width: 30px;
+            border: 1px solid #ccc;
+            background: #e2e2e2;
+            line-height: 30px;
+            padding: 5px;
+        }
+        .pagination li.active a {
+            background: #98d285;
+        }
+
+        .glyphicon.glyphicon-chevron-left::after {
+            content: '<';
+        }
+        .glyphicon.glyphicon-chevron-right::after {
+            content: '>';
+        }
+    </style>
+</head>
+<body>
+
+<div class="row">
+    <div class="sidebar">
+        <h1>{{ @VERSION }}</h1>
+        <ul>
+            {~ foreach (@menu as @url=>@desc): ~}
+            <li>{~ if (@active==@desc): ~}{{ @desc }}{~ else: ~}<a href="{{ @BASE.@url }}">{{ @desc }}</a>{~ endif ~}</li>
+            {~ endforeach ~}
+        </ul>
+    </div>
+    <div class="main">
+        <h1>Pagination and Pagebrowser Test</h1>
+
+        <div class="debug">
+            total: {{ @results.total }}<br>
+            limit: {{ @results.limit }}<br>
+            count: {{ @results.count }}<br>
+            pos:   {{ @results.pos }}
+        </div>
+
+
+        <F3:pagebrowser items="{{@results.total}}" limit="{{@results.limit}}" token-prefix="page-" src="pagebrowser.html"></F3:pagebrowser>
+
+        <ol class="results" start="{{@results.pos*@results.limit+1}}">
+            <F3:repeat group="{{@results.subset}}" value="{{@val}}">
+                <li>
+                    <h3>{{@val.title}}</h3>
+                    <p>{{@val.randomText}}</p>
+                </li>
+            </F3:repeat>
+        </ol>
+
+        {{ @pagebrowser | raw }}
+
+        <p class="stats">{{ 'Page rendered in {0} msecs / Memory usage {1} Kibytes',round(1e3*(microtime(TRUE)-$TIME),2),round(memory_get_usage(TRUE)/1e3,1) | format }}</p>
+    </div>
+</div>
+
+
+
+
+</body>
+</html>

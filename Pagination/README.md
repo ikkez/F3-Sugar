@@ -149,3 +149,14 @@ Of course you can set all of these options in the custom tag too. Just have a lo
 ```
 
 You can also pass template variables to all of those arguments, like `range="{{@range}}"`.
+
+
+### Testsuite
+
+To add the tests to the fatfree-dev testing bench:
+
+```php
+// Pagination Tests
+$f3->concat('AUTOLOAD',',sugar/Pagination/test/,sugar/Pagination/lib/');
+\PaginationTest::init();
+```

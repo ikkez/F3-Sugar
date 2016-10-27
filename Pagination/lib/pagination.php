@@ -8,10 +8,10 @@
     compliance with the license. Any of the license terms and conditions
     can be waived if you get permission from the copyright holder.
 
-    Copyright (c) 2012 by ikkez
+    Copyright (c) 2012-2016 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-    @version 1.4.2
+    @version 1.4.3
  **/
 
 class Pagination {
@@ -24,7 +24,7 @@ class Pagination {
     private $routeKey;
     private $routeKeyPrefix;
     private $linkPath;
-	private $fw;
+    private $fw;
 
     const
         TEXT_MissingItemsAttr='You need to specify items attribute for a pagination.';
@@ -34,7 +34,7 @@ class Pagination {
      * @param $limit int max items per page
      * @param $routeKey string the key for pagination in your routing
      */
-    public function __construct( $items, $limit = 10, $routeKey = 'page' ) {
+    public function __construct($items, $limit = 10, $routeKey = 'page' ) {
         $this->fw = \Base::instance();
         $this->items_count = is_array($items)?count($items):$items;
         $this->routeKey = $routeKey;
@@ -209,7 +209,8 @@ class Pagination {
         if(is_null($this->linkPath)) {
             $route = $this->fw->get('PARAMS.0');
             if($this->fw->exists('PARAMS.'.$this->routeKey))
-                $route = preg_replace("/".$this->fw->get('PARAMS.'.$this->routeKey)."$/",'',$route);
+                $route = preg_replace('/'.preg_quote($this->routeKeyPrefix.
+                    $this->fw->get('PARAMS.'.$this->routeKey)).'$/','',$route);
             elseif(substr($route,-1) != '/')
                 $route.= '/';
         } else

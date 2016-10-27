@@ -1,3 +1,4 @@
+<br>Page <b>{{ @pg.currentPage }}</b> of <b>{{ @pg.allPages }}</b>
 <ul class="pagination">
 	<F3:check if="{{@pg.firstPage}}">
         <li><a href="{{@BASE, @pg.route, @pg.prefix.@pg.firstPage}}">First</a></li>
@@ -15,4 +16,3 @@
         <li><a href="{{@BASE, @pg.route, @pg.prefix.@pg.lastPage}}">Last [{{ @pg.lastPage }}]</a></li>
     </F3:check>
 </ul>
-<br>Page <b>{{ @pg.currentPage }}</b> of <b>{{ @pg.allPages }}</b>
