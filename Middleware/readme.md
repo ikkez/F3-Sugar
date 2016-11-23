@@ -14,7 +14,7 @@ $f3->route('GET|POST /admin/@action/@type','Controller\Admin->@action');
 $f3->route('PUT /admin/upload','Controller\Files->upload');
 
 // so just add a global pre-route to all at once
-\Middleware::instance()->before('GET|POST /admin/*', function(\Base $f3, $params) {
+\Middleware::instance()->before('GET|POST /admin/*', function(\Base $f3, $params, $alias) {
 	// do auth checks
 });
 
@@ -29,4 +29,20 @@ Of course you could also use the `beforeroute` and `afterroute` events in your c
 \Middleware::instance()->before('GET|HEAD|POST|PUT|OPTIONS /api/*', function(\Base $f3) {
 	$f3->set('CORS.origin','*');
 });
+```
+
+You can also create additional middleware wrappers on other events:
+
+```php
+$mw = \Middleware::instance()->
+$mw->on('limit',['GET @v1: /api/v1/*','GET @v2: /api/v2/*'], function($f3,$args,$alias) {
+	// do api usage limit checks
+	return false;
+});
+
+if ($mw->run('limit')) {
+	// all good, continue
+}else{
+	// API limit reached
+}
 ```

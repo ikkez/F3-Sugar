@@ -7,11 +7,11 @@
  *	compliance with the license. Any of the license terms and conditions
  *	can be waived if you get permission from the copyright holder.
  *
- *	Copyright (c) 2015 ~ ikkez
+ *	Copyright (c) 2016 ~ ikkez
  *	Christian Knuth <ikkez0n3@gmail.com>
  *
- *	@version: 1.0.1
- *	@date: 14.08.2015
+ *	@version: 1.1.0
+ *	@date: 23.11.2016
  *
  **/
 
@@ -46,8 +46,13 @@ class Middleware extends \Prefab {
 	public function run($event='before') {
 		if (!isset($this->routes[$event]))
 			return true;
-		foreach ($keys=array_keys($this->routes[$event]) as $key)
-			$paths[]=str_replace('@','*@',$key);
+		$paths=[];
+		foreach ($keys=array_keys($this->routes[$event]) as $key) {
+			$path=preg_replace('/@\w+/','*@',$key);
+			if (substr($path,-1)!='*')
+				$path.='+';
+			$paths[]=$path;
+		}
 		$vals=array_values($this->routes[$event]);
 		array_multisort($paths,SORT_DESC,$keys,$vals);
 		$this->routes[$event]=array_combine($keys,$vals);
@@ -58,30 +63,28 @@ class Middleware extends \Prefab {
 				continue;
 			ksort($args);
 			$route=NULL;
-			if (isset(
-				$routes[$ptr=$this->f3->AJAX+1][$this->f3->VERB]))
+			$ptr=$this->f3->CLI?Base::REQ_CLI:$this->f3->AJAX+1;
+			if (isset($routes[$ptr][$this->f3->VERB]) ||
+				isset($routes[$ptr=0]))
 				$route=$routes[$ptr];
-			elseif (isset($routes[\Base::REQ_SYNC|\Base::REQ_AJAX]))
-				$route=$routes[\Base::REQ_SYNC|\Base::REQ_AJAX];
 			if (!$route)
 				continue;
 			if ($this->f3->VERB!='OPTIONS' &&
 				isset($route[$this->f3->VERB])) {
-				$parts=parse_url($req);
-				if ($this->f3->VERB=='GET' &&
-					preg_match('/.+\/$/',$parts['path']))
-					$this->f3->reroute(substr($parts['path'],0,-1).
-						(isset($parts['query'])?('?'.$parts['query']):''));
+				if ($this->f3['VERB']=='GET' &&
+					preg_match('/.+\/$/',$this->f3['PATH']))
+					$this->reroute(substr($this->f3['PATH'],0,-1).
+						($this->f3['QUERY']?('?'.$this->f3['QUERY']):''));
 				$handler=$route[$this->f3->VERB][0];
-				if (is_bool(strpos($pattern,'/*')))
-					foreach (array_keys($args) as $key)
-						if (is_numeric($key) && $key)
-							unset($args[$key]);
+				$alias=$route[$this->f3->VERB][3];
 				if (is_string($handler)) {
 					// Replace route pattern tokens in handler if any
-					$handler=preg_replace_callback('/@(\w+\b)/',
+					$handler=preg_replace_callback('/({)?@(\w+\b)(?(1)})/',
 						function($id) use($args) {
-							return isset($args[$id[1]])?$args[$id[1]]:$id[0];
+							$pid=count($id)>2?2:1;
+							return isset($args[$id[$pid]])?
+								$args[$id[$pid]]:
+								$id[0];
 						},
 						$handler
 					);
@@ -90,7 +93,7 @@ class Middleware extends \Prefab {
 						$this->f3->error(500,'PreRoute handler not found');
 				}
 				// Call route handler
-				return $this->f3->call($handler,array($this->f3,$args),
+				return $this->f3->call($handler,array($this->f3,$args,$alias),
 					'beforeroute,afterroute') !== FALSE;
 			}
 		}
