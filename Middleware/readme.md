@@ -34,7 +34,7 @@ Of course you could also use the `beforeroute` and `afterroute` events in your c
 You can also create additional middleware wrappers on other events:
 
 ```php
-$mw = \Middleware::instance()->
+$mw = \Middleware::instance();
 $mw->on('limit',['GET @v1: /api/v1/*','GET @v2: /api/v2/*'], function($f3,$args,$alias) {
 	// do api usage limit checks
 	return false;
