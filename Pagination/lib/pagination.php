@@ -25,6 +25,7 @@ class Pagination {
     private $routeKey;
     private $routeKeyPrefix;
     private $linkPath;
+    private $displayed_count;
     private $fw;
 
     const
@@ -105,6 +106,14 @@ class Pagination {
     }
 
     /**
+     * set the number of items, that are currently selected for displaying
+     * @param $count int|array
+     */
+    public function setDisplayedCount($count) {
+        $this->displayed_count = is_array($count)?count($count):$count;
+    }
+
+    /**
      * set path to current routing for link building
      * @param $linkPath
      */
@@ -146,6 +155,14 @@ class Pagination {
      */
     public function getItemCount() {
         return $this->items_count;
+    }
+
+    /**
+     * returns the count of displayed items
+     * @return int
+     */
+    public function getDisplayedCount() {
+        return $this->displayed_count;
     }
 
     /**
@@ -241,6 +258,7 @@ class Pagination {
         $this->fw->set('pg.lastPage',$this->getLast());
         $this->fw->set('pg.rangePages',$this->getInRange());
         $this->fw->set('pg.allPages',$this->getMax());
+        $this->fw->set('pg.displayed',$this->getDisplayedCount());
         $this->fw->set('pg.anchor',$this->getAnchor());
         $output = \Template::instance()->render($this->template);
         $this->fw->clear('pg');
@@ -263,6 +281,8 @@ class Pagination {
             $pn_code .= '$pn->setLimit('.$attr['limit'].');';
         if(array_key_exists('range',$attr))
             $pn_code .= '$pn->setRange('.$attr['range'].');';
+        if(array_key_exists('displayed',$attr))
+            $pn_code .= '$pn->setDisplayedCount('.$attr['displayed'].');';
         if(array_key_exists('src',$attr))
             $pn_code .= '$pn->setTemplate("'.$attr['src'].'");';
         if(array_key_exists('anchor',$attr))

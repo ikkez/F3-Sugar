@@ -152,12 +152,19 @@ Then define the anchor within `Pagination`:
 $pages->setAnchor('myanchor');
 ```
 
+Sometimes, it may be useful to have the number of displayed records in your pagination. Note: This is not used in the default template, you'll have to make your own custom pagination template.
+
+``` php
+$pages->setDisplayedCount(count($articleList));
+```
+
+
 ***
 
 Of course you can set all of these options in the custom tag too. Just have a look at this fully configured example tag:
 
 ``` html
-<F3:pagebrowser items="{{@articleList.total}}" limit="{{ @articleList.limit }}" src="templates/pagebrowser.html" range="5" link-path="/search/results/" token="articlePage" token-prefix="page-" anchor="myanchor" />
+<F3:pagebrowser items="{{@articleList.total}}" limit="{{ @articleList.limit }}" displayed="{{ count(@articleList) }}" src="templates/pagebrowser.html" range="5" link-path="/search/results/" token="articlePage" token-prefix="page-" anchor="myanchor" />
 ```
 
 You can also pass template variables to all of those arguments, like `range="{{@range}}"`.
