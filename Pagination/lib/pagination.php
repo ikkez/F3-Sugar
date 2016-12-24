@@ -166,6 +166,14 @@ class Pagination {
     }
 
     /**
+     * returns the configured limit
+     * @return int
+     */
+    public function getLimit() {
+        return $this->items_per_page;
+    }
+
+    /**
      * get maximum pages needed to display all items
      * @return int
      */
@@ -258,7 +266,9 @@ class Pagination {
         $this->fw->set('pg.lastPage',$this->getLast());
         $this->fw->set('pg.rangePages',$this->getInRange());
         $this->fw->set('pg.allPages',$this->getMax());
+        $this->fw->set('pg.limit',$this->getLimit());
         $this->fw->set('pg.displayed',$this->getDisplayedCount());
+        $this->fw->set('pg.total',$this->getItemCount());
         $this->fw->set('pg.anchor',$this->getAnchor());
         $output = \Template::instance()->render($this->template);
         $this->fw->clear('pg');
