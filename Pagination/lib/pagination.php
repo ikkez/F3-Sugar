@@ -21,6 +21,7 @@ class Pagination {
     private $range = 2;
     private $current_page;
     private $template = 'pagebrowser.html';
+    private $anchor = '';
     private $routeKey;
     private $routeKeyPrefix;
     private $linkPath;
@@ -49,6 +50,14 @@ class Pagination {
         if(is_numeric($limit))
             $this->items_per_page = $limit;
         $this->setCurrent( self::findCurrentPage($this->routeKey));
+    }
+
+    /**
+     * set anchor to jump to specific location
+     * @param string $anchor
+     */
+    public function setAnchor($anchor) {
+        $this->anchor = $anchor;
     }
 
     /**
@@ -113,6 +122,14 @@ class Pagination {
         $f3 = \Base::instance();
         return $f3->exists('PARAMS.'.$key) ?
             preg_replace("/[^0-9]/", "", $f3->get('PARAMS.'.$key)) : 1;
+    }
+
+    /**
+     * returns the anchor name
+     * @return string
+     */
+    public function getAnchor() {
+        return $this->anchor;
     }
 
     /**
@@ -224,6 +241,7 @@ class Pagination {
         $this->fw->set('pg.lastPage',$this->getLast());
         $this->fw->set('pg.rangePages',$this->getInRange());
         $this->fw->set('pg.allPages',$this->getMax());
+        $this->fw->set('pg.anchor',$this->getAnchor());
         $output = \Template::instance()->render($this->template);
         $this->fw->clear('pg');
         return $output;
@@ -247,6 +265,8 @@ class Pagination {
             $pn_code .= '$pn->setRange('.$attr['range'].');';
         if(array_key_exists('src',$attr))
             $pn_code .= '$pn->setTemplate("'.$attr['src'].'");';
+        if(array_key_exists('anchor',$attr))
+            $pn_code .= '$pn->setAnchor("'.$attr['anchor'].'");';
         if(array_key_exists('token',$attr))
             $pn_code .= '$pn->setRouteKey("'.$attr['token'].'");';
         if(array_key_exists('link-path',$attr))

@@ -140,12 +140,24 @@ You can also alter the range of next and previous pages, based on the current pa
 $pages->setRange(5);
 ```
 
+You may want the pagination to point to anchor links. Define an anchor in your template:
+
+``` html
+<a name="myanchor"></a>
+```
+
+Then define the anchor within `Pagination`:
+
+``` php
+$pages->setAnchor('myanchor');
+```
+
 ***
 
 Of course you can set all of these options in the custom tag too. Just have a look at this fully configured example tag:
 
 ``` html
-<F3:pagebrowser items="{{@articleList.total}}" limit="{{ @articleList.limit }}" src="templates/pagebrowser.html" range="5" link-path="/search/results/" token="articlePage" token-prefix="page-" />
+<F3:pagebrowser items="{{@articleList.total}}" limit="{{ @articleList.limit }}" src="templates/pagebrowser.html" range="5" link-path="/search/results/" token="articlePage" token-prefix="page-" anchor="myanchor" />
 ```
 
 You can also pass template variables to all of those arguments, like `range="{{@range}}"`.
