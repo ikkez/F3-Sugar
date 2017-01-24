@@ -15,3 +15,6 @@
 [submodule "Mailer"]
 	path = Mailer
 	url = https://github.com/ikkez/f3-mailer.git
+[submodule "Middleware"]
+	path = Middleware
+	url = https://github.com/ikkez/f3-middleware.git
