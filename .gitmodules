@@ -21,3 +21,6 @@
 [submodule "FAL"]
 	path = FAL
 	url = https://github.com/ikkez/f3-fal.git
+[submodule "Flash"]
+	path = Flash
+	url = https://github.com/ikkez/f3-flash.git
