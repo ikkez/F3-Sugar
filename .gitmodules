@@ -18,3 +18,6 @@
 [submodule "Middleware"]
 	path = Middleware
 	url = https://github.com/ikkez/f3-middleware.git
+[submodule "FAL"]
+	path = FAL
+	url = https://github.com/ikkez/f3-fal.git
