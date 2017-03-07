@@ -4,7 +4,7 @@ Some Excel and CSV tools.
 
 
 ```php
-$excel = new Sheet();
+$excel = \Sheet::instance();
 
 // data array
 $rows = [ 
@@ -15,21 +15,44 @@ $rows = [
 	],
 	[
 		"name" => "daisy",
-		"adress" => "yellow",
+		"color" => "yellow",
 		"num" => 25,
 	],
 	[
 		"name" => "orchid",
-		"adress" => "purple",
+		"color" => "purple",
 		"num" => 7
 	]
-]);
+];
 // header array to rename the field labels and sort/reorder the data array 
-$headers = ['name'=>'Name','num'=>'Number','color'=>'Flower Color']);
+$headers = ['name'=>'Name', 'num'=>'Number', 'color'=>'Flower Color'];
 
 $excel->renderXLS($rows,$headers,"flowers.xls");
 ```
 
+In case your data array is not keyed, you can use the `applyHeader` method to transform the array:
+
+```php
+$rows = [ 
+	[
+		"rose",
+		"red",
+		15
+	],
+	[
+		"daisy",
+		"yellow",
+		25,
+	],
+	[
+		"orchid",
+		"purple",
+		7
+	]
+];
+$rows = \Sheet::instance()->applyHeader($rows,['name','color','num']);
+
+```
 
 **Notice:** The generated XLS can have problems in older versions of MS Office (Excel) with number-formatted fields not being recognized as such (displayed as text instead) and text fields, that contain line breaks can also leads to problems there (missing text). 
 
