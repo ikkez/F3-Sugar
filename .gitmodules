@@ -24,3 +24,6 @@
 [submodule "Flash"]
 	path = Flash
 	url = https://github.com/ikkez/f3-flash.git
+[submodule "Events"]
+	path = Events
+	url = https://github.com/ikkez/f3-events.git
