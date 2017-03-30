@@ -37,12 +37,17 @@ class Select extends \Template\TagHandler {
 		$srcKey = \Base::instance()->get('template.form.srcKey');
 		if (array_key_exists('group', $attr)) {
 			$attr['group'] = $this->tmpl->token($attr['group']);
-			$name = $this->tokenExport($attr['name']);
-			$ar_name = preg_replace('/\'*(\w+)(\[.*\])\'*/i','[$1]$2',$name,-1,$i);
-			$name = $i ? $ar_name : '['.$name.']';
+			$name = $this->attrExport($attr['name']);
+			if (preg_match('/\[\]$/s', $name)) {
+				$name=substr($name,0,-2);
+				$cond = '(isset(@'.$srcKey.$name.') && is_array(@'.$srcKey.$name.')'.
+					' && in_array(@key,@'.$srcKey.$name.'))';
+			} else
+				$cond = '(isset(@'.$srcKey.$name.') && @'.$srcKey.$name.'==@key)';
+
 			$content .= '<?php foreach('.$attr['group'].' as $key => $val) {?>'.
 				$this->tmpl->build('<option value="{{@key}}"'.
-						'{{(isset(@'.$srcKey.$name.') && @'.$srcKey.$name.'==@key)?'.
+						'{{'.$cond.'?'.
 						'\' selected="selected"\':\'\'}}>{{@val}}</option>').
 						'<?php } ?>';
 			unset($attr['group']);

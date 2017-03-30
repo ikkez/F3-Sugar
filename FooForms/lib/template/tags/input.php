@@ -36,16 +36,14 @@ class Input extends \Template\TagHandler {
 	function build($attr, $content) {
 		$srcKey = \Base::instance()->get('template.form.srcKey');
 		if (isset($attr['type']) && isset($attr['name'])) {
-			$name = $this->tokenExport($attr['name']);
-			$ar_name = preg_replace('/\'*(\w+)(\[.*\])\'*/i','[$1]$2',$name,-1,$i);
-			$name = $i ? $ar_name : '['.$name.']';
+			$name = $this->attrExport($attr['name']);
 
 			if (($attr['type'] == 'checkbox') ||
 				($attr['type'] == 'radio' && isset($attr['value']))
 			) {
 				$value = $this->tokenExport(isset($attr['value'])?$attr['value']:'on');
 				// static array match
-				if (preg_match('/(\[\])/s', $name)) {
+				if (preg_match('/\[\]$/s', $name)) {
 					$name=substr($name,0,-2);
 					$str='(isset(@'.$srcKey.$name.') && is_array(@'.$srcKey.$name.')'.
 						' && in_array('.$value.',@'.$srcKey.$name.'))';

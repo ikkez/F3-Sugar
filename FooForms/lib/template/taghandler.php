@@ -103,4 +103,35 @@ abstract class TagHandler extends \Prefab {
 		$val = implode('.', $split);
 		return $val;
 	}
+
+	/**
+	 * export resolved attribute values for further processing
+	 * samples:
+	 * value 			=> ['value']
+	 * {{@foo}} 		=> [$foo]
+	 * value-{{@foo}}	=> ['value-'.$foo]
+	 * foo[bar][]		=> ['foo']['bar'][]
+	 * foo[{{@bar}}][]	=> ['foo'][$bar][]
+	 *
+	 * @param $attr
+	 * @return mixed|string
+	 */
+	protected function attrExport($attr) {
+		$ar_split=preg_split('/\[(.+?)\]/s',$attr,-1,
+			PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
+		if (count($ar_split)>1) {
+			foreach ($ar_split as &$part) {
+				if ($part=='[]')
+					continue;
+				$part='['.$this->tokenExport($part).']';
+				unset($part);
+			}
+			$val = implode($ar_split);
+		} else {
+			$val = $this->tokenExport($attr);
+			$ar_name = preg_replace('/\'*(\w+)(\[.*\])\'*/i','[\'$1\']$2', $val,-1,$i);
+			$val = $i ? $ar_name : '['.$val.']';
+		}
+		return $val;
+	}
 } 

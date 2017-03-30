@@ -307,6 +307,18 @@
 <code class="language-php">&lt;select class="form-control" name="&lt;?php echo $select4; ?&gt;"&gt;&lt;?php foreach($fruits as $key =&gt; $val) {?&gt;&lt;option value="&lt;?php echo $key; ?&gt;"&lt;?php echo (isset($POST[$select4]) && $POST[$select4]==$key)?' selected="selected"':''; ?&gt;&gt;&lt;?php echo $val; ?&gt;&lt;/option&gt;&lt;?php } ?&gt;&lt;/select&gt;</code></pre></F3:ignore>
                 </div>
 
+                <div class="form-group">
+                    <label>Select field with complex dynamic array key</label>
+                    <F3:set select5="fruits5" />
+                    <select class="form-control" name="select5[{{ @select5 }}][]" group="{{ @fruits }}"></select>
+                    markup:
+                    <F3:ignore><pre>
+<code class="language-php">&lt;select class="form-control" name="select5[{{ @select5 }}][]" group="{{ @fruits }}"&gt;&lt;/select&gt;</code></pre></F3:ignore>
+                    rendered with FooForms:
+                    <F3:ignore><pre>
+<code class="language-php">&lt;select class="form-control" name="select5[&lt;?php echo $select5 ?&gt;][]"&gt;&lt;?php foreach($fruits as $key =&gt; $val) {?&gt;&lt;option value="&lt;?php echo $key; ?&gt;"&lt;?php echo (isset($POST['select5'][$select5]) && is_array($POST['select5'][$select5]) && in_array($key,$POST['select5'][$select5]))?' selected="selected"':''; ?&gt;&gt;&lt;?php echo $val; ?&gt;&lt;/option&gt;&lt;?php } ?&gt;&lt;/select&gt;</code></pre></F3:ignore>
+                </div>
+
             </div>
             <input type="submit" value="submit" class="btn btn-primary" />
         </div>
