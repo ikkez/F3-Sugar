@@ -65,7 +65,8 @@ class Input extends \Template\TagHandler {
 			}
 		}
 		// resolve all other / unhandled tag attributes
-		$attr = $this->resolveParams($attr);
+		if ($attr!=null)
+			$attr = $this->resolveParams($attr);
 		// create element and return
 		return '<input'.$attr.' />';
 	}

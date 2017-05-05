@@ -10,8 +10,8 @@
  *	Copyright (c) 2015 ~ ikkez
  *	Christian Knuth <ikkez0n3@gmail.com>
  *
- *	@version: 0.2.0
- *	@date: 14.04.2015
+ *	@version: 0.2.1
+ *	@date: 05.05.2017
  *
  **/
 
@@ -35,9 +35,10 @@ class Select extends \Template\TagHandler {
 	 */
 	function build($attr, $content) {
 		$srcKey = \Base::instance()->get('template.form.srcKey');
+		if (array_key_exists("name", $attr))
+			$name = $this->attrExport($attr['name']);
 		if (array_key_exists('group', $attr)) {
 			$attr['group'] = $this->tmpl->token($attr['group']);
-			$name = $this->attrExport($attr['name']);
 			if (preg_match('/\[\]$/s', $name)) {
 				$name=substr($name,0,-2);
 				$cond = '(isset(@'.$srcKey.$name.') && is_array(@'.$srcKey.$name.')'.
@@ -52,9 +53,17 @@ class Select extends \Template\TagHandler {
 						'<?php } ?>';
 			unset($attr['group']);
 		}
+
+		if (array_key_exists("name", $attr))
+		{
+			$setValue = $this->tmpl->build('{{@tmpValue=@'.$srcKey.$name.'}}');
+			$unsetValue = $this->tmpl->build('{{@tmpValue=null}}');
+		}
+
 		// resolve all other / unhandled tag attributes
-		$attr = $this->resolveParams($attr);
-		// create element and return
-		return '<select'.$attr.'>'.$content.'</select>';
+		if ($attr!=null)
+			$attr = $this->resolveParams($attr);
+		// create element and return		
+		return '<select'.$attr.'>'.$setValue.$content.$unsetValue.'</select>';
 	}
 }
