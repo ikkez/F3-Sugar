@@ -37,7 +37,7 @@ class Option extends \Template\TagHandler {
 		$srcKey = \Base::instance()->get('template.form.srcKey');
 		
 		if (array_key_exists("value", $attr))
-			$isSelected = $this->tmpl->build("{{(@tmpValue=='".$this->attrExport($attr['value'])."') ? 'selected=\"selected\"' : ''}}");
+			$isSelected = $this->tmpl->build("{{(@tmpValue=='".$attr['value']."') ? 'selected=\"selected\"' : ''}}");
 		
 		// resolve all other / unhandled tag attributes
 		if ($attr!=null)
