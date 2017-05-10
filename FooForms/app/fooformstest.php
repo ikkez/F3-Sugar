@@ -1,11 +1,21 @@
 <?php
 
-namespace App;
+class FooFormsTest extends \Prefab {
 
+	protected $repoPath;
 
-class FooForms {
+	function __construct($repoPath='sugar/FooForms/') {
+		$this->repoPath = $repoPath;
+	}
 
-	function get(\Base $f3) {
+	static public function init() {
+		/** @var \Base $f3 */
+		$f3 = \Base::instance();
+		$f3->route('GET|POST /fooforms','\FooFormsTest->run');
+		$f3->menu['/fooforms'] = 'FooForms';
+	}
+
+	function run(\Base $f3) {
 
 		\Template\FooForms::init();
 
@@ -30,12 +40,9 @@ class FooForms {
 			'sa'=>'saturday',
 			'su'=>'sunday'
 		));
-
+		$f3->UI = $this->repoPath.'ui/';
 		echo \Template::instance()->render('templates/fooforms.html');
 
 	}
 
-	function post($f3) {
-		$this->get($f3);
-	}
 } 

@@ -107,8 +107,8 @@ abstract class TagHandler extends \Prefab {
 	/**
 	 * export resolved attribute values for further processing
 	 * samples:
-	 * value 			=> ['value']
-	 * {{@foo}} 		=> [$foo]
+	 * value			=> ['value']
+	 * {{@foo}}			=> [$foo]
 	 * value-{{@foo}}	=> ['value-'.$foo]
 	 * foo[bar][]		=> ['foo']['bar'][]
 	 * foo[{{@bar}}][]	=> ['foo'][$bar][]
