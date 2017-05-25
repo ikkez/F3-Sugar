@@ -21,9 +21,11 @@ class Pagination {
     private $range = 2;
     private $current_page;
     private $template = 'pagebrowser.html';
+    private $anchor = '';
     private $routeKey;
     private $routeKeyPrefix;
     private $linkPath;
+    private $displayed_count;
     private $fw;
 
     const
@@ -49,6 +51,14 @@ class Pagination {
         if(is_numeric($limit))
             $this->items_per_page = $limit;
         $this->setCurrent( self::findCurrentPage($this->routeKey));
+    }
+
+    /**
+     * set anchor to jump to specific location
+     * @param string $anchor
+     */
+    public function setAnchor($anchor) {
+        $this->anchor = $anchor;
     }
 
     /**
@@ -96,6 +106,14 @@ class Pagination {
     }
 
     /**
+     * set the number of items, that are currently selected for displaying
+     * @param $count int|array
+     */
+    public function setDisplayedCount($count) {
+        $this->displayed_count = is_array($count)?count($count):$count;
+    }
+
+    /**
      * set path to current routing for link building
      * @param $linkPath
      */
@@ -116,6 +134,14 @@ class Pagination {
     }
 
     /**
+     * returns the anchor name
+     * @return string
+     */
+    public function getAnchor() {
+        return $this->anchor;
+    }
+
+    /**
      * returns the current page number
      * @return int
      */
@@ -129,6 +155,22 @@ class Pagination {
      */
     public function getItemCount() {
         return $this->items_count;
+    }
+
+    /**
+     * returns the count of displayed items
+     * @return int
+     */
+    public function getDisplayedCount() {
+        return $this->displayed_count;
+    }
+
+    /**
+     * returns the configured limit
+     * @return int
+     */
+    public function getLimit() {
+        return $this->items_per_page;
     }
 
     /**
@@ -224,6 +266,10 @@ class Pagination {
         $this->fw->set('pg.lastPage',$this->getLast());
         $this->fw->set('pg.rangePages',$this->getInRange());
         $this->fw->set('pg.allPages',$this->getMax());
+        $this->fw->set('pg.limit',$this->getLimit());
+        $this->fw->set('pg.displayed',$this->getDisplayedCount());
+        $this->fw->set('pg.total',$this->getItemCount());
+        $this->fw->set('pg.anchor',$this->getAnchor());
         $output = \Template::instance()->render($this->template);
         $this->fw->clear('pg');
         return $output;
@@ -245,8 +291,12 @@ class Pagination {
             $pn_code .= '$pn->setLimit('.$attr['limit'].');';
         if(array_key_exists('range',$attr))
             $pn_code .= '$pn->setRange('.$attr['range'].');';
+        if(array_key_exists('displayed',$attr))
+            $pn_code .= '$pn->setDisplayedCount('.$attr['displayed'].');';
         if(array_key_exists('src',$attr))
             $pn_code .= '$pn->setTemplate("'.$attr['src'].'");';
+        if(array_key_exists('anchor',$attr))
+            $pn_code .= '$pn->setAnchor("'.$attr['anchor'].'");';
         if(array_key_exists('token',$attr))
             $pn_code .= '$pn->setRouteKey("'.$attr['token'].'");';
         if(array_key_exists('link-path',$attr))
