@@ -27,3 +27,6 @@
 [submodule "Events"]
 	path = Events
 	url = https://github.com/ikkez/f3-events.git
+[submodule "Pagination"]
+	path = Pagination
+	url = https://github.com/ikkez/f3-pagination.git
