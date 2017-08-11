@@ -30,3 +30,6 @@
 [submodule "Pagination"]
 	path = Pagination
 	url = https://github.com/ikkez/f3-pagination.git
+[submodule "Sheet"]
+	path = Sheet
+	url = https://github.com/ikkez/f3-sheet.git
