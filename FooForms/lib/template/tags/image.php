@@ -93,7 +93,7 @@ class Image extends \Template\TagHandler {
 				$opt['height'] = round(($opt['width']/$ow)*$oh);
 			$imgObj->resize((int)$opt['width'], (int)$opt['height'], $opt['crop'], $opt['enlarge']);
 			// TODO: file ext
-			$file_data = $imgObj->dump('jpeg', null, $opt['quality']);
+			$file_data = $imgObj->dump('jpeg', $opt['quality']);
 			$f3->write($dst_path.$new_file_name, $file_data);
 		}
 		return $dst_path.$new_file_name;
