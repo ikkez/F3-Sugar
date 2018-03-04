@@ -38,7 +38,9 @@ class Textarea extends \Template\TagHandler {
 
 		if (isset($attr['name'])) {
 			$name = $this->attrExport($attr['name']);
-			$content = $this->tmpl->build('{{ isset(@'.$srcKey.$name.')?@'.$srcKey.$name.':"'.$content.'"}}');
+
+			if ($content=="")
+				$content = $this->tmpl->build('{{ isset(@'.$srcKey.$name.')?@'.$srcKey.$name.':\'\'}}');
 		}
 
 		// resolve all other / unhandled tag attributes
