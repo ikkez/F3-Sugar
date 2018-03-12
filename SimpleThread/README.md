@@ -26,9 +26,9 @@ Now run the task with one or more workers:
 ````php
 $f3->route('GET /test-async', function(\Base $f3) {
 	$workers = [];
-	$workers[] = SimpleThread::instance()->run('foo');
-	$workers[] = SimpleThread::instance()->run('foo', ['name' => 'bar']);
-	$workers[] = SimpleThread::instance()->run('foo', ['name' => 'narf']);
+	$workers[] = SimpleThread::instance()->run('log');
+	$workers[] = SimpleThread::instance()->run('log', ['name' => 'bar']);
+	$workers[] = SimpleThread::instance()->run('log', ['name' => 'narf']);
 	$f3->set('SESSION.workers',$workers);
 	echo "New workers spawned: ".var_export($workers,true);
 });
@@ -69,9 +69,9 @@ Resulting in
 
 ```php
 Your workers are active: array ( 
-	0 => array ( 'name' => 'foo', 'state' => 2, ), 
-	1 => array ( 'name' => 'foo', 'state' => 2, ), 
-	2 => array ( 'name' => 'foo', 'state' => 2, ),
+	0 => array ( 'name' => 'log', 'state' => 2, ), 
+	1 => array ( 'name' => 'log', 'state' => 2, ), 
+	2 => array ( 'name' => 'log', 'state' => 2, ),
 )
 ```
 
