@@ -33,3 +33,6 @@
 [submodule "Sheet"]
 	path = Sheet
 	url = https://github.com/ikkez/f3-sheet.git
+[submodule "TemplateDirectives"]
+	path = TemplateDirectives
+	url = https://github.com/ikkez/f3-template-directives.git
